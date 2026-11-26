@@ -1,4 +1,5 @@
 "use client";
+import {ChargingLink} from "@/components/ChargingLink";
 import { filedScreenLabel } from "@/lib/charging/summary";
 import { useSearchParams } from "next/navigation";
 import { reviewLink, reviewReturn, setReviewFilter, rememberReviewPosition, restoreReviewPosition } from "@/lib/reviewNavigation";
@@ -86,7 +87,7 @@ function SelectionList() {
         {r.financeVisible && <p>Workbook base savings: {r.amount === null ? "Unmodeled" : (r.amount*100).toFixed(1)+"%"}</p>}
         {r.charging && <div className="charging-preview"><strong>Charging · {r.charging.stale?"Refresh saved case":r.charging.result.decision}</strong>
           <p>{r.charging.name} · {r.charging.result.siteCost==null?"Cost pending":"$"+r.charging.result.siteCost.toFixed(2)+"/charge"}</p><small>{r.charging.result.next}</small>{!r.charging.selected && <p>{filedScreenLabel(r.charging.screen)}</p>}
-          <a className="text-link" href={"/charging?site="+encodeURIComponent(r.id)}>Open charging case</a></div>}
+          <ChargingLink site={r.id} revision={r.charging.selected}/></div>}
         {r.research && <SelectionResearch row={r.research}/>}
         {(r.hasRecord || r.mapped) && <a href={reviewLink("/",{site:r.id,city:r.city,funnel:"pipeline",sheet:"full"},origin+"#"+r.id)}>Open site record</a>}
       <p>{r.geometry} · {r.option}</p>

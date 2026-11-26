@@ -1,3 +1,5 @@
+import type { DealProps } from "../types";
+import {networkReference} from "./reference";
 import type { Sql } from "../actions/db";
 import { InputError } from "../actions/text";
 import { calculate, modelVersion, type Inputs, type SavedCase } from "./model";
@@ -14,7 +16,7 @@ export async function activeCases(sql:Sql) {
     JOIN charging_site_case s USING(site_id,case_id,revision)`)).rows;
 }
 export type SaveRequest={id:string; requestId:string; base:number; name:string; inputs:Inputs; sourceRevision:string; select:boolean; expectedSelection:string|null};
-export async function saveCase(sql:Sql,site:string,who:string,d:SaveRequest) {
+export async function saveCase(sql:Sql,site:string,who:string,d:SaveRequest,deal?:DealProps) {
   await sql.exec("BEGIN");
   try {
     await sql.query("SELECT pg_advisory_xact_lock(hashtext($1))",["charging-case:"+site]);
@@ -29,9 +31,21 @@ export async function saveCase(sql:Sql,site:string,who:string,d:SaveRequest) {
         const selected=await sql.query<{key:string}>("SELECT case_id::text || ':' || revision::text AS key FROM charging_site_case WHERE site_id=$1",[site]);
         if((selected.rows[0]?.key??null)!==d.expectedSelection)throw new InputError("The shared site case changed. Reload before selecting another case.",409);
       }
+      // A reviewer identity can travel with a duplicated source, but only after that observation was recorded on this site.
+      const observations=(input:Inputs)=>Object.entries(input.values).flatMap(([name,value])=>{
+        const k=name as keyof Inputs["values"];
+        return [{value,evidence:input.evidence[k]},input.sourceValues?.[k]].filter(o=>o?.evidence?.reviewer && o.evidence.reviewer!==who)
+          .map(o=>JSON.stringify([k,o!.value,o!.evidence!.status,o!.evidence!.source,o!.evidence!.url??"",o!.evidence!.date,o!.evidence!.reviewer]));
+      });
+      const carried=observations(d.inputs);
+      if(carried.length){
+        const recorded=new Set((await caseHistory(sql,site)).flatMap(row=>observations(row.inputs)));
+        if(carried.some(item=>!recorded.has(item)))throw new InputError("The source reviewer does not match a recorded observation.",400);
+      }
+      const result={...calculate(d.inputs),...(deal?{network:networkReference(deal,d.inputs)}:{})};
       await sql.query(`INSERT INTO charging_case_revisions (site_id,case_id,revision,request_id,name,author,model_version,source_revision,inputs,result,selection_intent,expected_selection)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12)`,
-        [site,d.id,d.base+1,d.requestId,d.name,who,modelVersion,d.sourceRevision,JSON.stringify(d.inputs),JSON.stringify(calculate(d.inputs)),d.select,d.expectedSelection]);
+        [site,d.id,d.base+1,d.requestId,d.name,who,modelVersion,d.sourceRevision,JSON.stringify(d.inputs),JSON.stringify(result),d.select,d.expectedSelection]);
       if(d.select)await sql.query(`INSERT INTO charging_site_case VALUES($1,$2,$3) ON CONFLICT(site_id)
         DO UPDATE SET case_id=excluded.case_id,revision=excluded.revision`,[site,d.id,d.base+1]);
     }

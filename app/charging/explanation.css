@@ -1,0 +1,47 @@
+/* A single-site estimate and its separate network reference share the case revision. */
+.charging-page { max-width:900px; }
+.cost-modes { margin-bottom:1rem; }
+.cost-explanation { margin:1rem 0; }
+.cost-reading { display:grid; grid-template-columns:1fr 1fr; background:var(--paper); border:1px solid var(--line); border-radius:14px 14px 0 0; overflow:hidden; }
+.cost-reading>div { display:grid; align-content:start; gap:.3rem; padding:clamp(.8rem,2vw,1.3rem); }
+.cost-reading>div+div { border-left:1px solid var(--line); }
+.cost-reading strong { font:500 clamp(1.8rem,4vw,3rem)/1.08 var(--font-serif),serif; overflow-wrap:anywhere; }
+.cost-reading small,.calc-equation span,.calc-item small,.calc-evidence-row small { color:var(--ink-3); font-size:.8rem; }
+.charging-page .cost-verdict { background:var(--pine,#1e4636); color:#fffdf8; padding:.55rem 1rem; margin:0 0 1rem; border-radius:0 0 12px 12px; }
+.cost-section,.calc-next,.calc-trial { border-top:1px solid var(--line); padding:.8rem 0; }
+.cost-section>summary.disclosure,.calc-group>summary.disclosure,.calc-item>summary.disclosure { display:flex; gap:.6rem; align-items:center; min-height:40px; }
+.cost-section>summary { font-weight:650; font-size:1.03rem; }
+.cost-section>summary b,.calc-item>summary b { margin-left:auto; }
+.calc-equation { display:flex; align-items:center; gap:clamp(.3rem,2vw,1.4rem); padding:.8rem; margin-block:.4rem; background:var(--cream,#f5f1e9); border-radius:8px; }
+.calc-equation div,.calc-evidence-row span { display:grid; min-width:0; }
+.calc-equation b,.calc-row b,.calc-item b { font-variant-numeric:tabular-nums; }
+.calc-equation i { font-style:normal; color:var(--ink-3); }
+.calc-group { margin-left:.5rem; }
+.calc-item,.calc-row,.calc-evidence-row { border-top:1px solid var(--line); }
+.calc-item small,.calc-trial dd small { display:block; }
+.calc-row,.calc-evidence-row { display:flex; gap:.6rem; justify-content:space-between; padding:.45rem .3rem; }
+.calc-total { font-weight:650; }
+.calc-evidence-row.action { width:100%; text-align:left; justify-content:space-between; }
+.calc-inputs { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem .8rem; padding:.3rem .4rem .6rem; }
+.calc-next h3 { font:500 1.15rem/1.4 var(--font-serif),serif; margin:.25rem 0; }
+.calc-trial { padding:.9rem; background:var(--cream,#f5f1e9); border-radius:10px; overflow-wrap:anywhere; }
+.calc-trial form { display:flex; flex-wrap:wrap; align-items:end; gap:.6rem; margin:.7rem 0; }
+.calc-observation { margin-top:.8rem; padding-left:.8rem; border-left:2px solid var(--pine,#1e4636); }
+.charging-editor .calc-trial .charging-metrics { grid-template-columns:repeat(3,minmax(0,1fr)); }
+@media(max-width:700px){
+  .charging-page { max-width:none; min-height:100dvh; }
+  .cost-explanation summary.disclosure,.calc-inputs .text-link,.calc-evidence-row { min-height:44px; }
+  .calc-inputs .text-link { display:inline-flex; align-items:center; text-align:left; }
+  .charging-editor .calc-trial .charging-metrics>div:last-child { grid-column:auto; }
+}
+.calc-trial select,.calc-trial input,.calc-trial label,.calc-trial form { min-width:0; max-width:100%; }
+.calc-trial select { width:100%; text-overflow:ellipsis; }
+.charging-page .cost-verdict[data-state=pending] { background:#e9e4da; color:var(--ink); }
+.charging-page .cost-verdict[data-state=above] { background:#f4e7d2; color:#654113; }
+.calc-next { border:0; border-left:3px solid #bc9a61; margin:.7rem 0 1rem; padding:.2rem .8rem; }
+.calc-item .calc-bar { margin-left:auto; width:clamp(25px,10%,85px); height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+.calc-bar i { display:block; height:100%; background:#557460; }
+.calc-bar i.offset { background:#9c7b49; }
+.calc-bar+b { min-width:6.5rem; margin-left:0 !important; text-align:right; }
+.cost-evidence-link.text-link { display:block; max-width:100%; text-align:left; font-size:.84rem; min-height:36px; }
+@media(max-width:700px){ .cost-evidence-link.text-link { min-height:44px; } }

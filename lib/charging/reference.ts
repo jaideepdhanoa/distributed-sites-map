@@ -12,9 +12,17 @@ export function networkReference(d:DealProps,c:Inputs) {
      v.ownWeek+v.hostWeek!==24 || v.ownEnd+v.hostEnd!==24 || (hours>0 && v.hostFee==null))return null;
   const sites=Math.ceil(a.demand/v.stalls);
   const labor=(ref.hostHours-hours)/24*ref.attendant*Math.ceil(v.stalls/ref.perPost)+hours*365*(v.hostFee??0);
-  const delta=(v.ask-row.quote)*(1+a.closing)*a.capital*a.horizon + labor*ref.escalation +
-    v.conversion*(a.capital*a.horizon+ref.tax*ref.escalation)+v.loss*a.horizon;
-  return {cost:(a.hub*(1-filed.base)+sites*delta)/ref.charges,depot:a.hub/ref.charges,sites};
+  const filedCost=a.hub*(1-filed.base);
+  const adjustments=[
+    {label:"Change to purchase price",value:(v.ask-row.quote)*(1+a.closing)*a.capital*a.horizon},
+    {label:"Change to paid staffing",value:labor*ref.escalation},
+    {label:"Additional conversion works",value:v.conversion*(a.capital*a.horizon+ref.tax*ref.escalation)},
+    {label:"Displaced operating margin",value:v.loss*a.horizon}
+  ];
+  const delta=adjustments.reduce((total,line)=>total+line.value,0);
+  const lines=[{label:"Filed network cost",value:filedCost/ref.charges},
+    ...adjustments.map(line=>({label:line.label,value:sites*line.value/ref.charges!}))];
+  return {cost:(filedCost+sites*delta)/ref.charges,depot:a.hub/ref.charges,sites,lines,hostHours:ref.hostHours};
 }
 
 // Re-price the filed layout sensitivities with paid Moove coverage, leaving the

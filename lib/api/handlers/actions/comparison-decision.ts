@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   if (!body || typeof body.view !== "string" || !request.headers.get("Idempotency-Key")) return jsonError("Invalid decision or save reference.", 400);
   const draft = body.decision?.citations;
   const verifyFigure = (c:CitedFigure) => isStatementMeasure(c?.measure) ||
-    ["on_site_service","frontage_hosting","business_price","business_multiple","asking_multiple","hub_savings"].includes(c?.measure) ||
+    ["purchase_case","on_site_service","frontage_hosting","business_price","business_multiple","asking_multiple","hub_savings"].includes(c?.measure) ||
     (Boolean(c?.source) && ["cash_flow","revenue","ebitda"].includes(c?.measure));
   const hasFiguresToVerify = Array.isArray(draft) && draft.some(verifyFigure);
   if (hasFiguresToVerify && draft.length > 6) return jsonError("Cite one to six figures.",400);
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
         await catalog.prepareStatements(tx,draft);
         for (const c of draft.filter(verifyFigure)) {
           const live = catalog.figure(c);
-          const wrongPeriod = isStatementMeasure(c.measure) && (!live || !("anchor" in live) || !c.anchor || c.anchor !== live.anchor || c.value === "—");
+          const wrongPeriod = (isStatementMeasure(c.measure) || c.measure==="purchase_case") && (!live || !("anchor" in live) || !c.anchor || c.anchor !== live.anchor || c.value === "—");
           const fallback = ["cash_flow","revenue","ebitda"].includes(c.measure) ? "Deal record" : "";
           if (!live || wrongPeriod || (c.source || "") !== (live.source || fallback) || evidenceChanged(c,live))
             throw new InputError("The cited figure changed. Reload the comparison.",409);

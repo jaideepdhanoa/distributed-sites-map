@@ -4434,6 +4434,29 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .space-review-results p { font-size:.9rem; margin:3px 0; }
 @media(max-width:600px){.space-review-results li { grid-template-columns:1fr; gap:8px; }}
 
+.purchase-review { display: grid; gap: .85rem; padding: 1rem; color: var(--ink); background: #fffdf8; border: 1px solid #d6cebe; border-radius: 14px; }
+.purchase-review h3, .purchase-review h4, .purchase-review p, .purchase-ledger { margin: 0; }
+.purchase-review h3 { font-size: 1.32rem; line-height: 1.2; }
+.purchase-review h4 { margin-top: .5rem; font-size: 1rem; }
+.purchase-basis, .purchase-review small { color: #536158; }
+.purchase-lead { display: grid; gap: 4px; padding: .95rem; border-radius: 10px; background: #e9f0e7; color: #1e4636; }
+.purchase-lead strong { font: 2.45rem/1.14 Georgia, serif; font-variant-numeric: tabular-nums; }
+.purchase-check { background: #f6efdc; border-left: 3px solid #9a783a; padding: .7rem .85rem; border-radius: 4px; }
+.purchase-check p { margin-top: .25rem; font-size: .87rem; line-height: 1.4; }
+.purchase-ledger > div { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(0,1fr); gap: .6rem; padding: .4rem 0; border-bottom: 1px solid #e6e1d8; }
+.purchase-ledger dt { color: #58574f; }
+.purchase-ledger dd { text-align: right; margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap:anywhere; }
+.purchase-review details > label { display: grid; gap: .25rem; margin-top: .55rem; }
+.purchase-review details > p { margin: .55rem 0; }
+.purchase-review details > summary { padding: .5rem 0; }
+.purchase-actions { display: flex; flex-wrap: wrap; gap: .65rem; }
+.purchase-review .segmented { justify-self: start; }
+@media (max-width: 767px) { .purchase-review { padding:.8rem; } .purchase-review .text-link, .purchase-review summary, .purchase-review .secondary, .purchase-review .field { min-height:44px; } }
+.financial-portfolio { padding: .6rem; border: 1px solid #d6cebe; background:#fffdf8; border-radius:10px; }
+.financial-portfolio ul { list-style:none; padding:0; max-height:32vh; overflow:auto; }
+.financial-portfolio li { display:grid; justify-items:start; gap:3px; padding:.45rem 0; border-top:1px solid #e6e1d8; }
+.finance-filters { display:flex; gap:.5rem; flex-wrap:wrap; align-items:end; }
+.finance-filters label { display:grid; gap:2px; font-size:.8rem; }
 /* A selected space owns the map canvas. The inspector leaves the footprint in view. */
 .space-map-launch.tool { position:absolute; left:14px; bottom:48px; z-index:4; display:inline-flex; align-items:center; gap:7px; background:#fffdf5; }
 .shell:has(.space-map-open) > :not(.map-stage) { display:none; }
@@ -4519,6 +4542,14 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   .space-map-launch.tool { left:8px; top:calc(var(--bar-h, 138px) + 8px); bottom:auto; min-height:44px; }
 }
 
+.purchase-funding {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;border-block:1px solid #d6cebe;padding:12px 0;}
+.purchase-funding div {display:grid;gap:3px;}
+.purchase-funding span,.purchase-funding p {font-size:.78rem;}
+.purchase-funding b {font-size:1.2rem;font-variant-numeric:tabular-nums;}
+.purchase-funding p {grid-column:1/-1;margin:0;}
+.purchase-meter {display:block;border-radius:4px;height:6px;background:#ded9cf;overflow:hidden;margin-bottom:6px;}
+.purchase-meter i {display:block;height:100%;background:#356456;}
+.purchase-summary {display:grid;gap:12px;}
 /* Market context shares the shortlist and map camera with Nearby sites. */
 .market-layer-tools { display: flex; align-items: center; gap: 6px; }
 .market-panel { width: min(362px, calc(100vw - 24px)); max-height: 57vh; overflow: auto; box-sizing: border-box; border: 1px solid var(--line-2); border-radius: 15px; background: var(--paper-card,#fffdf8); color: var(--ink); box-shadow: var(--shadow-1); padding: 12px 14px; }

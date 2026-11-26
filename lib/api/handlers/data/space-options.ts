@@ -18,11 +18,11 @@ export async function GET(request: Request) {
   if (!isSession(session)) return session;
   const params = new URL(request.url).searchParams;
   if (params.get("view") === "map") {
-    const deals = await loadMapDeals(session.actionRole);
+    const deals = await loadMapDeals(session.actionRole, false);
     return json(await mapCatalog(deals.features));
   }
   if (params.get("view") === "portfolio") {
-    const deals = await loadMapDeals(session.actionRole);
+    const deals = await loadMapDeals(session.actionRole, false);
     const mapped = deals.features.flatMap(feature => {
       const deal = feature.properties as DealProps;
       if (deal.kind !== "pipeline" || isExcludedSite(deal.deal_id)) return [];

@@ -13,6 +13,7 @@ export type PhoneCard = {
   chips?: ReactNode;
   selected?: boolean;
   check?: ReactNode;
+  secondaryAction?: ReactNode;
   onOpen: () => void;
 };
 
@@ -43,6 +44,7 @@ export function PhoneCards({ rows, commonStage }: { rows: PhoneCard[]; commonSta
                 </span>
               ) : null}
             </button>
+            {row.secondaryAction}
           </li>
         );
       })}

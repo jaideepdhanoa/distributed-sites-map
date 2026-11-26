@@ -14,6 +14,9 @@ import ReviewEvidence, { changeDestination } from "./queue/ReviewEvidence";
 import { previewFitFigure, screeningEvidence } from "@/lib/screeningEvidence";
 import NearbySites from "./NearbySites";
 import type { MapOutline } from "./spaces/SpaceOptions";
+import FinancialPortfolio from "./FinancialPortfolio";
+import { PurchaseScenarios } from "./PurchaseScenarios";
+import { purchaseLabels, financialEvidence } from "@/lib/purchaseReview";
 import MapSitePreview from "./MapSitePreview";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import { PanelBoundary } from "./PanelBoundary";
@@ -608,7 +611,7 @@ export default function Explorer() {
     const inspectedId = source?.get("site") || id;
     setSelected(inspectedId);
     const panel = marketLabels.some(label=>label===measure) ? "market-context" : measure === "Open evidence gaps" ? "discussion" : numberEvidence[measure] === "open-land" ? "open-land" : numberEvidence[measure] || measure === "Bays that fit" ? "numbers" : null;
-    replaceSearch(comparisonOrigin.current, { site: inspectedId, measure, panel:source?.get("panel") || (["Revenue","Cash flow","EBITDA","Implied business price","Business-only multiple","Savings versus hub","Land estimate","Asking / earnings"].includes(measure) ? "economics" : panel), note:source?.get("note") || null, sheet: "full" }, true);
+    replaceSearch(comparisonOrigin.current, { site: inspectedId, measure, panel:source?.get("panel") || (purchaseLabels.some(l=>l===measure) || measure==="Purchase scenario" ? "purchase" : ["Revenue","Cash flow","EBITDA","Implied business price","Business-only multiple","Savings versus hub","Land estimate","Asking / earnings"].includes(measure) ? "economics" : panel), note:source?.get("note") || null, sheet: "full" }, true);
   }
   function returnComparison() {
     if (comparisonOrigin.current !== null) {
@@ -963,7 +966,7 @@ export default function Explorer() {
   useEffect(() => {
     const apply = () => {
       const panel = params.get("panel");
-      const linked = panel === "finding" || panel === "market-context" || panel === "economics" || panel === "open-land" || panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal" || panel === "financials" || panel === "intel" || panel === "space-options";
+      const linked = panel === "purchase" || panel === "market-context" || panel === "finding" || panel === "economics" || panel === "open-land" || panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal" || panel === "financials" || panel === "intel" || panel === "space-options";
       if (linked && window.matchMedia("(max-width: 767px)").matches) {
         setSheetSnap("full");
         return;
@@ -1456,6 +1459,12 @@ export default function Explorer() {
       cancel = true;
     };
   }, [selected, selectedSiteId, data]);
+
+  function openPurchase(id:string) {
+    if (isProtectedId(id)) return;
+    setPreviewId(null); chooseLayers(false); setSelected(id); setSheetSnap("full");
+    write({site:id,panel:"purchase",sheet:"full"},true);
+  }
 
   function choose(id: string | null) {
     setPreviewId(null);
@@ -2313,7 +2322,7 @@ export default function Explorer() {
   const spaceSqft = recordSpaces.reduce((sum, space) => sum + space.box.lengthFt * space.box.widthFt, 0);
 
   return (
-    <div ref={bindShell} onFocusCapture={event => {
+    <PurchaseScenarios key={me?.u || "signed-out"}><div ref={bindShell} onFocusCapture={event => {
       const target = event.target as HTMLElement;
       const row = target.closest<HTMLElement>("[data-site-row]");
       if (row) lastCell.current = { row: row.dataset.siteRow || "", cell: target.closest<HTMLElement>("[data-col]")?.dataset.col || "" };
@@ -3047,6 +3056,7 @@ export default function Explorer() {
           <PipelineList
             title={shortlistTitle}
             initialSelection={listSelection.current.pipeline.length ? listSelection.current.pipeline : params.has("pipelineLayout") ? compareIds : undefined} onSelection={ids => { listSelection.current.pipeline = ids; }} onScope={rememberScope}
+            onFinancials={openPurchase}
             rows={pipelineRows}
             outsideRow={outsideRow}
             unreadIds={openQueueIds}
@@ -3135,6 +3145,8 @@ export default function Explorer() {
                     <button key={id} type="button" className={`segmented ${pinLabel === id ? "on" : ""}`} title={title} onClick={() => setPinLabel(id)}>{label}</button>
                   ))}
                 </div>
+                {me?.u && <button type="button" className={pinLabel==="financials"?"chip on":"chip"} aria-pressed={pinLabel==="financials"} onClick={()=>setPinLabel(pinLabel==="financials"?"asking":"financials")}>Financial evidence</button>}
+                {me?.u && pinLabel==="financials" && <FinancialPortfolio deals={drawnDeals.filter(f=>f.geometry && (!liveArea || inMapArea(...f.geometry.coordinates,liveArea)) && financialEvidence(f.properties)!=="Not applicable").map(f=>f.properties)} open={openPurchase}/>}
                 <p className="eyebrow">On the map</p>
                 {funnel === "universe" ? (
                   <label className="layer-row" title={LAYER_TITLES.pipeline}>
@@ -3412,6 +3424,6 @@ export default function Explorer() {
         <div ref={ringNoteRef} className="map-tip-fixed" data-hidden="1">{LAYER_TITLES.rings}</div>,
         document.body,
       ) : null}
-    </div>
+    </div></PurchaseScenarios>
   );
 }

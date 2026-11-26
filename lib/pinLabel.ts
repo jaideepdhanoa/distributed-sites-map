@@ -10,7 +10,7 @@ export const PIN_LABEL_VERSION = "2";
 
 export const PIN_LABEL_VERSION_KEY = "pin-label-version";
 
-const CHOICES = new Set<PinLabel>(["none", "asking", "acres", "peracre"]);
+const CHOICES = new Set<PinLabel>(["none", "asking", "acres", "peracre", "financials"]);
 
 export function isPinLabel(value: string | null | undefined): value is PinLabel {
   return CHOICES.has(value as PinLabel);

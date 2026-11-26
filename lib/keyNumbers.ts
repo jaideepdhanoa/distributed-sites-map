@@ -1,3 +1,4 @@
+import { financialEvidence } from "./purchaseReview.ts";
 import { basisBadge } from "./pricing.ts";
 import { explicitMw, lineVolts, phaseKind, serviceAmps } from "./score/power-rating.ts";
 import { packageOnFile } from "./pnl/package.ts";
@@ -142,7 +143,7 @@ export const COLUMN_MINIMUMS: Record<string, number> = {
 };
 
 export type PipelineColumnId = (typeof PIPELINE_COLUMNS)[number]["id"];
-export type PinLabel = "none" | "asking" | "acres" | "peracre";
+export type PinLabel = "financials" | "none" | "asking" | "acres" | "peracre";
 
 export type RangeFilter = {
   askMin: number | null;
@@ -161,7 +162,7 @@ const RANGE_KEYS = ["amin", "amax", "cmin", "cmax", "pmin", "pmax", "omin", "oma
 export function publicDeal<T extends Record<string, unknown>>(props: T): T {
   const copy = { ...props };
   for (const key of Object.keys(copy)) {
-    if (key === "site_capacity" || key === "photos" || key.startsWith("cap_")) delete copy[key];
+    if (key === "statementCoverage" || key === "purchase" || key === "site_capacity" || key === "photos" || key.startsWith("cap_")) delete copy[key];
     if (key === "stated_revenue" || key === "stated_revenue_display" || key === "stated_cash_flow" || key === "stated_cash_flow_display") delete copy[key];
     if (key === "county_value" || key === "county_value_display" || key === "land_estimate" || key === "land_estimate_display") delete copy[key];
     if (key === "business_value" || key === "business_value_display" || key.endsWith("_multiple") || key.endsWith("_multiple_display")) delete copy[key];
@@ -502,6 +503,7 @@ export function depotLine(miles?: number | null, hasPin = true) {
 }
 
 export function pillText(deal: DealProps, mode: PinLabel) {
+  if (mode === "financials") return financialEvidence(deal)==="Not applicable" ? "" : financialEvidence(deal);
   if (mode === "asking") return compactMoney(deal.asking_price);
   if (mode === "acres") {
     const acres = deal.land_acres;

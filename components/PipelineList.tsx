@@ -1,5 +1,6 @@
 "use client";
 
+import { FinanceFilters, financeMatch } from "./FinancialPortfolio";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { DealProps } from "@/lib/types";
@@ -240,6 +241,7 @@ export default function PipelineList({
   sort,
   onSort,
   onOpen,
+  onFinancials,
   onShowMap,
   onColumns,
   onResetColumns,
@@ -269,6 +271,7 @@ export default function PipelineList({
   sort: { id: PipelineColumnId; desc: boolean };
   onSort: (id: PipelineColumnId, desc?: boolean) => void;
   onOpen: (id: string) => void;
+  onFinancials?: (id:string)=>void;
   onShowMap: (id: string) => void;
   onColumns: (next: PipelineColumnId[]) => void;
   onResetColumns: () => void;
@@ -342,10 +345,13 @@ export default function PipelineList({
       },
     };
   });
+  const [finEvidence,setFinEvidence]=useState("");
+  const [finCarry,setFinCarry]=useState("");
+  const [financeOpen,setFinanceOpen]=useState(false);
   const ordered = useMemo(() => {
     const scoped = mapArea ? rows.filter((row) => row.point && inMapArea(row.point[0], row.point[1], mapArea)) : rows;
-    return prepareRows(scoped, sheetColumns, activeLayout, visible);
-  }, [activeLayout, mapArea, rows, sheetColumns, visible]);
+    return prepareRows(signedIn && financeOpen ? scoped.filter(r=>financeMatch(r.deal,finEvidence,finCarry)) : scoped, sheetColumns, activeLayout, visible);
+  }, [activeLayout, mapArea, rows, sheetColumns, visible,signedIn,financeOpen,finEvidence,finCarry]);
   const summary = useMemo(() => summaryOf(ordered.map((row) => row.deal)), [ordered]);
   const compMedian = useMemo(() => compMedianOf(ordered.map((row) => row.deal)), [ordered]);
   const marketComps = new Map<string, number>();
@@ -522,6 +528,8 @@ export default function PipelineList({
             </button>
           );
         })}
+        {signedIn && <button className="paper-btn" type="button" aria-expanded={financeOpen} onClick={()=>setFinanceOpen(!financeOpen)}>Filter by financials</button>}
+        {signedIn && financeOpen && <FinanceFilters deals={rows.map(r=>r.deal)} evidence={finEvidence} carry={finCarry} setEvidence={setFinEvidence} setCarry={setFinCarry}/>}
         <ColumnPicker
           resetLabel="Pipeline default"
           onPreset={signedIn ? () => {
@@ -589,6 +597,7 @@ export default function PipelineList({
                   <input className="check" type="checkbox" aria-label={`Select ${row.deal.name || id}, ${displayAddress(row.deal.address) || id}`} checked={pickedSet.has(id)} onChange={() => toggleRow(id)} />
                 </label>
               ),
+              secondaryAction:signedIn && onFinancials && row.deal.kind==="pipeline" && <button type="button" className="text-link" onClick={()=>onFinancials(id)}>Financials</button>,
               onOpen: () => onOpen(id),
             };
           })} />
@@ -666,6 +675,7 @@ export default function PipelineList({
                   {cell(row, "site", signedIn)}
                   {row.noPin ? <span className="no-pin"> No pin</span> : null}
                 </span>
+                {signedIn && onFinancials && row.deal.kind==="pipeline" && <button type="button" className="text-link" onClick={e=>{e.stopPropagation();onFinancials(id);}}>Financials</button>}
                 <span className="site-meta">
                   {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== String(row.deal.name || "").trim() ? (
                     <span className="site-address" title={displayAddress(row.deal.address)}>{displayAddress(row.deal.address)}</span>

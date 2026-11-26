@@ -60,3 +60,25 @@ test("released selection review joins uniquely and serves active rows", async ({
   await page.goto("/selection-review");
   await expect(page.getByText(rows.length+" of "+rows.length+" active sites")).toBeVisible();
 });
+
+test("rank eligible sites by market and allocate a shared peak once", async ({page},info) => {
+  const load={sessions:1200,peak:8,annualFixed:8400,variable:2};
+  const network={pool:"weekday west",annualNeed:1200,peakNeed:8,avoided:12,years:4,rate:0,depot:12,base:load,downside:load,yearOne:25000};
+  const merit={version:"site-merit/1",action:"Advance diligence",next:"Review the funded operating plan.",order:0,checkCost:null,checkDays:null,
+    downsideGap:-3,downsideCeiling:50000,netValue:14400,servedPeak:8,network};
+  const row={id:"PIPE-LAS-9997",city:"LAS",name:"West dispatch site",priority:"Verify a condition",instruction:"Verify the plan.",stage:"2 Financial screen",
+    amount:null,section:"Ranked",mapped:true,financeVisible:true,readiness:"Local case",charging:{name:"Paid shifts",selected:"demo:1",merit,
+      comparator:"local",screen:[],result:{siteCost:9,depot:12,earlyMin:20}}};
+  const peer={...row,id:"PIPE-LAS-9998",name:"West alternative"};
+  const incomplete={...row,id:"PIPE-LAS-9999",name:"Unmeasured bay",charging:{...row.charging,merit:{...merit,action:"Verify a condition",order:1,netValue:null,network:null,next:"Measure bay circulation."}}};
+  await page.route("**/api/data/selection-review",r=>r.fulfill({json:{hasInputs:true,mismatches:0,rows:[peer,incomplete,row]}}));
+  await page.goto("/selection-review?market=LAS");
+  await expect(page.getByText("Measure bay circulation.")).toBeVisible();
+  await page.getByLabel("Order",{exact:true}).selectOption("investment");
+  await expect(page.getByText("1 of 3 active sites")).toBeVisible();
+  await expect(page.getByRole("heading",{name:"West dispatch site"})).toBeVisible();
+  await expect(page.getByText(/LAS #1.*14,400.*8 residual peak charges/)).toBeVisible();
+  expect(await page.locator("main").evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  await mkdir("review-shots",{recursive:true});
+  await page.screenshot({path:"review-shots/"+info.project.name+"-investment-sequence.png",animations:"disabled"});
+});

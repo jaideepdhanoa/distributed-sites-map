@@ -1,8 +1,19 @@
+import { downsideKeys,type DownsideKey } from "./merit";
 import { z } from "zod";
 import { fields,keys,type Key,type Inputs } from "./model";
 const bounds=Object.fromEntries(keys.map(k=>[k,z.number().finite().min(fields[k].min).max(fields[k].max).nullable()])) as Record<Key,z.ZodNullable<z.ZodNumber>>;
 const date=z.union([z.literal(""),z.iso.date()]);
+const amount=z.number().finite().min(0).max(1e10).nullable();
+const ranking=z.strictObject({
+  valuationDate:date.optional(),
+  schedule:z.strictObject({key:z.string().max(120),source:z.string().max(400),
+    flows:z.array(z.strictObject({date,without:amount,withSite:amount})).max(120)}).optional(),
+  source:z.string().max(400),date,needBy:date,pool:z.string().max(120),
+  avoided:amount,annualNeed:amount,peakNeed:amount,checkDays:amount,checkCost:amount,
+  downside:z.strictObject(Object.fromEntries(downsideKeys.map(k=>[k,z.number().finite().min(fields[k].min).max(fields[k].max).optional()])) as Record<DownsideKey,z.ZodOptional<z.ZodNumber>>)
+}).refine(n=>n.downside.stalls==null || Number.isInteger(n.downside.stalls),"Downside stalls must be whole.");
 const inputs=z.strictObject({
+  ranking:ranking.optional(),
   values:z.strictObject(bounds), evidence:z.partialRecord(z.enum(keys as [Key,...Key[]]),z.strictObject({
     status:z.enum(["assumed","quoted","verified"]),source:z.string().max(400),date
   }).refine(e=>e.status==="assumed" || Boolean(e.source.trim() && e.date),"Quoted or verified inputs need a dated source.")),

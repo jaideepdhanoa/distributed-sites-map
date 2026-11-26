@@ -168,12 +168,24 @@ test("national mapped and missing counts reconcile with the shortlist", async ({
 });
 
 
-test("the map key reflects the workspace and enabled layers", async ({ page }) => {
+test("the map key reflects the workspace and enabled layers", async ({ page,baseURL }) => {
+  if(baseURL && ["localhost","127.0.0.1"].includes(new URL(baseURL).hostname)){
+    // Exercise the application overlays locally without a third-party tile service.
+    await page.route("https://tiles.openfreemap.org/styles/positron",route=>route.fulfill({json:{
+      version:8,sources:{},layers:[{id:"background",type:"background",paint:{"background-color":"#f3efe6"}}],
+    }}));
+  }
   await page.goto("/?city=PHX&funnel=pipeline&pstage=desk", { waitUntil: "domcontentloaded" });
   const key = page.getByRole("complementary", { name: "Key" });
   const open = key.getByRole("button", { name: "Map key" });
   await open.click();
-  await expect(key.getByText("Desk screen", { exact: true })).toBeVisible();
+  const response=await page.request.get("/api/data/deals");
+  expect(response.ok()).toBe(true);
+  const data=await response.json();
+  const actions=new Set<string>(data.features.flatMap((f:{properties:{city:string;stage_group:string;charging?:{merit:{action:string}}}})=>
+    f.properties.city==="PHX" && f.properties.stage_group==="desk" && f.properties.charging ? [f.properties.charging.merit.action] : []));
+  if(actions.size)await expect.poll(async()=>(await key.locator("li").allTextContents()).some(label=>actions.has(label.trim()))).toBe(true);
+  else await expect(key.getByText("Desk screen", {exact:true})).toBeVisible();
   await expect(key.getByText("Cleared", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Layers", exact: true }).click();
   const rings = page.getByRole("checkbox", { name: "Depot rings" });

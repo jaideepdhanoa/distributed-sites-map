@@ -5,7 +5,7 @@ import { actionsEnabled, withSql } from "@/lib/actions/db";
 import { createHash } from "node:crypto";
 import { assessedLayouts } from "@/lib/spaces/assessmentLoad";
 import { triage } from "@/lib/spaces/triage";
-import { screenSummary, type Inputs } from "@/lib/selection/screen";
+import { chargingHold,screenSummary, type Inputs } from "@/lib/selection/screen";
 import { readGeneratedOptional } from "@/lib/snapshot/read";
 import { mapCatalog } from "@/lib/spaces/mapCatalogLoad";
 import { selectionResearch } from "@/lib/selection/researchLoad";
@@ -73,7 +73,7 @@ export async function loadMapDeals(role: ActionRole, includePurchase = true) {
     const screening = active && (row || selection?.[d.deal_id]) ? screenSummary(d.city,selection?.[d.deal_id],view,d) : undefined;
     if (!allowed) return {...feature, properties:{...d,screening}};
     const statementCoverage = !captured ? "unavailable" : captured.has(d.deal_id) || captured.has(d.universe_id || "") ? "present" : "empty";
-    const record:DealProps={...d,screening,statementCoverage,selectionResearch:research?.get(d.deal_id),...(inputs && purchase ? {purchase:{inputs,assumptions:purchase.assumptions,
+    const record:DealProps={...d,chargingHold:chargingHold(selection?.[d.deal_id]),screening,statementCoverage,selectionResearch:research?.get(d.deal_id),...(inputs && purchase ? {purchase:{inputs,assumptions:purchase.assumptions,
       layout:layouts.get(d.deal_id)}} : {})};
     if(active && ["MIA","PHX","LAS"].includes(d.city) && !selection?.[d.deal_id]?.land) record.charging=summarize(record,sourceRevision(record),saved?.get(d.deal_id));
     return {...feature,properties:record};

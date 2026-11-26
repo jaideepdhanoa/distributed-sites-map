@@ -1,5 +1,6 @@
 "use client";
 
+import { actionColors } from "@/lib/charging/merit";
 import { useEffect, useRef, useState } from "react";
 import { GeoJSONSource, Map, Marker, NavigationControl, setWorkerUrl, type ExpressionSpecification, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -605,7 +606,7 @@ export default function MapView(props: Props) {
             source: "deals",
             minzoom: PIN_SPLIT_ZOOM,
             filter: ["==", ["get", "kind"], "pipeline"],
-            layout: { "icon-image": ["concat", "sq-", ["get", "stage_group"]], "icon-size": 0.9, "icon-allow-overlap": true },
+            layout: { "icon-image": ["case",["has","merit_action"],["concat","merit-",["get","merit_action"]],["concat", "sq-", ["get", "stage_group"]]], "icon-size": 0.9, "icon-allow-overlap": true },
           },
           {
             id: "unscreened",
@@ -927,6 +928,10 @@ export default function MapView(props: Props) {
       held: [29, 78, 137],
     };
     for (const [name, rgb] of Object.entries(pinColors)) icons[`dia-${name}`] = marker("diamond", rgb);
+    for(const [name,hex] of Object.entries(actionColors)){
+      const rgb=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)) as [number,number,number];
+      icons["merit-"+name]=square(rgb);
+    }
     const squares: Record<string, [number, number, number]> = {
       sourced: pinColors.stone,
       desk: pinColors.amber,
@@ -1472,7 +1477,7 @@ export default function MapView(props: Props) {
       }));
       const dealFeatures = props.deals.filter((feature) => feature.geometry).map((feature) => ({
         ...feature,
-        properties: { ...publicDeal(feature.properties), pin_kind: "deal" },
+        properties: { ...publicDeal(feature.properties), ...(feature.properties.charging?.merit ? {merit_action:feature.properties.charging.merit.action} : {}), pin_kind: "deal" },
       }));
       const metric = props.marketMetric;
       (map.getSource("sites") as GeoJSONSource).setData({ type: "FeatureCollection", features: metric ? [] : siteFeatures });

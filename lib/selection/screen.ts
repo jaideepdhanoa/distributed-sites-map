@@ -5,6 +5,13 @@ export type Inputs = {
   hurdle?: number | null; operating?: boolean; outside?: boolean; section: string; screen: number | null; recorded: number | null;
 };
 
+export function chargingHold(input:Inputs|undefined) {
+  if(input?.unavailable)return "Verify current seller availability before further underwriting.";
+  if(input?.control)return "Resolve the tenant lease and operating rights for this footprint.";
+  if(input?.outside)return "Verify a service-area exception for this parcel.";
+  if(input?.operating===false)return "Verify a continuing operating business and the offered assets.";
+}
+
 export type SelectionRow = {
   id: string; name: string; city: string; mapped: boolean; stage: string; mirrorStage: string;
   priority: string; instruction: string; geometry: string; section: string; amount: number | null;

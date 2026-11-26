@@ -57,7 +57,8 @@ export const PIPELINE_COLUMNS = [
   { id: "chip_zoning", label: "Zoning check", optional: true },
   { id: "chip_title", label: "Title check", optional: true },
   { id: "chip_environmental", label: "Environmental check", optional: true },
-  { id: "score", label: "Score" },
+  { id: "merit", label: "Site action" },
+  { id: "score", label: "Historical score", optional: true },
   { id: "asking", label: "Asking · source" },
   { id: "acres", label: "Acres", optional: true },
   { id: "perAcre", label: "Per acre", optional: true },
@@ -161,7 +162,7 @@ const RANGE_KEYS = ["amin", "amax", "cmin", "cmax", "pmin", "pmax", "omin", "oma
 export function publicDeal<T extends Record<string, unknown>>(props: T): T {
   const copy = { ...props };
   for (const key of Object.keys(copy)) {
-    if (key === "statementCoverage" || key === "purchase" || key === "site_capacity" || key === "photos" || key.startsWith("cap_")) delete copy[key];
+    if (key === "charging" || key === "selectionResearch" || key === "statementCoverage" || key === "purchase" || key === "site_capacity" || key === "photos" || key.startsWith("cap_")) delete copy[key];
     if (key === "stated_revenue" || key === "stated_revenue_display" || key === "stated_cash_flow" || key === "stated_cash_flow_display") delete copy[key];
     if (key === "county_value" || key === "county_value_display" || key === "land_estimate" || key === "land_estimate_display") delete copy[key];
     if (key === "business_value" || key === "business_value_display" || key.endsWith("_multiple") || key.endsWith("_multiple_display")) delete copy[key];

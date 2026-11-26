@@ -30,6 +30,7 @@ export const fields = {
 export type Key = keyof typeof fields;
 export type Evidence = {status:"assumed"|"quoted"|"verified"; source:string; date:string};
 export type Inputs = {
+  ranking?: import("./merit").RankingInputs;
   values:Record<Key,number|null>; evidence:Partial<Record<Key,Evidence>>;
   layout:string; rights:"unknown"|"controlled"|"unavailable"; rightsSource:string; rightsDate:string;
   comparable:boolean; sensitivityPct:number; terms:"purchase"|"lease"; comparator:"workbook"|"local"; energyScope:"excluded"|"included";

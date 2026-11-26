@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { mkdir, readFile } from "node:fs/promises";
 import { example } from "../tests/fixtures/purchase-review";
+import { emptyRanking,siteMerit } from "../lib/charging/merit";
+import { calculate,initialCase } from "../lib/charging/model";
 import { isExcludedSite } from "../lib/alerts/excluded";
 import type { DealProps } from "../lib/types";
 
@@ -74,10 +76,22 @@ test("compare an adjusted purchase against a common baseline and restore the sel
   expect(records).toHaveLength(2);
   for (const [i,record] of records.entries()) Object.assign(record.properties,{name:"Example business "+(i+1),
     financials_open:true,figures_status:"shown",purchase:example,stage_group:"desk",selectionResearch:undefined});
+  for(const record of records){
+    const d=record.properties as DealProps,c=initialCase(d);
+    const load={sessions:1000,peak:4,annualFixed:5000,variable:1};
+    const network={pool:"Example overlap",annualNeed:1000,peakNeed:4,avoided:10,years:5,rate:0,depot:10,base:load,downside:load,yearOne:30000};
+    c.ranking={...emptyRanking};
+    d.city="LAS";
+    d.charging={merit:{...siteMerit(d,c,false,false,false),action:"Advance diligence",netValue:20000,servedPeak:4,network},
+      term:"purchase",comparator:"local",name:"Illustrative layout",sourceRevision:"example",selected:"example:1",stale:false,screen:[],screenDepot:null,result:calculate(c)};
+  }
   await page.route("**/api/data/deals",r=>r.fulfill({json:{...data,features:records}}));
   const ids=records.map((record:{properties:DealProps})=>record.properties.deal_id);
   await page.goto("/?"+new URLSearchParams({funnel:"pipeline",city:"all",view:"list",compare:ids.join("|")}));
   const tray=page.getByTestId("compare-tray");
+  const margins=tray.locator('[data-compare-row="Marginal value in comparison"]');
+  await expect(margins).toContainText("$20,000");
+  await expect(margins).toContainText("Shared demand already served");
   const row=tray.locator('[data-compare-row="Retained annual cash"]');
   await row.getByRole("button").first().click();
   const panel=page.getByTestId("purchase-review");

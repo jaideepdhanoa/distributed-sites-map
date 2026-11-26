@@ -15,6 +15,8 @@ import { csvCell } from "@/lib/actions/text";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { displayAddress } from "@/lib/format";
+import { marketSequence,incompatibleMarkets } from "@/lib/charging/merit";
+import { amounts } from "@/lib/charging/model";
 import { acquisitionCriteria, compareSections, comparisonMeasures, dealRows, siteRows, MISSING } from "@/lib/comparison";
 
 export default function CompareTray({
@@ -94,6 +96,17 @@ export default function CompareTray({
   function statementFor(column: typeof columns[number], anchor?:string) {
     const loaded = column.deal && statements.rows[column.deal.deal_id];
     return loaded ? statementFigures(loaded.pnl,Boolean(loaded.pnlDemo),anchor) : [];
+  }
+  const comparedDeals=new Map(columns.flatMap(c=>signedIn && c.deal?.charging ? [[c.deal.deal_id,c.deal] as const] : []));
+  const candidates=[...comparedDeals.values()].map(d=>({id:d.deal_id,city:d.city,merit:d.charging?.merit}));
+  const sequence=marketSequence(candidates), incompatible=incompatibleMarkets(candidates);
+  for(const c of columns){
+    const deal=c.deal;
+    if(!deal || !comparedDeals.has(deal.deal_id))continue;
+    const pick=sequence.get(deal.deal_id);
+    const value=pick ? amounts(pick.value)+" · "+deal.city+" #"+pick.rank+" · "+pick.peak+" peak charges"
+      : incompatible.has(deal.city) ? "Align market valuation basis" : deal.charging?.merit.netValue!=null ? "Shared demand already served" : "Pending evidence";
+    c.rows.push({label:"Marginal value in comparison",value,basis:"Compared sites in this market"});
   }
   const options = new Map<string,CitedFigure>();
   const purchaseFigures:CitedFigure[]=[];

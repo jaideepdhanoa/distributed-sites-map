@@ -2,10 +2,11 @@ import { paidScreen } from "./reference";
 import type { DealProps } from "../types";
 import { amounts,calculate,initialCase,modelVersion,type Result,type SavedCase } from "./model";
 
-export type ChargingSummary = {screen:ReturnType<typeof paidScreen>;name:string;sourceRevision:string;stale:boolean;result:Result;selected:string|null;term:"purchase"|"lease";comparator:"workbook"|"local"};
+export type ChargingSummary = {screen:ReturnType<typeof paidScreen>;screenDepot:number|null;name:string;sourceRevision:string;stale:boolean;result:Result;selected:string|null;term:"purchase"|"lease";comparator:"workbook"|"local"};
 export function summarize(deal:DealProps,sourceRevision:string,active?:SavedCase):ChargingSummary {
   const inputs=active?.inputs ?? initialCase(deal);
-  return {screen:paidScreen(deal),name:active?.name??"Moove staffed · planning",sourceRevision,selected:active?active.id+":"+active.revision:null,
+  const a=deal.purchase?.assumptions;
+  return {screen:paidScreen(deal),screenDepot:a?.hub && a.charging?.charges?a.hub/a.charging.charges:null,name:active?.name??"Moove staffed · planning",sourceRevision,selected:active?active.id+":"+active.revision:null,
     stale:!!active && (active.sourceRevision!==sourceRevision || active.model!==modelVersion),result:active?.result??calculate(inputs),term:inputs.terms,comparator:inputs.comparator};
 }
 export function filedScreenLabel(screen:ReturnType<typeof paidScreen>) {

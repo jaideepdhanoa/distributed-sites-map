@@ -47,7 +47,7 @@ test("reference matches the filed network and independently prices host labor an
 });
 test("saved history reopens exactly, rejects stale revisions and retains the selected case",async()=>{
   const sql=await memorySql();await migrate(sql);
-  const input={id:randomUUID(),requestId:randomUUID(),base:0,name:"Paid coverage",inputs:example(),sourceRevision:"aaaaaaaaaaaaaaaa",select:true,expectedSelection:null};
+  const input={id:randomUUID(),requestId:randomUUID(),base:0,name:"Paid coverage",inputs:example(),sourceRevision:"aaaaaaaaaaaaaaaaaaaaaaaa",select:true,expectedSelection:null};
   const site="PIPE-PHX-9998";
   assert.ok(validateInputs(input.inputs).success);
   let rows=await saveCase(sql,site,"reviewer",input);assert.equal(rows.length,1);assert.equal(rows[0].selected,true);

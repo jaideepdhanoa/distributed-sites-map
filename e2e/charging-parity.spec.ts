@@ -5,7 +5,7 @@ import type {SelectionRow} from "../lib/selection/screen";
 
 test("edit, save, reopen and compare a charging case",async({page},info)=>{
   const site={deal_id:"PIPE-PHX-9998",name:"Example wash and service",asking_price:500000,bays_that_fit:6};
-  const source="aaaaaaaaaaaaaaaa", inputs=initialCase(site);
+  const source="aaaaaaaaaaaaaaaaaaaaaaaa", inputs=initialCase(site);
   Object.assign(inputs.values,{stalls:6,supply:500,load:100,charger:75,dwell:35,energy:42,efficiency:90,uptime:95,
     demand:5,peak:6,peakCover:6,shortfall:55,posts:1,wage:24,build:600000,upgrade:80000,cash:50000,fixed:25000,
     tax:1,rate:10,closing:2,years:10,depot:12});
@@ -44,7 +44,7 @@ test("edit, save, reopen and compare a charging case",async({page},info)=>{
   await page.getByLabel("Compare with").selectOption({label:"Paid coverage · v1"});
   await expect(metric).toContainText("Compared");
   await expect(page.getByLabel("Host coverage hours per weekday",{exact:true})).toHaveValue("5");
-  latest="bbbbbbbbbbbbbbbb";await page.reload();
+  latest="bbbbbbbbbbbbbbbbbbbbbbbb";await page.reload();
   await expect(editor).toContainText("Site evidence or model changed");
   await expect(page.getByRole("button",{name:"Save case",exact:true})).toBeDisabled();
   expect(await editor.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);

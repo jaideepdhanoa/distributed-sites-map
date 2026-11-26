@@ -14,5 +14,5 @@ const inputs=z.strictObject({
 .refine(c=>c.rights==="unknown" || Boolean(c.rightsSource.trim() && c.rightsDate),"Add a dated source for the rights evidence.")
 .refine(c=>c.values.stalls===null || Number.isInteger(c.values.stalls),"Stalls must be a whole number.");
 export const saveSchema=z.strictObject({id:z.uuid(),requestId:z.uuid(),base:z.number().int().nonnegative(),name:z.string().trim().min(1).max(80),
-  sourceRevision:z.string().regex(/^[a-f0-9]{16}$/), expectedSelection:z.string().max(70).nullable(),select:z.boolean(),inputs});
+  sourceRevision:z.string().regex(/^[a-f0-9]{24}$/), expectedSelection:z.string().max(70).nullable(),select:z.boolean(),inputs});
 export const validateInputs=(v:Inputs)=>inputs.safeParse(v);

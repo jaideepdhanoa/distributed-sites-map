@@ -2,3 +2,12 @@
 .opportunity-review h3, .opportunity-review h4, .opportunity-review p { margin: 0.35rem 0; }
 .opportunity-review details { margin-top: 0.55rem; }
 .opportunity-review summary { cursor: pointer; }
+.visit-decision { margin-block: .6rem; padding: .65rem .8rem; background: var(--paper, #fffdf8); border: 1px solid var(--line, #d6cebe); border-radius: 8px; }
+.visit-decision ul { display: grid; gap: .4rem; padding-inline-start: 1.15rem; margin-block: .4rem; }
+.visit-decision details h4 { margin-top: .85rem; }
+.visit-trial-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: .5rem; }
+.visit-trial-inputs label { display: grid; gap: .2rem; }
+.visit-trial-inputs input { min-width: 0; width: 100%; }
+.visit-decision table { width: 100%; font-variant-numeric: tabular-nums; }
+.visit-decision caption, .visit-decision th { text-align: left; }
+.visit-decision td, .visit-decision th:last-child { text-align: right; }

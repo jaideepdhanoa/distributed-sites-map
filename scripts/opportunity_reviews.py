@@ -13,6 +13,30 @@ def date_text(value):
     return value.strftime("%Y-%m-%d") if isinstance(value, date) else value
 
 
+VISIT_COLUMNS = {
+    "Visit decision": "decision", "Why visit?": "reason", "Seller and economics": "commercial",
+    "Power inquiry": "power", "Before booking": "beforeVisit", "On site": "fieldwork",
+    "Scenario and price": "scenario", "Before an LOI": "beforeLoi", "Scenario basis": "basis",
+}
+
+
+def attach_visit_plans(book, sites):
+    if "Visit decisions" not in book:
+        return
+    rows = iter(book["Visit decisions"].values)
+    if tuple(next(rows, ())) != ("Site ID", *VISIT_COLUMNS):
+        raise ValueError("Check the Visit decisions column headings.")
+    for number, cells in enumerate(rows, 2):
+        if not any(value is not None for value in cells):
+            continue
+        site = sites.get(cells[0])
+        if site is None or "visitPlan" in site:
+            raise ValueError(f"Check the site reference on visit decision row {number}.")
+        if not all(isinstance(value, str) and value.strip() for value in cells[1:]):
+            raise ValueError(f"Complete the visit decision on row {number}.")
+        site["visitPlan"] = dict(zip(VISIT_COLUMNS.values(), cells[1:], strict=True))
+
+
 def build(book, register=None):
     rows = iter(book["Opportunities"].values)
     if tuple(next(rows, ())) != HEADERS:
@@ -36,6 +60,7 @@ def build(book, register=None):
             raise ValueError(f"Duplicate primary opportunity on row {number}.")
     if not sites or any(not row["primary"] for row in sites.values()):
         raise ValueError("Each site needs one primary opportunity.")
+    attach_visit_plans(book, sites)
     return {"version": 1, "register": register, "sites": sites}
 
 

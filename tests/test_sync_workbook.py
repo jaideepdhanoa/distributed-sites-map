@@ -7,6 +7,7 @@ import json
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 import urllib.error
 from pathlib import Path
 
@@ -197,6 +198,25 @@ class SyncFetchTest(unittest.TestCase):
             self.assertEqual(build._load_rewrites("deals"), {})
         finally:
             build._rewrite_paths = original
+
+    def test_pipeline_refresh_preserves_the_separate_opportunity_workbook(self) -> None:
+        listing = Listing(_files([{"id": "review-sheet", "name": "opportunity-reviews", "mimeType": SHEET}]))
+        def fake_get(url, token):
+            if f"/{sync.FILE_ID}?fields=" in url:
+                return b'{"modifiedTime":"2026-01-02"}'
+            return listing.get(url, token)
+        with tempfile.TemporaryDirectory() as tmp, patch.object(sync, "SRC", Path(tmp)), \
+                patch.object(sync, "_get", fake_get), patch.object(sync, "_token", return_value="fake"), \
+                patch.dict(sync.os.environ, {"GOOGLE_SERVICE_ACCOUNT_JSON": "{}"}), \
+                patch("scripts.site_photos.cache_map_images"):
+            stale = Path(tmp, "previous-pipeline.xlsx")
+            stale.write_bytes(b"old")
+            sync.export_workbook()
+            register = Path(tmp, "reviews", "opportunity-reviews.xlsx")
+            self.assertEqual(register.read_bytes(), b"exported")
+            self.assertIn("review-sheet", register.with_suffix(".url").read_text())
+            self.assertFalse(stale.exists())
+            self.assertTrue(Path(tmp, "pipeline_sync.xlsx").is_file())
 
     def test_logs_do_not_name_skipped_files(self) -> None:
         listing = Listing(_files())

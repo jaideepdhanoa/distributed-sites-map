@@ -46,6 +46,11 @@ name: Workbook sync
 # changes on every run. Neon Free allows 1 GB per project, so that day of
 # history stays.
 on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/opportunity_reviews.py
+      - scripts/verify-opportunities.mjs
   # Backup. Vercel Cron dispatches this workflow every 15 minutes.
   # GitHub may run this schedule later than the mark.
   schedule:
@@ -402,7 +407,7 @@ jobs:
           if [ ! -d node_modules/tsx ]; then npm ci; fi
           node --import tsx scripts/verify-selection-evidence.mjs --live
       - name: Verify published opportunity reviews
-        if: always() && !cancelled() && github.ref == 'refs/heads/main' && hashFiles('data/generated/opportunity-reviews.json') != '' && (steps.publish.outputs.published == 'true' || steps.same.outputs.unchanged == 'true' || steps.live.outputs.unchanged == 'true')
+        if: always() && !cancelled() && github.ref == 'refs/heads/main' && (steps.publish.outputs.published == 'true' || steps.same.outputs.unchanged == 'true' || steps.live.outputs.unchanged == 'true')
         env:
           E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}

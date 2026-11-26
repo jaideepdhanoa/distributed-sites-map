@@ -40,13 +40,14 @@ def build(book, register=None):
 
 
 if __name__ == "__main__":
-    source = Path("data/source/opportunity-reviews.xlsx")
-    if source.exists():
-        location = source.with_suffix(".url")
-        with source.open("rb") as f:
-            book = load_workbook(f, read_only=True, data_only=True)
-            try:
-                result = build(book, location.read_text().strip() if location.exists() else None)
-            finally:
-                book.close()
-        Path("data/generated/opportunity-reviews.json").write_text(json.dumps(result, ensure_ascii=False))
+    source = Path("data/source/reviews/opportunity-reviews.xlsx")
+    if not source.is_file():
+        raise SystemExit("The private opportunity register is missing. The previous snapshot is retained.")
+    location = source.with_suffix(".url")
+    with source.open("rb") as f:
+        book = load_workbook(f, read_only=True, data_only=True)
+        try:
+            result = build(book, location.read_text().strip() if location.exists() else None)
+        finally:
+            book.close()
+    Path("data/generated/opportunity-reviews.json").write_text(json.dumps(result, ensure_ascii=False))

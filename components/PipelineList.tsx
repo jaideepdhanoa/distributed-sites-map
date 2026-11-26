@@ -360,7 +360,8 @@ export default function PipelineList({
   const restoreKey = useRef("");
   useEffect(()=>{
     if (ordered.length && restoreKey.current!==origin) {
-      restoreReviewPosition(listScroller());
+      const selection = restoreReviewPosition(listScroller());
+      if (selection) setPicked(selection);
       restoreKey.current=origin;
     }
   },[ordered.length,origin,phone]);
@@ -562,15 +563,15 @@ export default function PipelineList({
           sort={{ id: activeLayout.sort?.id || "site", desc: Boolean(activeLayout.sort?.desc) }}
           onChange={(id, desc) => commit({ ...activeLayout, sort: { id, desc }, touched: true })}
         />
-        {signedIn && <a className="paper-btn only-desktop" onClick={()=>rememberReviewPosition(listScroller())} href={reviewLink("/selection-review",{scope},origin)}>Screen pipeline</a>}
-        {signedIn && <a className="paper-btn only-desktop" onClick={()=>rememberReviewPosition(listScroller())} href={reviewLink("/space-review",{scope},origin)}>Review layouts</a>}
+        {signedIn && <a className="paper-btn only-desktop" onClick={()=>rememberReviewPosition(listScroller(),"",picked)} href={reviewLink("/selection-review",{scope},origin)}>Screen pipeline</a>}
+        {signedIn && <a className="paper-btn only-desktop" onClick={()=>rememberReviewPosition(listScroller(),"",picked)} href={reviewLink("/space-review",{scope},origin)}>Review layouts</a>}
         <button type="button" className="paper-btn only-desktop" onClick={() => download(ordered)}>Export CSV</button>
         <div className="more-wrap only-mobile">
           <button type="button" className="paper-btn" aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More list actions" onClick={() => setMoreOpen((value) => !value)}>More</button>
           {moreOpen ? (
             <div className="menu" role="menu" aria-label="List actions">
-              {signedIn && <a className="menu-item" role="menuitem" onClick={()=>rememberReviewPosition(listScroller())} href={reviewLink("/selection-review",{scope},origin)}>Screen pipeline</a>}
-              {signedIn && <a className="menu-item" role="menuitem" onClick={()=>rememberReviewPosition(listScroller())} href={reviewLink("/space-review",{scope},origin)}>Review layouts</a>}
+              {signedIn && <a className="menu-item" role="menuitem" onClick={()=>rememberReviewPosition(listScroller(),"",picked)} href={reviewLink("/selection-review",{scope},origin)}>Screen pipeline</a>}
+              {signedIn && <a className="menu-item" role="menuitem" onClick={()=>rememberReviewPosition(listScroller(),"",picked)} href={reviewLink("/space-review",{scope},origin)}>Review layouts</a>}
               {<button type="button" className="menu-item" role="menuitem" onClick={() => { toggleAll(); setMoreOpen(false); }}>{allOn ? "Clear selection" : "Select all shown"}</button>}
               <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); download(ordered); }}>Export CSV</button>
               {mapArea ? <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); onClearArea?.(); }}>Clear area</button> : null}

@@ -709,7 +709,7 @@ export default function Detail({
       {signedIn && savedLots}
       {related}
       <PanelSections
-        purchase={signedIn && linkedDeal?.kind==="pipeline" && !site.land_only && <PurchaseReview key={linkedDeal.deal_id} deal={linkedDeal} pnl={pnl}/>}
+        purchase={signedIn && linkedDeal?.kind==="pipeline" && !site.land_only && <PurchaseReview power={power} key={linkedDeal.deal_id} deal={linkedDeal} pnl={pnl}/>}
         market={<MarketEvidence deal={linkedDeal} site={site} inspection={washInspection} expanded />}
         economics={<Economics pnl={pnl} deal={linkedDeal} site={site} signedIn={signedIn} />}
         overview={
@@ -1040,7 +1040,7 @@ export function DealDetail({
       {signedIn && savedLots}
       {related}
       <PanelSections
-        purchase={signedIn && deal.kind==="pipeline" && <PurchaseReview key={deal.deal_id} deal={deal} pnl={pnl}/>}
+        purchase={signedIn && deal.kind==="pipeline" && <PurchaseReview power={power} key={deal.deal_id} deal={deal} pnl={pnl}/>}
         market={<MarketEvidence deal={deal} site={universeSite} inspection={washInspection} expanded />}
         economics={<Economics pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />}
         overview={

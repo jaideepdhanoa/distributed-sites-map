@@ -28,16 +28,16 @@ export function setReviewFilter(key:string,value:string) {
   if (value) url.searchParams.set(key,value);
   else url.searchParams.delete(key);
   url.hash = "";
-  window.history.replaceState(window.history.state,"",url);
+  window.history.replaceState(null,"",url);
   if (url.pathname === "/") rememberSearch(url.pathname + url.search);
 }
 
 const positionKey = (href:string) => "review-position:" + href.split("#")[0];
 
-export function rememberReviewPosition(element:HTMLElement | null, row = "") {
+export function rememberReviewPosition(element:HTMLElement | null, row = "", selected?:string[]) {
   if (!element) return;
   const {pathname,search} = window.location;
-  try { sessionStorage.setItem(positionKey(pathname+search),JSON.stringify({top:element.scrollTop,left:element.scrollLeft,row})); } catch {}
+  try { sessionStorage.setItem(positionKey(pathname+search),JSON.stringify({top:element.scrollTop,left:element.scrollLeft,row,selected})); } catch {}
 }
 
 export function restoreReviewPosition(element:HTMLElement | null) {
@@ -53,7 +53,7 @@ export function restoreReviewPosition(element:HTMLElement | null) {
       row ||= position.row;
       sessionStorage.removeItem(key);
       if (row) document.getElementById(row)?.focus({preventScroll:true});
-      return;
+      return Array.isArray(position.selected) ? position.selected.filter((id:unknown): id is string=>typeof id==="string") as string[] : undefined;
     }
   } catch {}
   const target = row && document.getElementById(row);

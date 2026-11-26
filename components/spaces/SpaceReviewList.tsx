@@ -14,7 +14,7 @@ export default function SpaceReviewList() {
   const origin = "/space-review?" + params;
   const pane = useRef<HTMLElement>(null);
   const back = reviewReturn(params.get("returnTo"), selectedId ? ["/selection-review","/space-review"] : ["/"], selectedId ? "/space-review" : undefined);
-  const scope=params.has("scope") ? new Set(params.get("scope")?.split("|")) : null;
+  const scope=params.has("scope") ? new Map(params.get("scope")?.split("|").map((id,i)=>[id,i])) : null;
   const [rows, setRows] = useState<TriageRow[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [retry, setRetry] = useState(0);
@@ -34,7 +34,7 @@ export default function SpaceReviewList() {
   const query = search.trim().toLowerCase();
   const matches = scoped.filter(row => (!focus || row.focus === focus) && (!layout || row.options.includes(layout)) &&
     (!query || [row.id, row.city, row.name, ...row.kinds].join(" ").toLowerCase().includes(query)))
-    .sort((a,b) => focusOrder.indexOf(a.focus) - focusOrder.indexOf(b.focus) || a.city.localeCompare(b.city) || a.name.localeCompare(b.name));
+    .sort((a,b) => scope ? scope.get(a.id)! - scope.get(b.id)! : focusOrder.indexOf(a.focus) - focusOrder.indexOf(b.focus) || a.city.localeCompare(b.city) || a.name.localeCompare(b.name));
   if (selectedId && status === "ready") {
     const site = rows.find(row => row.id === selectedId);
     return <main ref={pane} className="space-review-page"><a className="text-link" href={back}>← {reviewLabel(back)}</a>

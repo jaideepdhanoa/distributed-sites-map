@@ -317,7 +317,7 @@ test("screen property, street and grid evidence from a selected pin", async ({pa
   await viewSwitch.getByRole("button",{name:"List",exact:true}).click();
   const shortlist = page.getByTestId("pipeline-list");
   await expect(shortlist).toHaveAttribute("data-list-count","1");
-  await expect(shortlist.locator(".site-name-text")).toHaveText("Example service site");
+  await expect(shortlist.locator('[data-site-row="'+id+'"]')).toContainText("Example service site");
   await viewSwitch.getByRole("button",{name:"Map",exact:true}).click();
   const nearby=page.getByRole("complementary",{name:"Nearby sites"});
   const toggle=nearby.getByRole("button",{name:/Nearby sites/});

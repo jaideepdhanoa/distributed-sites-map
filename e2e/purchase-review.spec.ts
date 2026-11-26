@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { example } from "../tests/fixtures/purchase-review";
 import { isExcludedSite } from "../lib/alerts/excluded";
 import type { DealProps } from "../lib/types";
@@ -87,6 +87,12 @@ test("compare an adjusted purchase against a common baseline and restore the sel
   await expect(row).toHaveAttribute("data-state","basis");
   await expect(row).toContainText("$5,000/yr displaced");
   await expect(row).toContainText("$40,000");
+  const downloadPromise = page.waitForEvent("download");
+  await tray.getByRole("button",{name:"Download dated snapshot"}).click();
+  const download = await downloadPromise;
+  const csv = await readFile((await download.path())!,"utf8");
+  const exportedCash = csv.split("\r\n").find(line=>line.includes("Retained annual cash")) || "";
+  expect(exportedCash.includes("$40,000") && exportedCash.includes("$5,000/yr displaced")).toBe(true);
   await row.scrollIntoViewIfNeeded();
   await mkdir("review-shots",{recursive:true});
   await row.screenshot({path:"review-shots/"+info.project.name+"-"+(process.env.MAP_DEPLOYED_PREVIEW?"deployed-":"")+"compared-cases.png"});

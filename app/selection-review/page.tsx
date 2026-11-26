@@ -20,7 +20,7 @@ function SelectionList() {
   const pane=useRef<HTMLElement>(null);
   const back=reviewReturn(params.get("returnTo"),["/"]);
   const origin="/selection-review?" + params;
-  const scope=params.has("scope") ? new Set(params.get("scope")?.split("|")) : null;
+  const scope=params.has("scope") ? new Map(params.get("scope")?.split("|").map((id,i)=>[id,i])) : null;
   useEffect(()=>{if(data) restoreReviewPosition(pane.current);},[data]);
   useEffect(() => {
     const controller = new AbortController();
@@ -33,7 +33,7 @@ function SelectionList() {
   },[attempt]);
   const rows = data?.rows || [];
   const scoped = rows.filter(r => (!scope || scope.has(r.id)) && (!market || r.city === market) && (!check || r.priority === check) &&
-    [r.name,r.city,r.id].join(" ").toLowerCase().includes(query.trim().toLowerCase())).sort((a,b)=>a.city.localeCompare(b.city) || a.name.localeCompare(b.name));
+    [r.name,r.city,r.id].join(" ").toLowerCase().includes(query.trim().toLowerCase())).sort((a,b)=>scope ? scope.get(a.id)! - scope.get(b.id)! : a.city.localeCompare(b.city) || a.name.localeCompare(b.name));
   return <main ref={pane} className="space-review-page">
     <a className="text-link" href={back}>← Pipeline list</a>
     <h1>Selection review</h1><p>Choose the next diligence check. Investment approval requires verified site rights, usable space, power, retained cash flow and network benefit.</p>

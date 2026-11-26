@@ -20,11 +20,11 @@ export const kinds = {
   clear: { option: null, label: "Keep clear", protect: "", check: "" },
 } as const;
 export type Zone = { kind: keyof typeof kinds; label: string; points: Point[]; check?: string };
-export type Aerial = { kind?: "site-plan"; documentUrl?: string; id: string; src: string; source: string; date: string; width: number; height: number; bounds?: Bounds };
+export type Aerial = { kind?: "site-plan" | "site-photo"; metersPerPixel?: number; documentUrl?: string; id: string; src: string; source: string; date: string; width: number; height: number; bounds?: Bounds };
 export type Assessment = {
   status: "reviewed" | "hold" | "needs-image"; summary: string; recorded: number | null;
   baseline: "recorded" | "unconfirmed" | "conflict"; zones: Zone[]; segment: string;
-  cohort: "active" | "off-market" | "dropped"; revision: string; image?: Aerial;
+  cohort: "active" | "off-market" | "dropped"; evidence?: { label:string; url:string; option:Option }[]; revision: string; image?: Aerial;
 };
 
 export function optionZones(row: Assessment, option: Option) {
@@ -60,11 +60,19 @@ export function conversionReturn(investment: number, charging: number, displaced
   return { net, years: net > 0 ? investment / net : null };
 }
 
-/** Only use a registered rectangular outdoor footprint for dimension sensitivity. */
-export function outlineDimensions(zone: Zone | undefined, bounds?: Bounds): [number, number] | null {
-  if (!bounds || !zone || zone.kind === "bay" || zone.kind === "clear" || zone.points.length !== 4) return null;
-  const points = zone.points.map(p => worldPoint(p, bounds)).map(([lng, lat]) => ({ lng, lat }));
-  const edges = points.map((p, i) => geodesicInverse(p, points[(i + 1) % 4]));
+/** A rectangular outdoor footprint needs a map registration or a source scale bar. */
+export function outlineDimensions(zone: Zone | undefined, bounds?: Bounds, image?: Aerial): [number, number] | null {
+  if ((!bounds && !image?.metersPerPixel) || !zone || zone.kind === "bay" || zone.kind === "clear" || zone.points.length !== 4) return null;
+  const edges = zone.points.map((point, i) => {
+    const next = zone.points[(i + 1) % 4];
+    if (bounds) {
+      const [lng, lat] = worldPoint(point, bounds), [nextLng, nextLat] = worldPoint(next, bounds);
+      return geodesicInverse({ lng, lat }, { lng: nextLng, lat: nextLat });
+    }
+    const dx = (next[0] - point[0]) * image!.width / 100;
+    const dy = (next[1] - point[1]) * image!.height / 100;
+    return { meters: Math.hypot(dx,dy) * image!.metersPerPixel!, bearingDeg: Math.atan2(dx,-dy) * 180 / Math.PI };
+  });
   if (edges.some((edge, i) => {
     const difference = Math.abs(((edge.bearingDeg - edges[(i + 1) % 4].bearingDeg + 540) % 360) - 180);
     return Math.abs(difference - 90) > 5;

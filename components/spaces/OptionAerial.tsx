@@ -5,7 +5,7 @@ import { kinds } from "@/lib/spaces/options";
 export default function OptionAerial({ image, zones, active, reviewed = [], onSelect, onPoint }: {
   image: Aerial; zones: Zone[]; active?: string; reviewed?: string[]; onSelect?: (area: string) => void; onPoint?: (point: Point) => void;
 }) {
-  const frameLabel = image.kind === "site-plan" ? "Site plan" : "Site aerial";
+  const frameLabel = image.kind === "site-plan" ? "Site plan" : image.kind === "site-photo" ? "Site photo" : "Site aerial";
   const pattern = useId().replace(/:/g, "");
   const [failed, setFailed] = useState("");
   if (failed === image.id) return <p role="status">The source image could not be displayed. <button type="button" className="text-link" onClick={() => setFailed("")}>Retry image</button></p>;

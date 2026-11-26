@@ -51,10 +51,10 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
     setDraft(current.map((p,i) => i === corner ? point : p));
   }
   const activePoint = (visible[which]?.points)?.[corner];
-  const dims = outlineDimensions(visible.find(z => z.label === zone?.label), row.image?.bounds);
+  const dims = outlineDimensions(visible.find(z => z.label === zone?.label), row.image?.bounds, row.image);
   const range = dims && fitRange(dims[0], dims[1], Math.min(6, dims[1]), "stalls_90");
   const edge = dims && range && range[1] < 4 ? edgeFitRange(dims[0], dims[1], Math.min(6, dims[1]), 24, "stalls_90") : null;
-  const originalDims = outlineDimensions(zone, row.image?.bounds);
+  const originalDims = outlineDimensions(zone, row.image?.bounds, row.image);
   const predicted = originalDims && fitRange(originalDims[0], originalDims[1], Math.min(6, originalDims[1]), "stalls_90");
   const held = row.status !== "reviewed";
   const bayEvidence = option === "bays" && photos ? photos.photos.filter(photo =>
@@ -67,9 +67,10 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
         onClick={() => { setOption(key); setWhich(0); reset(); }}>{options[key]}</button>)}</div>
     {row.image && <OptionAerial image={row.image} zones={painted} active={zone?.label} reviewed={reviewed} onSelect={!editing && zones.length > 1 ? label => selectArea(zones.findIndex(z => z.label === label)) : undefined} onPoint={editing ? changePoint : undefined} />}
     {painted.length > 0 && <div className="space-legend">{visible.some(z => !reviewed.includes(z.label)) && <span><i className="draft-key" />Proposed area</span>}{reviewed.length > 0 && <span><i className="review-key" />Team outline</span>}{clear.length > 0 && <span><i className="clear-key" />Keep clear</span>}</div>}
-    <div className="space-observation"><h4>{held ? (row.status === "hold" ? "Resolve the site or image" : "Source needed") : row.image?.kind === "site-plan" ? "What the site plan shows" : "What the aerial shows"}</h4><p>{row.summary}</p></div>
+    <div className="space-observation"><h4>{held ? (row.status === "hold" ? "Resolve the site or image" : "Source needed") : row.image?.kind === "site-plan" ? "What the site plan shows" : row.image?.kind === "site-photo" ? "What the site photo shows" : "What the aerial shows"}</h4><p>{row.summary}</p></div>
     {zones.length > 1 && <label>Candidate area<select className="secondary" value={which} onChange={e => selectArea(Number(e.target.value))}>{zones.map((z,i) => <option key={z.label} value={i}>{z.label}</option>)}</select></label>}
     <h4>{zone?.label || options[option]}</h4><p>{zone ? kinds[zone.kind].protect : held ? "The stall count remains unresolved for this layout." : missing[option]}</p>
+    {row.evidence?.filter(item => item.option === option).map(item => <p key={item.url}><a className="text-link" href={item.url} target="_blank" rel="noopener noreferrer">{item.label}</a></p>)}
     {option === "bays" && (bayEvidence.length > 0 || isPanoUrl(photos?.frontageUrl || "")) && <details className="disclosure"><summary className="disclosure">View bay and frontage evidence</summary>
       {bayEvidence.map((item, i) => <p key={i}><a className="text-link" href={item.url} target="_blank" rel="noopener noreferrer">{item.label}</a></p>)}
       {isPanoUrl(photos?.frontageUrl || "") && <p><a className="text-link" href={photos!.frontageUrl} target="_blank" rel="noopener noreferrer">Inspect the street frontage</a></p>}
@@ -128,7 +129,7 @@ export default function SpaceOptions({ site, photos, compact, onOpen, onOverlay 
   const opt = row ? firstOption(row) : "retain";
   const first = row && optionZones(row, opt)[0];
   const summary = row ? recordedFit(row) : "";
-  const compactDimensions = first ? outlineDimensions(first, row?.image?.bounds) : null;
+  const compactDimensions = first ? outlineDimensions(first, row?.image?.bounds, row?.image) : null;
   const compactFit = compactDimensions && fitRange(compactDimensions[0], compactDimensions[1], Math.min(6, compactDimensions[1]), "stalls_90");
   const fitLabel = compactFit ? compactFit[0] === compactFit[1] ? compactFit[0] + " stalls" : compactFit.join("–") + " stalls" : "Four-stall fit unresolved";
   if (compact) {

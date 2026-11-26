@@ -52,3 +52,10 @@ test("an outside aisle can change four-stall fit only when its full width and st
   assert.deepEqual(edgeFitRange(43,15,6,30,"stalls_90"),[0,0]);
   assert.equal(edgeFitRange(43,29,6,24,"pull_through"),null);
 });
+
+test("a filed scale bar supports fit without a map registration", () => {
+  const image = { id:"0123456789abcdef",width:300,height:250,src:"",date:"",source:"50 m scale bar",metersPerPixel:.25 };
+  const zone:Zone = {kind:"parking",label:"Row",points:[[0,0],[20,0],[20,20],[0,20]]};
+  assert.deepEqual(outlineDimensions(zone,undefined,image),[49,41]);
+  assert.equal(outlineDimensions({...zone,kind:"bay"},undefined,image),null);
+});

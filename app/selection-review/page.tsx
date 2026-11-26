@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { reviewLink, reviewReturn, setReviewFilter, rememberReviewPosition, restoreReviewPosition } from "@/lib/reviewNavigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import OpportunityReview from "@/components/OpportunityReview";
-import { compareAttention, dispositions, type FiledReview } from "@/lib/selection/opportunity";
+import { compareAttention, dispositions, matchingOption, routes, type OpportunitySite, type FiledReview } from "@/lib/selection/opportunity";
 import SelectionResearch from "@/components/SelectionResearch";
 import type { SelectionRow } from "@/lib/selection/screen";
 
@@ -38,13 +38,15 @@ function SelectionList() {
   const decision = params.get("disposition") || "";
   const order = params.get("sort") || "attention";
   const hasReviews = Boolean(data?.registerUrl || data?.filed?.length || rows.some(r=>r.review));
-  const matchesDecision = (value?:string) => !decision || (value || "Unreviewed") === decision;
+  const route = params.get("route") || "";
+  const match = (review?:OpportunitySite) => matchingOption(review,decision,route);
+  const matchesDecision = (review?:OpportunitySite) => review ? Boolean(match(review)) : !route && (!decision || decision === "Unreviewed");
   const matchesPlace = (r:{id:string;city:string}, name:string) => (!scope || scope.has(r.id)) && (!market || r.city === market) && [name,r.city,r.id].join(" ").toLowerCase().includes(query.trim().toLowerCase());
-  const filed = (data?.filed || []).filter(r => matchesPlace(r,r.review.name) && matchesDecision(r.review.primary.disposition));
-  const scoped = rows.filter(r => matchesPlace(r,r.name + " " + (r.review?.name || "")) && matchesDecision(r.review?.primary.disposition) && (!check || r.priority === check) &&
+  const filed = (data?.filed || []).filter(r => matchesPlace(r,r.review.name) && matchesDecision(r.review));
+  const scoped = rows.filter(r => matchesPlace(r,r.name + " " + (r.review?.name || "")) && matchesDecision(r.review) && (!check || r.priority === check) &&
     (!params.get("stalls") || r.charging?.screen.some(c=>c.stalls===Number(params.get("stalls")) && c.downside>=0)) &&
     (!params.get("charging") || (r.charging?.stale?"Refresh saved case":r.charging?.result.decision)===params.get("charging"))).sort((a,b)=>{
-      const priority = order === "attention" ? compareAttention(a.review?.primary,b.review?.primary) :
+      const priority = order === "attention" ? compareAttention(match(a.review),match(b.review)) :
         order === "earlier" ? (b.charging?.result.earlyMin??-1)-(a.charging?.result.earlyMin??-1) : 0;
       return priority || (scope && order !== "market" ? scope.get(a.id)! - scope.get(b.id)! : 0) || a.city.localeCompare(b.city) || a.name.localeCompare(b.name);
     });
@@ -56,13 +58,20 @@ function SelectionList() {
       {hasReviews && <label>Commercial decision<select className="secondary" value={decision} onChange={e=>setReviewFilter("disposition",e.target.value)}>
         <option value="">All commercial decisions</option>{[...dispositions,"Unreviewed"].map(d=><option key={d}>{d}</option>)}</select></label>}
       <label>Market<select aria-label="Market" className="secondary" value={market} onChange={e=>setReviewFilter("market",e.target.value)}><option value="">All markets</option>{[...new Set(rows.map(r=>r.city))].sort().map(c=><option key={c}>{c}</option>)}</select></label>
+      <label>Find a site<input className="field" value={query} onChange={e=>setReviewFilter("q",e.target.value)} placeholder="Name or site ID" /></label>
+    </div>
+    <details className="disclosure" open={(!hasReviews || Boolean(check || route || params.get("stalls") || params.get("charging") || params.get("sort"))) || undefined}>
+      <summary className="disclosure">Route, charging and screening filters</summary>
+      <div className="space-review-filters">
+      {hasReviews && <label>Transaction route<select className="secondary" value={route} onChange={e=>setReviewFilter("route",e.target.value)}>
+        <option value="">All routes</option>{routes.map(r=><option key={r}>{r}</option>)}</select></label>}
       <label>Screening check<select aria-label="Next check" className="secondary" value={check} onChange={e=>setReviewFilter("check",e.target.value)}><option value="">All checks</option>{[...new Set(rows.map(r=>r.priority))].sort().map(c=><option key={c}>{c}</option>)}</select></label>
       <label>Charging decision<select className="secondary" value={params.get("charging")||""} onChange={e=>setReviewFilter("charging",e.target.value)}>
         <option value="">All decisions</option>{[...new Set(rows.flatMap(r=>r.charging?[r.charging.stale?"Refresh saved case":r.charging.result.decision]:[]))].sort().map(s=><option key={s}>{s}</option>)}</select></label>
       <label>Moove-staffed downside at parity<select className="secondary" value={params.get("stalls")||""} onChange={e=>setReviewFilter("stalls",e.target.value)}><option value="">Any stall count</option>{[4,6,8,10].map(n=><option value={n} key={n}>{n} hypothetical stalls</option>)}</select></label>
       <label>Order<select className="secondary" value={params.get("sort")||""} onChange={e=>setReviewFilter("sort",e.target.value)}><option value="">Diligence priority</option><option value="market">Market and site</option><option value="earlier">Earlier usable charges</option></select></label>
-      <label>Find a site<input className="field" value={query} onChange={e=>setReviewFilter("q",e.target.value)} placeholder="Name or site ID" /></label>
-    </div>
+      </div>
+    </details>
     {scope && <button type="button" className="text-link" onClick={()=>setReviewFilter("scope","")}>Show all active sites</button>}
     {!data && !error && <p role="status">Loading pipeline…</p>}
     {error && <p role="alert">Pipeline could not be loaded. <button className="text-link" onClick={()=>setAttempt(a=>a+1)}>Retry</button></p>}
@@ -72,7 +81,7 @@ function SelectionList() {
       {!scoped.length && <p>No sites match these filters.</p>}
       <ul className="space-review-results">{scoped.map(r=><li id={r.id} tabIndex={-1} key={r.id} onClick={()=>rememberReviewPosition(pane.current,r.id)}><div>
         <small>{r.city} · {r.stage} · {r.section}</small><h2>{r.name}</h2>{r.review?.name && r.review.name !== r.name && <small>{r.review.name}</small>}
-        {r.review?.primary.disposition === "Previously dropped" && <p><strong>Reconcile stage history before reopening.</strong></p>}{r.review ? <OpportunityReview review={r.review}/> : <><strong>{r.priority}</strong><p>{r.instruction}</p></>}<small>{r.id}</small></div><div><strong>{r.readiness}</strong>
+        {r.review?.primary.disposition === "Previously dropped" && <p><strong>Reconcile stage history before reopening.</strong></p>}{r.review ? <OpportunityReview review={r.review} matched={match(r.review)}/> : <><strong>{r.priority}</strong><p>{r.instruction}</p></>}<small>{r.id}</small></div><div><strong>{r.readiness}</strong>
         {r.mirrorStage && r.stage !== r.mirrorStage && <p>Workbook stage: {r.mirrorStage}</p>}
         {r.financeVisible && <p>Workbook base savings: {r.amount === null ? "Unmodeled" : (r.amount*100).toFixed(1)+"%"}</p>}
         {r.charging && <div className="charging-preview"><strong>Charging · {r.charging.stale?"Refresh saved case":r.charging.result.decision}</strong>
@@ -86,7 +95,7 @@ function SelectionList() {
       </div></li>)}</ul>
       {filed.length > 0 && !check && !params.get("stalls") && !params.get("charging") && <details className="disclosure">
         <summary className="disclosure">Filed reviews outside the active list ({filed.length})</summary>
-        <ul className="space-review-results">{filed.map(r=><li key={r.id}><div><small>{r.city} · {r.stage} · {r.id}</small><h2>{r.review.name}</h2><OpportunityReview review={r.review}/></div></li>)}</ul>
+        <ul className="space-review-results">{filed.map(r=><li key={r.id}><div><small>{r.city} · {r.stage} · {r.id}</small><h2>{r.review.name}</h2><OpportunityReview review={r.review} matched={match(r.review)}/></div></li>)}</ul>
       </details>}</>}
   </main>;
 }

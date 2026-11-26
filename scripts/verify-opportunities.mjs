@@ -15,18 +15,27 @@ if (existsSync(path)) {
       username: process.env.E2E_USERNAME, password: process.env.E2E_PASSWORD,
     });
     let verified = false;
+    let coverage;
     for (let attempt = 0; attempt < 5 && !verified; attempt++) {
       if (attempt) await sleep(15000);
       const [portfolio, map] = await Promise.all([read("/api/data/selection-review"), read("/api/data/deals")]);
       if (!portfolio.ok || !map.ok) continue;
       const {rows, filed, registerUrl} = await portfolio.json();
       const {features} = await map.json();
+      coverage = {
+        activeSites: rows.length,
+        activeShortlist: rows.filter(r => r.review?.primary.disposition === "Shortlist").length,
+        serviceDiligence: rows.filter(r => r.review?.primary.disposition === "Service diligence").length,
+        recommendedDrops: rows.filter(r => r.review?.primary.disposition === "Suggest drop").length,
+        filedOutsideActive: filed?.length,
+      };
       const actual = new Map([...rows, ...(filed || [])].filter(r => r.review).map(r => [r.id, r.review]));
       verified = registerUrl === expected.register && actual.size === count &&
         Object.entries(expected.sites).every(([id, site]) => isDeepStrictEqual(site,actual.get(id))) &&
         features.every(({properties:p}) => p.kind !== "pipeline" || isDeepStrictEqual(expected.sites[p.deal_id],p.opportunityReview));
     }
     if (!verified) throw Error("Signed-in opportunity review readback did not match the private register.");
+    console.log(JSON.stringify(coverage));
   }
   console.log("Verified opportunity register sites:", count);
 }

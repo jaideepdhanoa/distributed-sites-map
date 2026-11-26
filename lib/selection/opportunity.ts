@@ -37,6 +37,12 @@ export function parseOpportunities(value: unknown) {
   return file;
 }
 
+export function matchingOption(review: OpportunitySite | undefined, decision: string, route: string) {
+  if (!review) return undefined;
+  return [review.primary, ...review.alternatives].find(option =>
+    (!decision || decision === option.disposition) && (!route || route === option.route));
+}
+
 export function compareAttention(a?: Opportunity, b?: Opportunity) {
   const order = (o?: Opportunity) => o ? dispositions.indexOf(o.disposition) : dispositions.indexOf("Hold") - 0.5;
   return order(a) - order(b) || (a?.rank ?? Infinity) - (b?.rank ?? Infinity) || 0;

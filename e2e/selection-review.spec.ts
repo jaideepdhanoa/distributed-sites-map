@@ -82,6 +82,11 @@ test("commercial diligence order, alternate routes and archived reviews", async 
   await page.getByText("Filed reviews outside the active list (1)").click();
   await expect(page.getByRole("heading",{name:"Archived example"})).toBeVisible();
   expect(await page.locator("main").evaluate(el=>el.scrollWidth<=el.clientWidth)).toBeTruthy();
+  await page.getByLabel("Commercial decision").selectOption("Conditional");
+  await expect(page.getByRole("heading",{name:"Conditional",exact:true}).first()).toBeVisible();
+  await page.getByText("Route, charging and screening filters").click();
+  await page.getByLabel("Transaction route").selectOption("Host agreement");
+  await expect(page.getByText("1 of 2 active sites")).toBeVisible();
   await mkdir("review-shots",{recursive:true});
   await page.screenshot({path:"review-shots/"+info.project.name+"-opportunities.png",animations:"disabled"});
 });

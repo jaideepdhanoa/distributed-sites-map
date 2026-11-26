@@ -352,6 +352,19 @@ jobs:
               echo "Could not dispatch $workflow on $BRANCH."
             fi
           done
+      - name: Check whether these financial inputs passed signed-in production readback
+        id: purchase-readback
+        if: always() && !cancelled() && github.ref == 'refs/heads/main' && hashFiles('data/generated/purchase-review.json') != '' && (steps.publish.outputs.published == 'true' || steps.same.outputs.unchanged == 'true' || steps.live.outputs.unchanged == 'true')
+        uses: actions/cache@v4
+        with:
+          path: .purchase-review-readback
+          key: purchase-review-readback-v1-${{ hashFiles('data/generated/purchase-review.json') }}
+      - name: Verify the released financial inputs and assumptions
+        if: always() && !cancelled() && steps.purchase-readback.outcome == 'success' && steps.purchase-readback.outputs.cache-hit != 'true'
+        env:
+          E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: node scripts/verify-purchase-review.mjs
       - name: Check whether this layout file has passed signed-in production readback
         id: layouts
         if: github.ref == 'refs/heads/main' && hashFiles('data/generated/space-layouts.json') != '' && (steps.publish.outputs.published == 'true' || steps.same.outputs.unchanged == 'true' || steps.live.outputs.unchanged == 'true')
@@ -365,19 +378,6 @@ jobs:
           E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
         run: node scripts/verify-space-layouts.mjs
-      - name: Check whether these financial inputs passed signed-in production readback
-        id: purchase-readback
-        if: github.ref == 'refs/heads/main' && hashFiles('data/generated/purchase-review.json') != '' && (steps.publish.outputs.published == 'true' || steps.same.outputs.unchanged == 'true' || steps.live.outputs.unchanged == 'true')
-        uses: actions/cache@v4
-        with:
-          path: .purchase-review-readback
-          key: purchase-review-readback-v1-${{ hashFiles('data/generated/purchase-review.json') }}
-      - name: Verify the released financial inputs and assumptions
-        if: steps.purchase-readback.outcome == 'success' && steps.purchase-readback.outputs.cache-hit != 'true'
-        env:
-          E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
-          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
-        run: node scripts/verify-purchase-review.mjs
       - name: Fail when the data checks failed
         if: steps.checks.outcome == 'failure' || steps.gap.outcome == 'failure'
         run: exit 1

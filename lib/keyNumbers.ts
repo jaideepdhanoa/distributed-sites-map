@@ -1,4 +1,4 @@
-import { financialEvidence } from "./purchaseReview";
+import { financialEvidence } from "./purchaseReview.ts";
 import { basisBadge } from "./pricing.ts";
 import { explicitMw, lineVolts, phaseKind, serviceAmps } from "./score/power-rating.ts";
 import { packageOnFile } from "./pnl/package.ts";

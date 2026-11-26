@@ -66,7 +66,7 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
         onClick={() => { setOption(key); setWhich(0); reset(); }}>{options[key]}</button>)}</div>
     {row.image && <OptionAerial image={row.image} zones={painted} active={zone?.label} reviewed={reviewed} onSelect={!editing && zones.length > 1 ? label => selectArea(zones.findIndex(z => z.label === label)) : undefined} onPoint={editing ? changePoint : undefined} />}
     {painted.length > 0 && <div className="space-legend">{visible.some(z => !reviewed.includes(z.label)) && <span><i className="draft-key" />Proposed area</span>}{reviewed.length > 0 && <span><i className="review-key" />Team outline</span>}{clear.length > 0 && <span><i className="clear-key" />Keep clear</span>}</div>}
-    <div className="space-observation"><h4>{held ? (row.status === "hold" ? "Resolve the site or image" : "Source needed") : "What the aerial shows"}</h4><p>{row.summary}</p></div>
+    <div className="space-observation"><h4>{held ? (row.status === "hold" ? "Resolve the site or image" : "Source needed") : row.image?.kind === "site-plan" ? "What the site plan shows" : "What the aerial shows"}</h4><p>{row.summary}</p></div>
     {zones.length > 1 && <label>Candidate area<select className="secondary" value={which} onChange={e => selectArea(Number(e.target.value))}>{zones.map((z,i) => <option key={z.label} value={i}>{z.label}</option>)}</select></label>}
     <h4>{zone?.label || options[option]}</h4><p>{zone ? kinds[zone.kind].protect : held ? "The stall count remains unresolved for this layout." : missing[option]}</p>
     {option === "bays" && (bayEvidence.length > 0 || isPanoUrl(photos?.frontageUrl || "")) && <details className="disclosure"><summary className="disclosure">View bay and frontage evidence</summary>
@@ -76,7 +76,7 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
     {range && dims && <div className="space-fit-range"><strong>{range[0] === range[1] ? range[0] : range.join("–")} stalls · outline-only test</strong><p>{threshold(...range)}. Approx. {dims[0]} × {dims[1]} ft; 90° stalls and aisle inside this outline. The lower case reserves up to 6 ft in each dimension. Rights and operating hours still need evidence.</p></div>}
     {zone && !range && <p className="space-gate"><strong>Four-stall fit unresolved.</strong> {zone.kind === "bay" ? "Interior dimensions and access are needed." : "Measure the clear rectangle and its aisle."}</p>}
     {zone && <div className="space-next"><strong>What would settle fit and availability</strong><p>{zone.check || kinds[zone.kind].check}</p></div>}
-    {editing && activePoint && zone && <div className="space-edit"><strong>Adjust a corner</strong><p>Choose a corner, then tap the aerial or enter its position.</p>
+    {editing && activePoint && zone && <div className="space-edit"><strong>Adjust a corner</strong><p>Choose a corner, then tap the image or enter its position.</p>
       <div className="layout-inputs"><label>Corner<select className="secondary" value={corner} onChange={e=>setCorner(Number(e.target.value))}>{zone.points.map((_,i) => <option key={i} value={i}>{i+1}</option>)}</select></label>
       {(["Horizontal %", "Vertical %"] as const).map((n,i) => <label key={n}>{n}<input className="field" type="number" min={0} max={100} step={0.1} value={activePoint[i]} onChange={e => { const v=e.target.valueAsNumber; if(Number.isFinite(v)&&v>=0&&v<=100) changePoint(i===0?[v,activePoint[1]]:[activePoint[0],v]); }} /></label>)}</div>
       <button type="button" className="text-link" onClick={reset}>Reset changes</button><p>Keep for diligence to save this outline with the team's review.</p></div>}
@@ -85,7 +85,7 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
       refresh={history.retry} edit={zone && !editing ? () => setEditing(true) : undefined} points={draft || visible[which]?.points} clearPoints={() => setDraft(undefined)} stopEdit={() => setEditing(false)} />
     {history.reviews.some(x => x.review?.revision !== row.revision && x.review?.area !== area) && <details className="disclosure"><summary className="disclosure">Earlier layout reviews</summary>{history.reviews.filter(x => x.review?.revision !== row.revision && x.review?.area !== area).map(x => <p key={x.note.id}>{x.review?.area} · {x.review?.disposition} · {x.review?.reason}</p>)}</details>}
     <a className="text-link" href="/space-review">Review other sites</a>
-    <p className="space-date">Aerial review · {reviewedOn}{row.cohort !== "active" ? " · " + (row.cohort === "dropped" ? "Dropped record" : "Off-market record") : ""}</p>
+    <p className="space-date">Layout review · {reviewedOn}{row.cohort !== "active" ? " · " + (row.cohort === "dropped" ? "Dropped record" : "Off-market record") : ""}</p>
   </div>;
 }
 export default function SpaceOptions({ site, photos, compact, onOpen, onOverlay }: { site: string; photos?: PhotoCard; compact?: boolean; onOpen?: () => void; onOverlay?: (v: MapOutline | null) => void }) {
@@ -136,7 +136,7 @@ export default function SpaceOptions({ site, photos, compact, onOpen, onOverlay 
   return <section ref={ref} aria-labelledby={titleId} className="space-options" data-testid="space-options">
     <div className="space-heading"><Layers3 size={19} aria-hidden="true"/><h3 id={titleId}>Space options</h3></div>
     {row && !open && <div className="space-top">
-      {row.image && <div className="space-thumb"><OptionAerial image={row.image} zones={first ? [first] : []}/><button type="button" className="text-link" aria-label="Open annotated aerial" onClick={() => setOpen(true)} /></div>}
+      {row.image && <div className="space-thumb"><OptionAerial image={row.image} zones={first ? [first] : []}/><button type="button" className="text-link" aria-label="Open annotated layout" onClick={() => setOpen(true)} /></div>}
       <div><strong>{first ? first.label : row.status === "hold" ? "Parcel or imagery check" : row.status === "needs-image" ? "Aerial needed" : "Layout needs measurement"}</strong>
       <p>{summary}</p>{first && <small>{options[opt]} · {fitLabel}{compactFit && " in outline test"}</small>}</div>
     </div>}

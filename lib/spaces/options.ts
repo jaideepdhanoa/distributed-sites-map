@@ -20,7 +20,7 @@ export const kinds = {
   clear: { option: null, label: "Keep clear", protect: "", check: "" },
 } as const;
 export type Zone = { kind: keyof typeof kinds; label: string; points: Point[]; check?: string };
-export type Aerial = { id: string; src: string; source: string; date: string; width: number; height: number; bounds?: Bounds };
+export type Aerial = { kind?: "site-plan"; documentUrl?: string; id: string; src: string; source: string; date: string; width: number; height: number; bounds?: Bounds };
 export type Assessment = {
   status: "reviewed" | "hold" | "needs-image"; summary: string; recorded: number | null;
   baseline: "recorded" | "unconfirmed" | "conflict"; zones: Zone[]; segment: string;

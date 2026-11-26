@@ -5,11 +5,12 @@ import { kinds } from "@/lib/spaces/options";
 export default function OptionAerial({ image, zones, active, reviewed = [], onSelect, onPoint }: {
   image: Aerial; zones: Zone[]; active?: string; reviewed?: string[]; onSelect?: (area: string) => void; onPoint?: (point: Point) => void;
 }) {
+  const frameLabel = image.kind === "site-plan" ? "Site plan" : "Site aerial";
   const pattern = useId().replace(/:/g, "");
   const [failed, setFailed] = useState("");
-  if (failed === image.id) return <p role="status">The source aerial could not be displayed. <button type="button" className="text-link" onClick={() => setFailed("")}>Retry image</button></p>;
+  if (failed === image.id) return <p role="status">The source image could not be displayed. <button type="button" className="text-link" onClick={() => setFailed("")}>Retry image</button></p>;
   return <figure className="option-aerial">
-    <svg viewBox={`0 0 ${image.width} ${image.height}`} role="img" aria-label={zones.length ? "Site aerial showing " + zones.map(z => z.label).join(", ") : "Source aerial of the site"}
+    <svg viewBox={`0 0 ${image.width} ${image.height}`} role="img" aria-label={zones.length ? frameLabel + " showing " + zones.map(z => z.label).join(", ") : frameLabel}
       onClick={onPoint ? event => {
         const matrix = event.currentTarget.getScreenCTM();
         if (!matrix) return;
@@ -29,6 +30,6 @@ export default function OptionAerial({ image, zones, active, reviewed = [], onSe
         </g>;
       })}
     </svg>
-    <figcaption>{image.source} · {image.date || "Imagery date unknown"}</figcaption>
+    <figcaption>{image.source} · {image.kind === "site-plan" ? "Filed " : ""}{image.date || "Date unknown"}{image.documentUrl && <> · <a href={image.documentUrl} target="_blank" rel="noopener noreferrer" className="text-link">Open source</a></>}</figcaption>
   </figure>;
 }

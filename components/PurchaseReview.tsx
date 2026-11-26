@@ -2,7 +2,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { DealProps } from "@/lib/types";
-import { amount, financialEvidence, layoutName, purchaseCase, purchaseCheck, type PurchaseScenario } from "@/lib/purchaseReview";
+import { amount, financialEvidence, layoutName, purchaseCase, purchaseCheck, purchaseConstraints, type PurchaseScenario } from "@/lib/purchaseReview";
 import { usePurchaseScenario } from "./PurchaseScenarios";
 import FinancialsEntry, { type usePnlTiles } from "./FinancialsEntry";
 import FinancialsPanel from "./FinancialsPanel";
@@ -28,11 +28,14 @@ export default function PurchaseReview({deal,pnl}:{deal:DealProps;pnl:ReturnType
   const claim=w?.claim ?? deal.stated_cash_flow;
   const claimLabel=w?.claimLabel || deal.cash_flow_label || "Reported earnings";
   const annual=result?.cash;
+  const standaloneEarnings = w?.normalized ?? w?.ebitda;
+  const earningsLabel = w?.normalized!=null ? "Normalized EBITDA" : "Workbook EBITDA";
   const revenue = w?.revenue ?? deal.stated_revenue;
   const ask = deal.asking_price ?? w?.ask;
-  const leadLabel = annual!=null ? "Retained annual cash" : claim!=null ? claimLabel : revenue!=null ? "Reported revenue" : ask!=null ? "Asking price" : "Operating cash";
+  const leadLabel = annual!=null ? "Retained annual cash" : claim!=null ? claimLabel : standaloneEarnings!=null ? earningsLabel : revenue!=null ? "Reported revenue" : ask!=null ? "Asking price" : "Operating cash";
   const leadNote = annual!=null ? [scenario.basis==="normalized" ? "Normalized EBITDA" : "Workbook EBITDA", linePeriod, "modeled per year"] :
     claim!=null ? [deal.earnings_period || "Period unconfirmed", deal.earnings_basis || w?.status || "Source basis unconfirmed"] :
+    standaloneEarnings!=null ? [w?.periods?.[w?.normalized!=null?"normalized":"ebitda"] || "Period unconfirmed","Annual cash calculation pending"] :
     revenue!=null ? [w?.periods?.revenue || deal.revenue_period || "Period unconfirmed", deal.revenue_basis || "Revenue only"] : ["Annual operating cash pending"];
   const layout=layoutName(deal,scenario);
   const changed=layout==="Footprint changed";
@@ -47,6 +50,16 @@ export default function PurchaseReview({deal,pnl}:{deal:DealProps;pnl:ReturnType
   function closeChecklist(){setChecklist(false);requestAnimationFrame(()=>trigger.current?.focus());}
   if (evidence==="Not applicable") return <p>Operating financials are not applicable to this site.</p>;
   const withheld=evidence==="Withheld" || /refus|unavailable/i.test(w?.package || deal.package_status || "");
+  const constraints = purchaseConstraints(deal);
+  const sources = (pnl.panel?.figures || []).filter(f=>{
+    if (!result || result.ebitda==null || ![f.figure,f.metric].some(v=>v?.trim().toLowerCase()===(isRecast?"normalized ebitda":"ebitda"))) return false;
+    const raw = f.text.trim();
+    if (!/^(?:-?\$?[\d,]+(?:\.\d+)?|\(\$?[\d,]+(?:\.\d+)?\))$/.test(raw)) return false;
+    const n = Number(raw.replace(/[$,()]/g,"")) * (raw.startsWith("(")?-1:1);
+    return Math.abs(n-result.ebitda)<1 && (!w?.periods?.[isRecast?"normalized":"ebitda"] ||
+      [f.period,f.periodLabel].includes(linePeriod));
+  });
+  const source=sources.length===1?sources[0]:null;
   const check=changed ? "Review the changed footprint" : purchaseCheck(deal);
   return <section className="purchase-review" aria-label="Purchase support" data-testid="purchase-review">
     <div className="purchase-summary">
@@ -54,7 +67,7 @@ export default function PurchaseReview({deal,pnl}:{deal:DealProps;pnl:ReturnType
       <p className="purchase-basis">{evidence}{w?.checked && " · Checked "+w.checked}</p></header>
     <article className="purchase-lead">
       <span>{leadLabel}</span>
-      <strong>{amount(annual ?? claim ?? revenue ?? ask)}</strong>
+      <strong>{amount(annual ?? claim ?? standaloneEarnings ?? revenue ?? ask)}</strong>
       <small>{leadNote.join(" · ")}</small>
     </article>
     {annual!=null && result?.charge!=null && <div className="purchase-funding" aria-label="Annual purchase coverage">
@@ -65,7 +78,7 @@ export default function PurchaseReview({deal,pnl}:{deal:DealProps;pnl:ReturnType
     </div>}
     <div className="purchase-check"><b>{check}</b><p>{w?.normalized!=null && w.normalized!==w.ebitda ? "Compare the workbook input and the normalized recast. Check the period and lease obligations for the purchase." :
       withheld ? "View the existing request or refusal before another follow-up." : w?.fit===0 ? "The recorded layout fits zero stalls. Review an alternative footprint before using the network ceiling." :
-      result?.cash==null ? "Open the available evidence and identify a full operating period." : "Confirm that the income, occupancy costs and available space belong to the same purchase setup."}</p></div>
+      result?.cash==null ? "Open the available evidence and identify a full operating period." : "Confirm that the income, occupancy costs and available space belong to the same purchase setup."}</p>{constraints.length>0 && <ul>{constraints.map(c=><li key={c}>{c}</li>)}</ul>}</div>
     </div>
     {data && w && a && result && <>
       <h4>Cash from operations</h4>
@@ -73,6 +86,9 @@ export default function PurchaseReview({deal,pnl}:{deal:DealProps;pnl:ReturnType
       <Ledger rows={[[basisLabel,amount(result.ebitda)],["Annual revenue"+(result.inferredRevenue?" · inferred from margin":""),amount(result.revenue)],
         ["Upkeep reserve · "+percent(a.upkeep),amount(result.upkeep==null?null:-result.upkeep)],["Moove oversight",amount(a.oversight==null?null:-a.oversight)],
         ...(scenario.lostCash?[["Displaced operating contribution",amount(-scenario.lostCash)] as [string,string]]:[]),["Retained per year",amount(result.cash)]]}/>
+      {source && (source.sourceName || source.sourceHref) && <p className="layer-meta">{source.sourceHref
+        ? <a className="text-link" href={source.sourceHref} target="_blank" rel="noreferrer">{source.sourceName || "Open earnings source"} ↗</a>
+        : source.sourceName}{source.page && " · "+source.page}</p>}
       {!result.open && <p>Workbook setup closes the business. Its retained operating cash is zero.</p>}
       {w.textInputs.length>0 && <p className="layer-meta">Some worksheet amounts are stored as text. The workbook case preserves its published outputs.</p>}
       <h4>Purchase at the asking price</h4>

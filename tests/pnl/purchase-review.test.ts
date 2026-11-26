@@ -52,3 +52,19 @@ test("document received, statements, unavailability and withheld are different s
   assert.equal(financialEvidence({...site,figures_status:"withheld"}),"Withheld");
   assert.equal(financialEvidence({...site,kind:"land"}),"Not applicable");
 });
+
+test("a saved purchase case resolves against current records and flags a changed footprint", async () => {
+  const { decisionCatalog } = await import("../../lib/actions/decisionCatalog");
+  const { evidenceChanged } = await import("../../lib/comparisonDecision");
+  const scenario = { ...originalScenario, basis: "normalized" as const, layout: "abcdef123456.0", upgrade: 1000 };
+  const citation = {
+    targetId: site.deal_id, targetKind: "deal" as const, measure: "purchase_case" as const,
+    ...scenarioFigure(site, scenario)!,
+  };
+  const current = decisionCatalog([], [site]).figure(citation);
+  assert.ok(current && !evidenceChanged(citation,current));
+  const revised = {...site, purchase:{...example, layout:{revision:"999999999999", zones:["Excess parking"]}}};
+  const changed = decisionCatalog([], [revised]).figure(citation);
+  assert.ok(changed && evidenceChanged(citation,changed));
+  assert.equal(changed.value,"—");
+});

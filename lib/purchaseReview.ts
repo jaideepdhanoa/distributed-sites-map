@@ -17,7 +17,7 @@ export function financialEvidence(d: DealProps) {
   if (d.statementCoverage === "present") return "P&L captured";
   if (w?.normalized != null) return "Recast on file";
   if (/receiv|partial|on file/i.test(pkg)) return "Package on file";
-  if (w?.claim != null || d.stated_cash_flow != null || d.stated_revenue != null || w?.revenue != null) return "Figures on file";
+  if (w?.claim != null || w?.ebitda != null || w?.cash != null || d.stated_cash_flow != null || d.stated_revenue != null || w?.revenue != null) return "Figures on file";
   if (/request/i.test(pkg)) return "Package requested";
   return d.statementCoverage === "unavailable" ? "Statement lookup unavailable" : "No figures on file";
 }
@@ -69,6 +69,18 @@ export function purchaseCheck(d:DealProps) {
   if (!/^yes$/i.test(w.ownership)) return "Confirm purchase scope";
   if (w.fit == null || w.fit <= 0 || w.stalls == null || w.stalls <= 0 || w.stalls>w.fit) return "Confirm usable layout";
   return "Check retained operations and lease terms";
+}
+export function purchaseConstraints(d: DealProps): string[] {
+  const w = d.purchase?.inputs;
+  if (!w) return [];
+  const checks: string[] = [];
+  if (/^no$/i.test(w.ownership)) checks.push("Real estate is excluded from the recorded sale. Confirm the lease and the asset being priced.");
+  else if (!/^yes$/i.test(w.ownership)) checks.push("Real-estate ownership and lease terms are unconfirmed.");
+  if (w.fit === 0) checks.push("The recorded layout fits zero stalls. The network ceiling depends on finding a usable footprint.");
+  else if (w.fit == null || w.stalls == null || w.stalls > w.fit) checks.push("The modeled stall count still needs a footprint check.");
+  if (w.ask != null && d.asking_price != null && Math.abs(w.ask-d.asking_price)>1)
+    checks.push("The current asking price differs from the workbook input.");
+  return checks;
 }
 export function purchaseRows(d:DealProps, scenario:PurchaseScenario=preferredScenario(d)) {
   const w=d.purchase?.inputs;

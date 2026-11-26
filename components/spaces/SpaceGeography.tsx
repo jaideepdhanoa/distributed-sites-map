@@ -259,7 +259,8 @@ export default function SpaceGeography(props: Props) {
           source: "space-evidence-image",
           paint: { "raster-fade-duration": 0 },
         },
-        map.getLayer(layers[0]) ? layers[0] : undefined,
+        // The filed frame fills missing satellite tiles. Its printed markings belong in source inspection.
+        map.getLayer("imagery") ? "imagery" : map.getLayer(layers[0]) ? layers[0] : undefined,
       );
     }
     if (map.isStyleLoaded() || map.getSource("sites") || map.getSource(sourceId)) install();

@@ -1,5 +1,6 @@
 "use client";
 
+import { dropReasons } from "@/lib/selection/dropReasons";
 import { useSearchParams } from "next/navigation";
 import { reviewLink, rememberReviewPosition, restoreReviewPosition, setReviewFilter } from "@/lib/reviewNavigation";
 import { FinanceFilters, financeMatch } from "./FinancialPortfolio";
@@ -49,7 +50,7 @@ import { isQuickLube, QUICK_LUBE_LABEL, stageTone } from "@/lib/labels";
 import { plainNextStep } from "@/lib/nextStepLine";
 import { stripGmailIds } from "@/lib/displayText";
 import { chipsForDeal, suggestedDropChip } from "@/lib/tags/show";
-import { columnFamily, tagFamily } from "@/lib/tags/vocab";
+import { columnFamily } from "@/lib/tags/vocab";
 import { ReasonPicker } from "./ReasonPicker";
 import { PhoneCards } from "./PhoneCards";
 import { TagChip } from "./TagChip";
@@ -482,7 +483,7 @@ export default function PipelineList({
   }
 
   async function submitDrop() {
-    const label = tagFamily("drop_reason")?.codes.find((item) => item.code === reason)?.label || "";
+    const label = dropReasons.find((item) => item.code === reason)?.label || "";
     if (!onDrop || !label || !pickedRows.length) return;
     setPending(true);
     setActionError("");
@@ -694,7 +695,7 @@ export default function PipelineList({
                   {row.noPin ? <span className="no-pin"> No pin</span> : null}
                 </span>
                 {signedIn && row.deal.opportunityReview && <small className="site-address" title={row.deal.opportunityReview.primary.next}>
-                  {row.deal.opportunityReview.primary.disposition}{row.deal.opportunityReview.primary.rank != null && " #" + row.deal.opportunityReview.primary.rank}
+                  {row.deal.opportunityReview.primary.disposition}{row.deal.opportunityReview.primary.dropReason && " · " + row.deal.opportunityReview.primary.dropReason}{row.deal.opportunityReview.primary.rank != null && " #" + row.deal.opportunityReview.primary.rank}
                 </small>}
                 {signedIn && onFinancials && row.deal.kind==="pipeline" && <button type="button" className="text-link" onClick={e=>{e.stopPropagation();onFinancials(id);}}>Financials</button>}
                 <span className="site-meta">
@@ -758,9 +759,9 @@ export default function PipelineList({
             </div>
             <p className="filter-note">Each site is submitted for approval with this reason. Nothing is dropped until someone approves it.</p>
             <ul className="pick-list">{pickedRows.map((row) => <li key={row.deal.deal_id}>{row.deal.name || row.deal.deal_id} · {displayAddress(row.deal.address) || row.deal.deal_id}</li>)}</ul>
-            <ReasonPicker label="Drop reason" testId="drop-reason" options={tagFamily("drop_reason")?.codes || []} value={reason} onChange={setReason} />
+            <ReasonPicker label="Drop reason" testId="drop-reason" options={dropReasons} value={reason} onChange={setReason} />
             {actionError ? <p className="err">{actionError}</p> : null}
-            <button type="button" className="primary" disabled={pending || !tagFamily("drop_reason")?.codes.some((item) => item.code === reason)} onClick={() => void submitDrop()}>Submit for approval</button>
+            <button type="button" className="primary" disabled={pending || !dropReasons.some((item) => item.code === reason)} onClick={() => void submitDrop()}>Submit for approval</button>
           </div>
         </div>,
         document.body,

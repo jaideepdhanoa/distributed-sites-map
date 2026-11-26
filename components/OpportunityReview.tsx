@@ -19,11 +19,12 @@ export default function OpportunityReview({review, matched}:{review:OpportunityS
   return <section className="opportunity-review" aria-label="Commercial review">
     <small>{primary.route}{ranked}{primary.route !== review.primary.route && " · Alternative route"}</small>
     <h3>{primary.disposition}</h3>
-    <p><b>{["Close offering","Archive listing","Outside mandate","Previously dropped","Watch availability","Off-market prospect"].includes(primary.disposition) ? "Reopen when" : "Next check"}</b> · {primary.next}</p>
+    {primary.dropReason && <p><b>Drop reason</b> · {primary.dropReason}</p>}
+    <p><b>{["Dropped","Archive listing","Outside mandate","Watch availability","Off-market prospect"].includes(primary.disposition) ? "Reopen when" : "Next check"}</b> · {primary.next}</p>
     <details className="disclosure"><summary className="disclosure">Decision evidence{others.length > 0 && " and alternative routes"}</summary>
       <Evidence option={primary}/>
       {others.map(option=><div key={option.route}><h4>{option.route} · {option.disposition}</h4>
-        <p>{option.next}</p><Evidence option={option}/></div>)}
+        {option.dropReason && <p>Drop reason · {option.dropReason}</p>}<p>{option.next}</p><Evidence option={option}/></div>)}
     </details>
   </section>;
 }

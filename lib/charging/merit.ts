@@ -16,7 +16,7 @@ export type RankingInputs = {
 export const emptyRanking:RankingInputs = {pool:"",source:"",date:"",needBy:"",annualNeed:null,peakNeed:null,avoided:null,downside:{},checkDays:null,checkCost:null};
 export const actionColors = {
   "Advance diligence":"#387156", "Verify a condition":"#a8711b", "Reprice":"#385a7a",
-  "Evidence needed":"#827a70", "Review for closure":"#9e4b3e",
+  "Evidence needed":"#827a70", "Suggest drop":"#9e4b3e", "Dropped":"#756c66",
 };
 type Action=keyof typeof actionColors;
 type LoadCase = {sessions:number; peak:number; annualFixed:number; variable:number};
@@ -82,16 +82,18 @@ export function siteMerit(deal:DealProps,c:Inputs,selected:boolean,stale:boolean
     m.downsideCeiling=stress.offer;
   }
   function result(action:Action,next:string,order:number):Merit {return {...m,action,next,order};}
-  if(deal.suggested_drop || deal.listing_removed)return result("Review for closure",deal.suggested_drop || "Reconcile the offering and current disposition.",7);
   const commercial=deal.opportunityReview?.primary;
-  if(commercial?.disposition==="Suggest drop")return result("Review for closure",commercial.rationale,7);
+  if(commercial?.disposition==="Suggest drop")return result("Suggest drop",commercial.rationale,7);
   if(commercial){
-    const siteHold=["Previously dropped","Outside mandate"].includes(commercial.disposition);
-    const closed=["Close offering","Watch availability","Archive listing","Off-market prospect"].includes(commercial.disposition);
+    const siteHold=commercial.disposition === "Outside mandate";
+    const closed=["Watch availability","Archive listing","Off-market prospect"].includes(commercial.disposition);
     const routeApplies=c.terms==="purchase" ? ["Operating acquisition","Offered acquisition","Property only"].includes(commercial.route)
       : ["Operating lease","Host agreement"].includes(commercial.route);
+    if(commercial.disposition === "Dropped" && (commercial.route === "Site lead" || routeApplies))
+      return result("Dropped", commercial.next, 8);
     if(siteHold || (closed && routeApplies))return result("Verify a condition",commercial.next,2);
   }
+  if(deal.suggested_drop || deal.listing_removed)return result("Suggest drop",deal.suggested_drop || "Reconcile the offering and current disposition.",7);
   const blocker=deal.stage_blocker?.trim();
   if(blocker && !/^(?:—|-|unknown|n\/a|none|not on file)$/i.test(blocker))return result("Verify a condition",blocker,2);
   if(deal.chargingHold)return result("Verify a condition",deal.chargingHold,2);
@@ -100,7 +102,7 @@ export function siteMerit(deal:DealProps,c:Inputs,selected:boolean,stale:boolean
     return result("Verify a condition",deal.screening!.instruction,2);
   if(stale)return result("Verify a condition","Refresh the selected revision against the latest site evidence.",2);
   if(!selected)return result(conditional?"Verify a condition":"Evidence needed",check,conditional?1:5);
-  if(c.rights==="unavailable" && r.decision==="Recommend closing")return result("Review for closure",r.next,7);
+  if(c.rights==="unavailable" && r.decision==="Suggest drop")return result("Suggest drop",r.next,7);
   if(c.rights!=="controlled" || !c.rightsDate || !c.rightsSource.trim())return result("Verify a condition",check,conditional?1:3);
   if(c.comparator!=="local" || !c.comparable || c.energyScope!=="included")
     return result("Verify a condition","Obtain the local depot comparison including energy and demand charges on a matching session basis.",2);
@@ -112,7 +114,7 @@ export function siteMerit(deal:DealProps,c:Inputs,selected:boolean,stale:boolean
   if(v.hostWeek || v.hostEnd)required.push("hostFee");
   const gap=required.find(k=>v[k]==null || !known(k));
   if(gap)return result("Verify a condition","Document "+fields[gap].label+" for this layout.",2);
-  if(r.decision==="Recommend closing")return result("Review for closure",r.next,7);
+  if(r.decision==="Suggest drop")return result("Suggest drop",r.next,7);
   if((v.stalls??0)<4 || !r.peakSessions || r.difference==null)return result("Verify a condition","Verify a controlled four-stall layout and completed sessions in the required shift.",3);
   const terms=c.terms==="purchase"?v.ask:v.rent;
   if(c.terms==="purchase" && v.assetCap!=null && terms!=null && terms>v.assetCap)

@@ -30,10 +30,10 @@ if (!existsSync(path)) throw Error("The generated opportunity register is missin
         recommendedDrops: rows.filter(r => r.review?.primary.disposition === "Suggest drop").length,
         filedOutsideActive: filed?.length,
       };
-      const actual = new Map([...rows, ...(filed || [])].filter(r => r.review).map(r => [r.id, r.review]));
+      const actual = new Map([...rows, ...(filed || [])].filter(r => r.review).map(r => [r.id, r]));
       verified = registerUrl === expected.register && actual.size === count &&
-        Object.entries(expected.sites).every(([id, site]) => isDeepStrictEqual(site,actual.get(id))) &&
-        features.every(({properties:p}) => p.kind !== "pipeline" || isDeepStrictEqual(expected.sites[p.deal_id],p.opportunityReview));
+        Object.entries(expected.sites).every(([id, site]) => isDeepStrictEqual(opportunity.reviewAtStage(site, actual.get(id)?.stage || "", actual.get(id)?.decisionReason),actual.get(id)?.review)) &&
+        features.every(({properties:p}) => p.kind !== "pipeline" || isDeepStrictEqual(opportunity.reviewAtStage(expected.sites[p.deal_id], p.stage, p.decision_reason || p.chips?.find(c => c.family === "drop_reason")?.label),p.opportunityReview));
     }
     if (!verified) throw Error("Signed-in opportunity review readback did not match the private register.");
     console.log(JSON.stringify(coverage));

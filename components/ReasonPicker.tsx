@@ -10,7 +10,7 @@ export function ReasonPicker({
   testId,
 }: {
   label: string;
-  options: TagCode[];
+  options: Pick<TagCode, "code" | "label">[];
   value: string;
   onChange: (code: string) => void;
   testId: string;

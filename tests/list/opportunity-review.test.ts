@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { compareAttention, parseOpportunities, type Opportunity } from "../../lib/selection/opportunity";
+import { compareAttention, matchingOption, reviewAtStage, parseOpportunities, type Opportunity } from "../../lib/selection/opportunity";
 import { EXCLUDED_SITE_ID } from "../../lib/alerts/excluded";
 
 const offer: Opportunity = {route:"Operating acquisition", disposition:"Shortlist", rank:2, rationale:"A release is possible.",
@@ -12,6 +12,8 @@ test("each reviewed site has a primary opportunity and independently evaluated r
   const host = {...offer, route:"Host agreement", disposition:"Conditional", rank:null};
   const primary = {...offer,disposition:"Close offering", rank:null};
   const value = parseOpportunities({...file,sites:{"PIPE-LAS-9001":{...entry,primary,alternatives:[host]}}});
+  assert.equal(value.sites["PIPE-LAS-9001"].primary.disposition,"Dropped");
+  assert.equal(matchingOption(value.sites["PIPE-LAS-9001"],"",""),undefined);
   assert.equal(value.sites["PIPE-LAS-9001"].alternatives[0].disposition,"Conditional");
   assert.throws(()=>parseOpportunities({...file,sites:{"PIPE-LAS-9001":{...entry,alternatives:[offer]}}}));
   assert.throws(()=>parseOpportunities({...file,sites:{[EXCLUDED_SITE_ID]:entry}}));
@@ -23,4 +25,13 @@ test("prioritize separately ranked acquisition and service options and keep unre
   const hold:Opportunity={...offer,rank:null,disposition:"Hold"};
   assert.ok(compareAttention(one,offer)<0 && compareAttention(offer,service)<0);
   assert.ok(compareAttention(service,undefined)<0 && compareAttention(undefined,hold)<0);
+});
+
+test("an accepted drop updates a pending review without changing the source or alternative", () => {
+  const pending = {...entry, primary:{...offer, disposition:"Suggest drop" as const, rank:null}};
+  const resolved = reviewAtStage(pending, "Dropped", "No longer for sale");
+  assert.equal(resolved?.primary.disposition, "Dropped");
+  assert.equal(resolved?.primary.dropReason, "No longer for sale");
+  assert.equal(reviewAtStage(pending, "Desk screen"), pending);
+  assert.equal(pending.primary.disposition, "Suggest drop");
 });

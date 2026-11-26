@@ -53,6 +53,8 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
   const activePoint = (visible[which]?.points)?.[corner];
   const dims = outlineDimensions(visible.find(z => z.label === zone?.label), row.image?.bounds);
   const range = dims && fitRange(dims[0], dims[1], Math.min(6, dims[1]), "stalls_90");
+  const originalDims = outlineDimensions(zone, row.image?.bounds);
+  const predicted = originalDims && fitRange(originalDims[0], originalDims[1], Math.min(6, originalDims[1]), "stalls_90");
   const held = row.status !== "reviewed";
   const bayEvidence = option === "bays" && photos ? photos.photos.filter(photo =>
     ["building", "street_level", "floor_plan", "site_plan"].includes(photo.role) || /(?:floor|site) plan/i.test(photo.caption || "")
@@ -79,9 +81,10 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
       {(["Horizontal %", "Vertical %"] as const).map((n,i) => <label key={n}>{n}<input className="field" type="number" min={0} max={100} step={0.1} value={activePoint[i]} onChange={e => { const v=e.target.valueAsNumber; if(Number.isFinite(v)&&v>=0&&v<=100) changePoint(i===0?[v,activePoint[1]]:[activePoint[0],v]); }} /></label>)}</div>
       <button type="button" className="text-link" onClick={reset}>Reset changes</button><p>Keep for diligence to save this outline with the team's review.</p></div>}
     {history.state === "unavailable" && <p role="status">Team reviews unavailable. <button type="button" className="text-link" onClick={history.retry}>Retry</button></p>}
-    <OptionReview key={option + area} site={site} option={option} row={row} area={area} prior={prior} dimensions={dims} ready={history.state === "ready"}
+    <OptionReview key={option + area} site={site} option={option} row={row} area={area} prior={prior} dimensions={dims} predicted={predicted} ready={history.state === "ready"}
       refresh={history.retry} edit={zone && !editing ? () => setEditing(true) : undefined} points={draft || visible[which]?.points} clearPoints={() => setDraft(undefined)} stopEdit={() => setEditing(false)} />
     {history.reviews.some(x => x.review?.revision !== row.revision && x.review?.area !== area) && <details className="disclosure"><summary className="disclosure">Earlier layout reviews</summary>{history.reviews.filter(x => x.review?.revision !== row.revision && x.review?.area !== area).map(x => <p key={x.note.id}>{x.review?.area} · {x.review?.disposition} · {x.review?.reason}</p>)}</details>}
+    <a className="text-link" href="/space-review">Review other sites</a>
     <p className="space-date">Aerial review · {reviewedOn}{row.cohort !== "active" ? " · " + (row.cohort === "dropped" ? "Dropped record" : "Off-market record") : ""}</p>
   </div>;
 }

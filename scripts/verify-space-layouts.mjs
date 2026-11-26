@@ -36,7 +36,14 @@ export async function verifySpaceLayouts(origin, file, credentials) {
       const passed = await Promise.all(group.map(entry => check(entry).catch(() => false)));
       unresolved.push(...group.filter((_, j) => !passed[j]));
     }
-    if (!unresolved.length) return sites.length;
+    if (!unresolved.length) {
+      const portfolioResponse = await read("/api/data/space-options?view=portfolio");
+      if (!portfolioResponse.ok) throw Error("Production portfolio readback failed.");
+      const portfolio = await portfolioResponse.json();
+      const visible = new Set((portfolio.rows || []).map(row => row.id));
+      if (!sites.every(([site]) => visible.has(site))) throw Error("The portfolio is missing assessment records.");
+      return sites.length;
+    }
     remaining = unresolved;
   }
   throw Error("Production assessment or aerial readback unresolved for " + remaining.length + " of " + sites.length + " records.");

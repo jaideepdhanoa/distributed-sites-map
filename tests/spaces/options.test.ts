@@ -33,3 +33,13 @@ test("team corrections stay bound to their source and reject crossed or empty ge
   assert.equal(usableOutline(yard.points),true);
   assert.equal(assessmentSchema.safeParse({...row,image:{src:"https://example.org",id:"0000000000000000",width:100,height:100,source:"Map",date:""}}).success,false);
 });
+
+test("a cited zero can overturn the earlier four-stall screen without changing its geometry", async () => {
+  const { fitOutcome } = await import("../../lib/spaces/optionReview");
+  const measured = { stalls: 0, source: "Dimensioned plan, revision B", predicted: [4, 6] as [number, number] };
+  const base = { disposition: "Dismiss option" as const, option: "outdoor" as const, area: "Parking", revision: "abcdef123456", frame:"1234567890abcdef", reason:"Retained travel aisle." };
+  assert.deepEqual(readReview({body:reviewBody({...base, measured}), deleted:false, parentId:null})?.measured,measured);
+  assert.equal(fitOutcome(measured),"Aerial overestimated four-stall fit");
+  assert.equal(fitOutcome({stalls:4,source:"Visit",predicted:[1,3]}),"Aerial missed a four-stall layout");
+  assert.equal(fitOutcome({stalls:3,source:"Visit",predicted:[3,5]}),"Measurement falls below four stalls");
+});

@@ -20,10 +20,19 @@ export const assessmentSchema = z.object({
   }).optional(),
 });
 
-export function layoutAssessment(site: string): { row: Assessment; reviewedOn: string } | null {
-  if (!/^PIPE-(PHX|LAS|MIA|SNA)-\d{4,}$/.test(site) || isExcludedSite(site)) return null;
+function assessmentFile() {
   const file = readGeneratedOptional("space-layouts.json") as { version?: number; sites?: Record<string, unknown>; reviewedOn?: string } | undefined;
   if (file?.version !== 1 || !file.reviewedOn || !/^\d{4}-\d\d-\d\d$/.test(file.reviewedOn)) return null;
+  return file;
+}
+
+export function assessedSiteIds() {
+  return Object.keys(assessmentFile()?.sites || {}).filter(id => /^PIPE-(PHX|LAS|MIA|SNA)-\d{4,}$/.test(id) && !isExcludedSite(id));
+}
+export function layoutAssessment(site: string): { row: Assessment; reviewedOn: string } | null {
+  if (!/^PIPE-(PHX|LAS|MIA|SNA)-\d{4,}$/.test(site) || isExcludedSite(site)) return null;
+  const file = assessmentFile();
+  if (!file?.reviewedOn) return null;
   const checked = assessmentSchema.safeParse(file.sites?.[site]);
   return checked.success ? { row: checked.data, reviewedOn: file.reviewedOn } : null;
 }

@@ -28,3 +28,16 @@ test("compare operating layouts and model a four-stall boundary", async ({ page 
   await expect(panel).toContainText("0–4 stalls");
   expect(await panel.evaluate(el=>el.scrollWidth <= el.clientWidth)).toBeTruthy();
 });
+
+test("find a bay review in the portfolio, including a site without a map pin", async ({ page }) => {
+  const sample = { id:"PIPE-PHX-9999", mapped:false, city:"PHX", name:"Example repair business", stage:"Assessment cohort", cohort:"active", focus:"Test a conversion", baseline:"No recorded stall count", options:["bays"], kinds:["Service or wash bay"], finding:"Service building", next:"Obtain an interior service plan." };
+  await page.route("**/api/data/space-options?view=portfolio", r=>r.fulfill({ json:{ rows:[sample] } }));
+  await page.route("**/api/data/space-options?site=*", r=>r.fulfill({ json:{ assessment:null } }));
+  await page.goto("/space-review");
+  await page.getByLabel("Layout with an outline").selectOption("outdoor");
+  await expect(page.getByText("No sites match these filters.")).toBeVisible();
+  await page.getByLabel("Layout with an outline").selectOption("bays");
+  await page.getByRole("link",{name:"Example repair business"}).click();
+  await expect(page.getByRole("heading",{name:"Example repair business"})).toBeVisible();
+  await expect(page.getByTestId("space-options")).toContainText("No aerial assessment on file");
+});

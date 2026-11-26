@@ -2,8 +2,8 @@ import { useId, useState } from "react";
 import type { Aerial, Zone, Point } from "@/lib/spaces/options";
 import { kinds } from "@/lib/spaces/options";
 
-export default function OptionAerial({ image, zones, active, corrected, onPoint }: {
-  image: Aerial; zones: Zone[]; active?: string; corrected?: string; onPoint?: (point: Point) => void;
+export default function OptionAerial({ image, zones, active, reviewed = [], onSelect, onPoint }: {
+  image: Aerial; zones: Zone[]; active?: string; reviewed?: string[]; onSelect?: (area: string) => void; onPoint?: (point: Point) => void;
 }) {
   const pattern = useId().replace(/:/g, "");
   const [failed, setFailed] = useState("");
@@ -22,10 +22,10 @@ export default function OptionAerial({ image, zones, active, corrected, onPoint 
         const clear = z.kind === "clear", selected = !active || active === z.label;
         const points = z.points.map(([x,y]) => [x * image.width / 100, y * image.height / 100].join(",")).join(" ");
         const fill = clear ? "url(#" + pattern + ")" : z.kind === "bay" ? "#ffbb62" : "#64e5be";
-        return <g key={z.label + i} opacity={clear || selected ? 1 : .65}><title>{z.label} · {kinds[z.kind].label}</title>
+        return <g key={z.label + i} opacity={clear || selected ? 1 : .65} onClick={!clear && onSelect ? () => onSelect(z.label) : undefined} style={!clear && onSelect ? { cursor: "pointer" } : undefined}><title>{z.label} · {kinds[z.kind].label}</title>
           <polygon points={points} fill={fill} fillOpacity={clear ? .7 : .35} stroke="#152b27" strokeWidth="4" vectorEffect="non-scaling-stroke" />
           <polygon points={points} fill="none" stroke={clear ? "#fff" : z.kind === "bay" ? "#ffe49a" : "#abffe0"} strokeWidth="2"
-            strokeDasharray={clear || z.label === corrected ? undefined : "6 4"} vectorEffect="non-scaling-stroke" />
+            strokeDasharray={clear || reviewed.includes(z.label) ? undefined : "6 4"} vectorEffect="non-scaling-stroke" />
         </g>;
       })}
     </svg>

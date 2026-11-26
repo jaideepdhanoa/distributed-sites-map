@@ -2109,7 +2109,7 @@ export default function MapView(props: Props) {
       if (!source && !layer?.frame) return;
       const features = (layer?.zones || []).map(zone => {
         const ring = zone.points.map(point => worldPoint(point, layer!.frame!));
-        return { type: "Feature" as const, properties: { kind: zone.kind, solid: zone.kind === "clear" || zone.label === layer?.corrected }, geometry: { type: "Polygon" as const, coordinates: [[...ring, ring[0]]] } };
+        return { type: "Feature" as const, properties: { kind: zone.kind, solid: zone.kind === "clear" || Boolean(layer?.reviewed.includes(zone.label)) }, geometry: { type: "Polygon" as const, coordinates: [[...ring, ring[0]]] } };
       });
       const data = { type: "FeatureCollection" as const, features };
       if (source) { source.setData(data); return; }

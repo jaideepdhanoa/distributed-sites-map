@@ -4384,7 +4384,8 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .space-top strong { font-size:.92rem; }
 .space-top p { margin:2px 0; }
 .space-top small, .space-date, .option-aerial figcaption { color:#565c50; }
-.space-thumb { width:78px; height:64px; flex:none; }
+.space-thumb .text-link { position:absolute; inset:0; width:100%; height:100%; border-radius:5px; }
+.space-thumb { position:relative; width:78px; height:64px; flex:none; }
 .space-thumb .option-aerial, .space-thumb svg { width:100%; height:100%; }
 .space-thumb figcaption { display:none; }
 .space-workspace { border-top:1px solid #d7d9c9; padding-top:12px; margin-top:8px; }

@@ -21,6 +21,14 @@ The change `source` is required. `payload.at` is an ISO-8601 time with a numeric
 | `gmail_thread_ids` | Thread ids already on the message. Do not invent one. |
 | `covered_refs` | `PIPE-` and `LAND-` ids, or a short scope line when no row exists. |
 
+## Field limits
+
+The API accepts up to 400 characters in `note` and 200 in `source_ref`. Aim for about 200 characters in a note so it reads easily in the dossier. Each entry in `gmail_thread_ids` and `covered_refs` must contain 1–80 characters after trimming.
+
+Put phone numbers in `contact_phone` (up to 40 characters). If the API detects a phone number in another text field or list entry, it returns HTTP 400, including for `note`, `next_step`, `court_detail`, and `source_ref`.
+
+Agents without repository access can find the capture instructions in Workflow 12 of the Agent Operating Manual.
+
 ## Stage transitions
 
 | Email event | `stage` | `court` |

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import SelectionResearch from "@/components/SelectionResearch";
 import type { SelectionRow } from "@/lib/selection/screen";
 
 type Result = { rows: SelectionRow[]; mismatches: number; hasInputs: boolean };
@@ -41,6 +42,7 @@ export default function SelectionReview() {
         <small>{r.city} · {r.stage} · {r.section}</small><h2>{r.name}</h2><p>{r.id}</p><strong>{r.readiness}</strong>
         {r.mirrorStage && r.stage !== r.mirrorStage && <p>Workbook stage: {r.mirrorStage}</p>}
         {r.financeVisible && <p>Workbook base savings: {r.amount === null ? "Unmodeled" : (r.amount*100).toFixed(1)+"%"}</p>}
+        {r.research && <SelectionResearch row={r.research}/>}
         {r.mapped && <a href={"/?"+new URLSearchParams({site:r.id,city:r.city,funnel:"pipeline",sheet:"full"})}>Open site record</a>}
       </div><div><strong>{r.priority}</strong><p>{r.instruction}</p><p>{r.geometry} · {r.option}</p>
         {r.quickLube && r.priority !== "Screen fleet service" && <p>Retained lifts and fleet-service rights also need a separate check.</p>}

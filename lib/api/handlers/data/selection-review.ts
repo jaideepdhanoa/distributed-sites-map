@@ -8,6 +8,7 @@ import { overlayStageFile } from "@/lib/stageOverlayLoad";
 import { readGeneratedOptional } from "@/lib/snapshot/read";
 import { assessedSiteIds, layoutAssessment } from "@/lib/spaces/assessmentLoad";
 import { triage } from "@/lib/spaces/triage";
+import { selectionResearch } from "@/lib/selection/researchLoad";
 import { investmentScreen, selectionCheck, type Inputs, type SelectionRow } from "@/lib/selection/screen";
 import { loadMapDeals } from "./deals";
 
@@ -15,7 +16,7 @@ export async function GET() {
   const session = await requireUser();
   if (!isSession(session)) return session;
   const raw = readGeneratedOptional("selection-inputs.json") as Record<string,Inputs> | undefined;
-  const current = await loadMapDeals(session.actionRole);
+  const current = await loadMapDeals(session.actionRole, false);
   const mapped = new Map(current.features.filter(f => f.properties?.kind === "pipeline").map(f => [String(f.properties?.deal_id), f]));
   const missing = (raw ? Object.keys(raw) : assessedSiteIds()).filter(id => !mapped.has(id) && !isExcludedSite(id));
   const features = missing.map(id => {
@@ -28,6 +29,7 @@ export async function GET() {
   const rows: SelectionRow[] = [];
   let mismatches = 0;
   const financeVisible = canReadFinancials(session.actionRole);
+  const evidence = financeVisible ? selectionResearch() : null;
   for (const feature of all) {
     const p: Record<string,unknown> = feature.properties || {};
     const id = String(p.deal_id);
@@ -41,7 +43,7 @@ export async function GET() {
     const view = triage(a?.row);
     const [priority,instruction] = selectionCheck(city,input,view.focus,p.listing_removed === true);
     rows.push({id,city,name:String(p.name || p.address || id),mapped:Boolean(mapped.get(id)?.geometry),stage,mirrorStage:input?.stage || "",
-      priority,instruction,geometry:!a && typeof input?.recorded === "number" ? input.recorded+" stalls in the workbook" : view.baseline,option:view.finding || view.focus,assessed:Boolean(a),evidenceDate:a?.reviewedOn || "",
+      research:evidence?.get(id),priority,instruction,geometry:!a && typeof input?.recorded === "number" ? input.recorded+" stalls in the workbook" : view.baseline,option:view.finding || view.focus,assessed:Boolean(a),evidenceDate:a?.reviewedOn || "",
       section:input?.section || (input ? "Missing section" : "Workbook input unavailable"),amount:financeVisible ? input?.screen ?? null : null,
       readiness:investmentScreen(input,financeVisible),financeVisible,quickLube:(input?.segment || a?.row.segment || "").toLowerCase().includes("lube") });
   }

@@ -93,6 +93,9 @@ jobs:
           python scripts/sync_workbook.py
           python scripts/build_data.py
           python -m scripts.selection_inputs
+          if [ -f data/source/selection-evidence.json ]; then
+            cp data/source/selection-evidence.json data/generated/selection-evidence.json
+          fi
           if [ -f data/source/space-layouts.json ]; then
             cp data/source/space-layouts.json data/generated/space-layouts.json
           fi
@@ -160,7 +163,9 @@ jobs:
         id: checks
         if: steps.same.outputs.unchanged != 'true' && steps.live.outputs.unchanged != 'true'
         continue-on-error: true
-        run: python scripts/run_sync_checks.py /tmp/sync-test-results.md
+        run: |
+          python scripts/run_sync_checks.py /tmp/sync-test-results.md
+          node --import tsx scripts/verify-selection-evidence.mjs
       - name: Report failed data checks
         if: steps.checks.outcome == 'failure'
         run: |
@@ -378,6 +383,21 @@ jobs:
           E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
         run: node scripts/verify-space-layouts.mjs
+      - name: Check whether the offering research passed signed-in readback
+        id: research-readback
+        if: always() && !cancelled() && github.ref == 'refs/heads/main' && hashFiles('data/generated/selection-evidence.json') != '' && (steps.publish.outputs.published == 'true' || steps.same.outputs.unchanged == 'true' || steps.live.outputs.unchanged == 'true')
+        uses: actions/cache@v4
+        with:
+          path: .selection-readback
+          key: selection-readback-v1-${{ hashFiles('data/generated/selection-evidence.json') }}
+      - name: Verify the released offering research
+        if: always() && !cancelled() && steps.research-readback.outcome == 'success' && steps.research-readback.outputs.cache-hit != 'true'
+        env:
+          E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: |
+          if [ ! -d node_modules/tsx ]; then npm ci; fi
+          node --import tsx scripts/verify-selection-evidence.mjs --live
       - name: Fail when the data checks failed
         if: steps.checks.outcome == 'failure' || steps.gap.outcome == 'failure'
         run: exit 1

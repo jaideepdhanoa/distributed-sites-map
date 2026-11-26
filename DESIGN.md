@@ -149,3 +149,7 @@ At city zoom, Nearby sites follows the visible map and orders matching records b
 Saved comparisons place the decision beside its source figures. Keep the original value, basis and reporting period legible when a current figure changes. Link each citation to the underlying record and any matching evidence follow-up.
 
 Decisions to revisit links directly to one changed citation. Show its original and current figures, the source, and the owner’s review action alongside the decision rationale. Keep and Revise create dated records. Nearby rows show one parcel fact and highlight its map position on hover or keyboard focus. The ring lets pointer events reach the map.
+
+### Power on the map
+
+Power view is a signed-in map layer. Filter property-service evidence independently of utility estimates. A pin's Power tab shows the actual readings with their sources, the forecast year, distance from the pin to mapped infrastructure, and the shared follow-up. Preserve recorded zeroes. A known distance can exist without matching geometry. Framing the grid is reversible and keeps the site selected.

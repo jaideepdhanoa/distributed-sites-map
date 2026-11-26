@@ -68,6 +68,7 @@ type Props = {
   overlayPoints?: { label: string; coordinates: [number, number] }[];
   washPoints?: NearbyWash[];
   gridFeatures?: GeoFeature[];
+  gridFocusId?: string | null;
   onRingsOutside?: (outside: boolean) => void;
   registerFrameRings?: (frame: (() => void) | null) => void;
   spaceShapes?: SpaceShape[];
@@ -1519,7 +1520,11 @@ export default function MapView(props: Props) {
       else map.addSource("overlays", { type: "geojson", data: overlayData });
       const gridData = {
         type: "FeatureCollection" as const,
-        features: (props.gridFeatures || []).filter((feature) => feature.geometry),
+        features: (props.gridFeatures || []).filter(f => f.geometry).map(f => {
+          const name = f.properties.kind === "line" ? "High-voltage line" : "Substation";
+          const distance = String(f.properties.label || "").match(/([\d,.]+\s*(?:mi|ft))\s*$/i)?.[1];
+          return {...f, properties:{...f.properties, map_label:distance ? name+" · "+distance+" away" : name}};
+        }),
       };
       const gridSource = map.getSource("grid") as GeoJSONSource | undefined;
       if (gridSource) gridSource.setData(gridData);
@@ -1556,7 +1561,7 @@ export default function MapView(props: Props) {
           id: "grid-substation-point",
           type: "circle",
           source: "grid",
-          filter: ["all", ["==", ["get", "kind"], "substation"], ["==", ["geometry-type"], "Point"]],
+          filter: ["all", ["==", ["get", "kind"], "substation"], ["==", ["geometry-type"], "Point"], ["!", ["has","label_only"]]],
           paint: { "circle-radius": 7, "circle-color": "#1d4e89", "circle-stroke-color": "#faf7f1", "circle-stroke-width": 2 },
         });
       }
@@ -1567,12 +1572,12 @@ export default function MapView(props: Props) {
           source: "grid",
           filter: ["any", ["==", ["geometry-type"], "Point"], ["has", "label_only"]],
           layout: {
-            "text-field": ["get", "label"],
+            "text-field": ["get", "map_label"],
             "text-font": ["Noto Sans Regular"],
             "text-size": 13,
             "text-offset": [0, -1.4],
             "text-anchor": "bottom",
-            "text-allow-overlap": true,
+            "text-allow-overlap": false,
           },
           paint: { "text-color": "#1d4e89", "text-halo-color": "#f7f4ee", "text-halo-width": 3 },
         });
@@ -1875,6 +1880,7 @@ export default function MapView(props: Props) {
     props.offMarket.some((feature) => feature.properties.site_id === props.selectedId) ||
     props.deals.some((feature) => feature.properties.deal_id === props.selectedId) ||
     props.unscreened?.some(feature => feature.properties.listing_id === props.selectedId);
+  const gridCamera = useRef<{id:string; center:[number,number]; zoom:number; bearing:number; pitch:number; padding:ReturnType<Map["getPadding"]>} | null>(null);
   const gridToken = (props.gridFeatures || []).map((feature) => String(feature.properties?.deal_id || feature.properties?.site_id || "")).join(",");
   useEffect(() => {
     const map = mapRef.current;
@@ -1894,7 +1900,7 @@ export default function MapView(props: Props) {
     }
     let cancel = false;
     const go = () => {
-      if (cancel || reviewFocusRef.current) return;
+      if (cancel || reviewFocusRef.current || propsRef.current.gridFocusId) return;
       if (propsRef.current.spaceDrawing && propsRef.current.spaceFly) {
         const fly = propsRef.current.spaceFly;
         map.jumpTo({ center: [fly.lng, fly.lat], zoom: 18, padding: pointPadding(map) });
@@ -1946,6 +1952,33 @@ export default function MapView(props: Props) {
       map.off("idle", go);
     };
   }, [mapGeneration, props.selectedId, props.previewName, selectedOnMap, props.focusLng, props.focusLat, props.focusZoom, props.fitAll, props.spaceDrawing, props.spaceFly, props.reviewFocus, gridToken]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const id = props.gridFocusId;
+    if (!id) {
+      const previous = gridCamera.current;
+      gridCamera.current = null;
+      if (previous && previous.id === props.selectedId && props.previewName) {
+        map.stop();
+        map.jumpTo(previous);
+      }
+      return;
+    }
+    const pin = previewLng != null && previewLat != null ? [previewLng,previewLat] : null;
+    if (!pin || !map.getContainer().clientWidth) return;
+    const coords = (propsRef.current.gridFeatures || []).flatMap(f => geometryCoords(f.geometry));
+    if (!coords.length) return;
+    map.stop();
+    if (gridCamera.current?.id !== id) gridCamera.current = {id, center:map.getCenter().toArray(),
+      zoom:map.getZoom(), bearing:map.getBearing(), pitch:map.getPitch(), padding:map.getPadding()};
+    const points = [pin,...coords];
+    const xs = points.map(p=>p[0]), ys = points.map(p=>p[1]);
+    const pad = pointPadding(map);
+    const bounds: [[number,number],[number,number]] = [[Math.min(...xs),Math.min(...ys)],[Math.max(...xs),Math.max(...ys)]];
+    fitMap(map,bounds,{padding:{top:pad.top+30,bottom:pad.bottom+32,left:pad.left+32,right:pad.right+32},maxZoom:16,duration:0});
+  }, [mapGeneration,props.gridFocusId,props.selectedId,props.previewName,gridToken,previewLng,previewLat]);
 
   useEffect(() => {
     const map = mapRef.current;

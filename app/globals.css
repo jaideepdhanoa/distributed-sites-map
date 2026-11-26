@@ -4432,3 +4432,27 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .space-review-results small { color:#545d52; }
 .space-review-results p { font-size:.9rem; margin:3px 0; }
 @media(max-width:600px){.space-review-results li { grid-template-columns:1fr; gap:8px; }}
+/* The power card keeps property evidence, utility forecasts and mapped distances distinct. */
+.power-tabs { margin: 8px 0; }
+.map-power-card section { border-top: 1px solid var(--line, #d6cebe); padding: 12px 0; }
+.map-power-card h3 { margin: 0 0 6px; color: var(--pine, #1e4636); font: 600 20px/1.2 Georgia, serif; }
+.map-power-card p, .map-power-card strong { margin: 4px 0; }
+.map-power-card small, .power-source, .power-forecast { font-size: 13px; color: var(--ink-3, #625b51); }
+.power-reading { margin: 7px 0; }
+.power-reading strong { display: block; font-size: 18px; }
+.power-status { display: inline-block; padding: 2px 8px; border-radius: 10px; background: #eceee6; color: #394c40; font-size: 12px; }
+.power-hosting { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
+.power-hosting div { background: #eef2f1; padding: 8px 10px; border-radius: 8px; }
+.power-hosting dt { font-size: 12px; }
+.power-hosting dd { margin: 2px 0 0; font-size: 16px; font-weight: 600; color: #2b5369; }
+.power-source summary { cursor: pointer; overflow-wrap: anywhere; }
+.power-source > div { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0; }
+.map-power-card .paper-btn, .map-power-card .primary { margin-top: 6px; }
+.map-power-card small { display: block; }
+.power-map-filters { display: grid; gap: 6px; }
+.power-map-filters label:not(.layer-row) { display: grid; gap: 3px; font-size: 13px; }
+@media (max-width: 767px) {
+  .shell.drawer-open.pin-preview-open .map-preview.with-power { max-height: 58dvh; }
+  .power-source summary, .map-power-card button, .power-tabs button { min-height: 44px; align-content: center; }
+}
+.map-preview .map-power-card h3 { text-transform: none; letter-spacing: normal; }

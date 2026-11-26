@@ -29,8 +29,10 @@ test("an assessment without a map pin can keep a review and a discussion on its 
     assert.ok(saved.ok);
     assert.equal(saved.anchor.label,parking.label);
     const link = new URL(commentHref(site,"COM-9001",saved.anchor));
-    assert.equal(link.pathname,"/space-review");
-    assert.equal(link.searchParams.get("outline"),anchor.spaceId);
+    assert.equal(link.pathname,"/");
+    assert.equal(link.searchParams.get("spaceSite"),site);
+    assert.equal(link.searchParams.get("discussion"),"1");
+    assert.equal(link.searchParams.get("spaceArea"),anchor.spaceId);
     assert.equal(link.searchParams.get("note"),"COM-9001");
     await assert.rejects(storeComment(sql,"COM-9002",{...write,anchor:{...anchor,spaceId:"outline:bays:Sample row"}},0), /not on this assessment/);
   } finally { resetSnapshotForTests(); }

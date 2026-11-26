@@ -10,6 +10,12 @@ export function useOptionReviews(id: string) {
   const [state, setState] = useState<"loading" | "ready" | "unavailable">("loading");
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    const refresh = () => setAttempt(n => n + 1);
+    window.addEventListener("space-outline-saved", refresh);
+    return () => window.removeEventListener("space-outline-saved", refresh);
+  }, []);
+  useEffect(() => {
+    if (!id) { setNotes([]); return; }
     const controller = new AbortController();
     setState("loading");
     fetch("/api/actions/notes?" + new URLSearchParams({ targetKind: "deal", targetId: id }), { signal: controller.signal, cache: "no-store" })
@@ -37,6 +43,7 @@ export function useSaveReview(site: string) {
     }
     receipt.current = { body: "", key: "" };
     window.dispatchEvent(new Event("queue-refresh"));
+    window.dispatchEvent(new Event("space-outline-saved"));
   };
 }
 

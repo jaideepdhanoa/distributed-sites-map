@@ -6,7 +6,8 @@ import { commentList, type OpenPnlComment } from "@/lib/comments/anchor";
 import { COMMENT_CHANGED } from "@/lib/comments/nav";
 import { conflictList, type DataConflict } from "@/lib/conflicts/view";
 import { financialsCard, shownYear, statementTiles, type StatementTile } from "@/lib/pnl/cue";
-import { emptyStatement, type PnlStatement } from "@/lib/pnl/statement";
+import type { FinancialPanel } from "@/lib/financials";
+import { emptyStatement, unavailableStatement, type PnlStatement } from "@/lib/pnl/statement";
 import ComparisonEvidence from "./actions/ComparisonEvidence";
 import { useActionStatus } from "./actions/panel";
 import { statementFigures, type StatementMeasure } from "@/lib/pnl/citation";
@@ -39,6 +40,9 @@ export function usePnlTiles(dealId: string) {
   const [statement, setStatement] = useState<PnlStatement | null>(null);
   const [conflicts, setConflicts] = useState<DataConflict[]>([]);
   const [comments, setComments] = useState<OpenPnlComment[]>([]);
+  const [panel,setPanel] = useState<FinancialPanel | null>(null);
+  const [failed,setFailed] = useState(false);
+  const [attempt,setAttempt] = useState(0);
   const [sample, setSample] = useState(false);
   const [settled, setSettled] = useState(!dealId);
   const [loadedFor, setLoadedFor] = useState(dealId);
@@ -50,6 +54,7 @@ export function usePnlTiles(dealId: string) {
   }, []);
   if (loadedFor !== dealId) {
     setLoadedFor(dealId);
+    setPanel(null); setFailed(false);
     setStatement(null);
     setSample(false);
     setSettled(!dealId);
@@ -72,16 +77,17 @@ export function usePnlTiles(dealId: string) {
       setSettled(false);
     }
     fetch(`/api/data/financials/${encodeURIComponent(dealId)}`, { cache: "no-store" })
-      .then(async (response) => (response.ok ? await response.json() as { pnl?: unknown; pnlDemo?: boolean; conflicts?: unknown; comments?: unknown } : null))
+      .then(async (response) => (response.ok ? await response.json() as FinancialPanel & { pnl?: unknown; pnlDemo?: boolean; conflicts?: unknown; comments?: unknown } : null))
       .then((body) => {
         if (cancel) return;
-        setStatement(readStatement(body?.pnl));
+        setPanel(body); setFailed(!body);
+        setStatement(body ? readStatement(body.pnl) : unavailableStatement());
         setConflicts(conflictList(body?.conflicts));
         setComments(commentList(body?.comments));
         setSample(Boolean(body?.pnlDemo));
       })
       .catch(() => {
-        if (!cancel) setStatement(emptyStatement());
+        if (!cancel) { setFailed(true); setStatement(unavailableStatement()); }
       })
       .finally(() => {
         if (!cancel) setSettled(true);
@@ -89,8 +95,8 @@ export function usePnlTiles(dealId: string) {
     return () => {
       cancel = true;
     };
-  }, [dealId, commentTick]);
-  return { statement, conflicts, comments, sample, settled, tiles: statement ? statementTiles(statement, sample) : null };
+  }, [dealId, commentTick, attempt]);
+  return { panel, failed, retry:()=>setAttempt(n=>n+1), statement, conflicts, comments, sample, settled, tiles: statement ? statementTiles(statement, sample) : null };
 }
 
 export default function FinancialsEntry({

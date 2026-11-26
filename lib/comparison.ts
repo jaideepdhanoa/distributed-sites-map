@@ -1,3 +1,4 @@
+import { purchaseLabels, purchaseRows } from "./purchaseReview";
 import type { DealProps, SiteProps } from "@/lib/types";
 import { displayAddress, shownPriceSource } from "@/lib/format";
 import { acresText, cashTile, comparisonPower, depotLine, factsForDeal, factsForSite, fullMoney, spareLandSqft, packageLine, powerSummary, sheetMoney, tradeAreaLines, universeTrafficLine, workbookTrafficLine } from "@/lib/keyNumbers";
@@ -12,7 +13,7 @@ type CompareRow = { label: string; value: string; key?: string | number | null; 
 export type ComparisonColumn = { id: string; title: string; rows: CompareRow[] };
 
 export const compareSections = ["Power evidence", "Acquisition economics", "Financials", "Site fit", "Evidence quality", "Diligence", "Record details"] as const;
-export const acquisitionCriteria = ["Open land", "Bays that fit", "On-site service", "Street-frontage hosting", "Implied business price", "Business-only multiple", "Savings versus hub", "Service area", "Zoning", "Asking", "Revenue", "EBITDA", "Cash flow", "Asking / earnings", "Land estimate", "Reporting period", "Figure basis", "Financial source", "NDA", "Open evidence gaps", "Blocker", "Next check"];
+export const acquisitionCriteria = [...purchaseLabels,"Open land", "Bays that fit", "On-site service", "Street-frontage hosting", "Implied business price", "Business-only multiple", "Savings versus hub", "Service area", "Zoning", "Asking", "Revenue", "EBITDA", "Cash flow", "Asking / earnings", "Land estimate", "Reporting period", "Figure basis", "Financial source", "NDA", "Open evidence gaps", "Blocker", "Next check"];
 
 function sectionFor(label: string): typeof compareSections[number] {
   if (["On-site service", "Street-frontage hosting"].includes(label)) return "Power evidence";
@@ -74,6 +75,7 @@ export function dealRows(deal: DealProps, sites: SiteProps[], signedIn: boolean)
     { label: "Depot", value: depotLine(deal.miles_to_depot) },
     { label: "Zoning", value: shown(linked?.zoning) },
     { label: "Property owner", value: shown(linked?.owner) },
+    ...(signedIn ? purchaseRows(deal) : []),
     ...decisionRows(deal, signedIn),
     ...ebitdaRows(deal, signedIn),
     { label: "Cash flow", key: signedIn && !cash.hidden ? deal.stated_cash_flow ?? deal.stated_cash_flow_display : null, basis: earningsBasis(deal), value: signedIn && cash.hidden ? "Not applicable" : signedIn ? shown(cashValue) : MISSING },
@@ -140,6 +142,7 @@ export function siteRows(site: SiteProps, deals: DealProps[], signedIn: boolean)
     { label: "Depot", value: depotLine(site.miles_to_depot) },
     { label: "Zoning", value: shown(site.zoning) },
     { label: "Property owner", value: shown(site.owner) },
+    ...(signedIn && linked ? purchaseRows(linked) : []),
     ...decisionRows(linked, signedIn),
     ...(signedIn && !linked && site.land_only ? [{label:"EBITDA",value:"Not applicable"}] : ebitdaRows(linked, signedIn)),
     ...(signedIn && !linked ? ["Revenue","Asking / earnings","Implied business price","Business-only multiple","Savings versus hub","Land estimate","NDA","Blocker","Next check","Figure basis","Reporting period","Financial source"].map(label=>({label,value:site.land_only && ["Revenue","Asking / earnings","Implied business price","Business-only multiple","Figure basis","Reporting period","Financial source"].includes(label) ? "Not applicable" : MISSING})) : []),

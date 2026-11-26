@@ -173,6 +173,8 @@ export type SiteProps = {
 };
 
 export type DealProps = {
+  statementCoverage?: "present" | "empty" | "unavailable";
+  purchase?: import("./purchaseReview").PurchaseData;
   deal_id: string;
   kind: "pipeline" | "land";
   name: string;

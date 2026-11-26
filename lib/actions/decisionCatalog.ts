@@ -1,3 +1,4 @@
+import { readScenario, scenarioFigure } from "@/lib/purchaseReview";
 import { showsFinancials } from "@/lib/keyNumbers";
 import { linkedPnlIds, loadPnlStatement } from "@/lib/pnl/read";
 import { demoStatement } from "@/lib/pnl/demo";
@@ -43,6 +44,12 @@ export function decisionCatalog(sites: SiteProps[], deals: DealProps[]) {
     const site = c.targetKind === "site" ? bySite.get(c.targetId) : undefined;
     const deal = site ? deals.find(d => d.deal_id === site.linked_deal_id || d.universe_id === site.site_id) : byDeal.get(c.targetId);
     if (!site && (!deal || c.targetKind !== "deal")) return null;
+    if (c.measure==="purchase_case") {
+      const scenario=readScenario(c.anchor || "");
+      if (!scenario || !deal) return null;
+      const current=scenarioFigure(deal,scenario);
+      return current ? {...c,...current} : {...c,value:MISSING,period:c.period,basis:"Inputs or footprint changed",source:"Pipeline workbook"};
+    }
     if (isStatementMeasure(c.measure)) {
       const entry = deal && statements.get(deal.deal_id);
       if (!entry || entry.pnl.status === "unavailable") return null;

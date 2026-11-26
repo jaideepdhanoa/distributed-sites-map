@@ -22,6 +22,7 @@ import { cardPhotos, isPanoUrl } from "@/lib/photos";
 import { aerialTile, streetViewHref } from "@/lib/aerial";
 import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
 import PanelSections, { RecordNavigation } from "./PanelSections";
+import PurchaseReview from "./PurchaseReview";
 import Economics from "./Economics";
 import RecordBrief from "./RecordBrief";
 import SitePhotos from "./SitePhotos";
@@ -655,7 +656,7 @@ export default function Detail({
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
       </div>
       <RecordBrief target={{ kind: "site", id: site.site_id }} pnl={pnl} site={site} deal={linkedDeal} signedIn={signedIn} />
-      <RecordNavigation />
+      <RecordNavigation financials={Boolean(signedIn && linkedDeal?.kind==="pipeline" && !site.land_only)} />
       <section className="decision-block" data-testid="decision-block">
         {decisionFirst && nextCard}
         <DecisionChips deal={linkedDeal} waiting={waitingChip} />
@@ -699,6 +700,7 @@ export default function Detail({
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections
+        purchase={signedIn && linkedDeal?.kind==="pipeline" && !site.land_only && <PurchaseReview key={linkedDeal.deal_id} deal={linkedDeal} pnl={pnl}/>}
         economics={<Economics pnl={pnl} deal={linkedDeal} site={site} signedIn={signedIn} />}
         overview={
           <>
@@ -987,7 +989,7 @@ export function DealDetail({
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
       </div>
       <RecordBrief target={{ kind: "deal", id: deal.deal_id }} pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />
-      <RecordNavigation />
+      <RecordNavigation financials={signedIn && deal.kind==="pipeline"} />
       <section className="decision-block" data-testid="decision-block">
         {decisionFirst && nextCard}
         <DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />
@@ -1019,6 +1021,7 @@ export function DealDetail({
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections
+        purchase={signedIn && deal.kind==="pipeline" && <PurchaseReview key={deal.deal_id} deal={deal} pnl={pnl}/>}
         economics={<Economics pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />}
         overview={
           <>

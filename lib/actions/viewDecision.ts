@@ -52,7 +52,7 @@ export async function saveDecision(sql: Sql, id: string, actor: string, input: D
   const citations: StoredFigure[] = [];
   for (const figure of input.citations) {
     if (!figure || typeof figure.value !== "string" || typeof figure.period !== "string" || typeof figure.basis !== "string" || !view.ids.includes(figure.targetId)) throw new InputError("Citations must belong to the saved comparison.");
-    if (figure.anchor && !figure.measure.startsWith("statement_")) throw new InputError("Only statement figures have a statement period.");
+    if (figure.anchor && figure.measure!=="purchase_case" && !figure.measure.startsWith("statement_")) throw new InputError("Only statement figures have a statement period.");
     const target = parseEvidenceTarget(new URLSearchParams(figure));
     const value = parseBody(figure.value, "cited figure", 1200);
     if (["Unavailable", "Checking…", "Not applicable"].includes(value)) throw new InputError("Choose an applicable figure.");

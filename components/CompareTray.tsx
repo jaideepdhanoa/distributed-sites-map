@@ -1,3 +1,5 @@
+import { usePurchaseScenarios } from "./PurchaseScenarios";
+import { purchaseLabels,purchaseRows,preferredScenario,scenarioFigure,readScenario } from "@/lib/purchaseReview";
 import { createPortal } from "react-dom";
 import PnlOverlay from "./PnlOverlay";
 import { useComparisonStatements } from "./useComparisonStatements";
@@ -40,6 +42,7 @@ export default function CompareTray({
   signedIn?: boolean;
   evidenceEnabled?: boolean;
 }) {
+  const purchaseScenarios=usePurchaseScenarios();
   const [showAll, setShowAll] = useState(false);
   const [sectionFilter, setSectionFilter] = useState("");
   const [highlight, setHighlight] = useState(true);
@@ -89,6 +92,15 @@ export default function CompareTray({
     return loaded ? statementFigures(loaded.pnl,Boolean(loaded.pnlDemo),anchor) : [];
   }
   const options = new Map<string,CitedFigure>();
+  const purchaseFigures:CitedFigure[]=[];
+  for (const c of columns) {
+    if (!signedIn || !c.deal || c.deal.kind!=="pipeline") continue;
+    const scenario=purchaseScenarios.cases[c.deal.deal_id] || preferredScenario(c.deal);
+    const rows=purchaseRows(c.deal,scenario);
+    c.rows=c.rows.map(r=>rows.find(v=>v.label===r.label) || r);
+    const f=scenarioFigure(c.deal,scenario);
+    if (f && f.value!==MISSING) purchaseFigures.push({...f,measure:"purchase_case",targetKind:c.targetKind,targetId:c.id});
+  }
   for (const column of columns) {
     if (!statementIds) break;
     const applicable = column.deal && showsFinancials(column.deal);
@@ -134,6 +146,11 @@ export default function CompareTray({
     const row = column.rows.find(row => row.label === label);
     const canFollowUp = column.followUps && column.deal?.kind !== "land" && column.deal?.stage_group !== "dropped";
     const statement = options.get(column.id+"|"+label);
+    if (onInspect && column.deal?.kind==="pipeline" && purchaseLabels.some(p=>p===label)) {
+      return <button type="button" className="text-link compare-evidence" onClick={event=>{
+        inspectedCell.current=event.currentTarget;onInspect(column.id,label);
+      }}>{value===MISSING?"Inspect financial inputs":value}</button>;
+    }
     if (statement && value === "Unavailable") return <button type="button" className="text-link" onClick={statements.retry}>Retry statement</button>;
     if (statement && !["Not applicable","Checking…",MISSING].includes(value)) return <button type="button" className="text-link compare-evidence"
       onClick={()=>openStatement(statement)}>{statement.value}<small>{[statement.period,statement.basis,statement.source].join(" · ")}</small></button>;
@@ -185,15 +202,19 @@ export default function CompareTray({
         <span className="layer-meta" role="status">{count} of 4 selected{count === 1 ? " · Select another site" : count === 4 ? " · Remove one to add another" : ""}</span>
         <button type="button" className="close" aria-label="Close compare" onClick={onClose}><span aria-hidden="true">×</span></button>
         {children}
-        {saveQuery && count >= 2 && onInspect && <SaveComparison key={columns.map(c => c.id).join("|")} query={saveQuery} sites={columns} inspect={onInspect} openStatement={openStatement} revision={refresh}
+        {saveQuery && count >= 2 && onInspect && <SaveComparison key={columns.map(c => c.id).join("|")} query={saveQuery} sites={columns} inspect={onInspect} restorePurchase={f=>{
+            const s=readScenario(f.anchor || ""), d=columns.find(c=>c.id===f.targetId)?.deal;
+            if(s && d) purchaseScenarios.set(d.deal_id,s);
+            onInspect(f.targetId,"Purchase scenario");
+          }} openStatement={openStatement} revision={refresh}
           checkGap={figure => setGap({ target: figure, title: figure.siteName, label: evidenceMeasures[figure.measure] })}
-          figures={columns.flatMap(column => column.rows.flatMap(row => {
+          figures={[...purchaseFigures.map(f=>({...f,siteName:columns.find(c=>c.id===f.targetId)!.title})),...columns.flatMap(column => column.rows.flatMap(row => {
             const statement = options.get(column.id+"|"+row.label);
             if (statement) return [{...statement,siteName:column.title}];
             const target = evidenceTarget(column.targetKind, column.id, row.label, column.deal);
             return target
               ? [{ ...target, value: row.value, siteName: column.title, source: row.source || "", ...(["revenue","cash_flow","ebitda"].includes(target.measure) ? {source:column.deal?.figures_source || "Deal record"} : {}) }] : [];
-          }))} />}
+          }))]} />}
       </div>
       {count >= 2 ? (
         <>

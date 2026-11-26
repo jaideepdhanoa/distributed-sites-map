@@ -27,3 +27,6 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+
+# Private workbook inputs for the signed-in purchase review
+/data/generated/purchase-review.json

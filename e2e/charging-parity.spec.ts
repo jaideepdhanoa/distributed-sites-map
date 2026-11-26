@@ -25,7 +25,7 @@ test("edit, save, reopen and compare a charging case",async({page},info)=>{
     await route.fulfill({json:{site,source:latest,history,canWrite:true}});
   });
   const url="/charging?site="+site.deal_id;
-  inputs.evidence.conversion={status:"quoted",source:"Synthetic contractor quote",date:"2026-11-01"};
+  inputs.evidence.conversion={status:"quoted",source:"Synthetic contractor quote",date:"2026-11-01",url:"https://example.org/contractor-estimate"};
   await page.goto(url+"&view=explain&case="+original.id+"%3A1");
   const explanation=page.getByRole("region",{name:"Cost per charge explanation"});
   await expect(explanation).toBeVisible();
@@ -33,6 +33,7 @@ test("edit, save, reopen and compare a charging case",async({page},info)=>{
   await explanation.getByText("Construction and interruption",{exact:true}).click();
   await explanation.getByRole("button",{name:"Additional conversion works ($ once)",exact:true}).click();
   await expect(explanation).toContainText("Synthetic contractor quote");
+  await expect(explanation.getByRole("link",{name:"Open source document"})).toHaveAttribute("href","https://example.org/contractor-estimate");
   await explanation.getByLabel("Trial value").fill("72000");
   await explanation.getByRole("button",{name:"Apply trial"}).click();
   await expect(explanation).toContainText("Scenario override");
@@ -93,13 +94,16 @@ test("open released charging assumptions from the portfolio",async({page})=>{
   const response=await page.request.get("/api/data/selection-review");
   expect(response.ok()).toBeTruthy();
   const {rows}=await response.json() as {rows:SelectionRow[]};
-  const record=rows.find(r=>r.charging && r.financeVisible);
+  const record=rows.find(r=>r.charging?.selected && r.financeVisible)??rows.find(r=>r.charging && r.financeVisible);
   expect(Boolean(record)).toBeTruthy();
   const res=await page.request.get("/api/actions/charging?site="+encodeURIComponent(record!.id));
   expect(res.ok()).toBeTruthy();
   const data=await res.json();
   expect(data.site.deal_id===record!.id).toBe(true);
-  await page.goto("/charging?view=explain&site="+encodeURIComponent(record!.id));
+  const params=new URLSearchParams({view:"explain",site:record!.id});
+  if(record!.charging?.selected)params.set("case",record!.charging.selected);
+  await page.goto("/charging?"+params);
+  if(record!.charging?.selected)await expect(page.getByLabel("Work on a case")).toHaveValue(record!.charging.selected);
   await expect(page.getByRole("region",{name:"Cost per charge explanation"})).toBeVisible();
   await expect(page.getByRole("region",{name:"Charging economics editor"})).toBeVisible();
 });

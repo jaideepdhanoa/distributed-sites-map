@@ -28,7 +28,7 @@ export const fields = {
   shortfall:field("Unserved fleet sessions per day before depot opens",groups[0]),
 };
 export type Key = keyof typeof fields;
-export type Evidence = {status:"assumed"|"quoted"|"verified"; source:string; date:string; reviewer?:string};
+export type Evidence = {status:"assumed"|"quoted"|"verified"; source:string; date:string; url?:string; reviewer?:string};
 export type Inputs = {
   values:Record<Key,number|null>; evidence:Partial<Record<Key,Evidence>>;
   sourceValues?:Partial<Record<Key,{value:number|null;evidence:Evidence}>>;
@@ -54,6 +54,10 @@ export function initialCase(d: Pick<DealProps,"purchase"|"selectionResearch"|"as
   for(const key of keys) if(values[key]!=null) {
     const planning=(["days","hostWeek","hostEnd","ownWeek","ownEnd","weekdayHours","weekendHours","hostFee","conversion","interruption","loss"] as Key[]).includes(key);
     evidence[key]={status:"assumed",source:planning?"Planning assumption":key==="ask" && d.selectionResearch ? d.selectionResearch.basis : "Workbook screening input",date:planning?"":(key==="ask"?d.selectionResearch?.reviewedOn:"") || w?.checked || ""};
+  }
+  const research=d.selectionResearch;
+  if(research?.quote!=null && research.source && research.reviewedOn && /^public (whole-property ask|quote\b)/i.test(research.basis)){
+    evidence.ask={status:"quoted",source:research.basis,url:research.source,date:research.reviewedOn};
   }
   return {values,evidence,sourceValues:{},layout:"Workbook footprint",rights:"unknown",rightsSource:"",rightsDate:"",comparable:false,sensitivityPct:10,terms:"purchase",comparator:"workbook",energyScope:"excluded",openEarly:"",openLate:"",depotDate:"",allOptionsReviewed:false,peakDay:"weekday",temporaryEnd:"",temporarySource:""};
 }

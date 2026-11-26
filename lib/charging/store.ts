@@ -35,7 +35,7 @@ export async function saveCase(sql:Sql,site:string,who:string,d:SaveRequest,deal
       const observations=(input:Inputs)=>Object.entries(input.values).flatMap(([name,value])=>{
         const k=name as keyof Inputs["values"];
         return [{value,evidence:input.evidence[k]},input.sourceValues?.[k]].filter(o=>o?.evidence?.reviewer && o.evidence.reviewer!==who)
-          .map(o=>JSON.stringify([k,o!.value,o!.evidence!.status,o!.evidence!.source,o!.evidence!.date,o!.evidence!.reviewer]));
+          .map(o=>JSON.stringify([k,o!.value,o!.evidence!.status,o!.evidence!.source,o!.evidence!.url??"",o!.evidence!.date,o!.evidence!.reviewer]));
       });
       const carried=observations(d.inputs);
       if(carried.length){

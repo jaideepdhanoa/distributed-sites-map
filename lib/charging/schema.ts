@@ -3,7 +3,7 @@ import { fields,keys,type Key,type Inputs } from "./model";
 const bounds=Object.fromEntries(keys.map(k=>[k,z.number().finite().min(fields[k].min).max(fields[k].max).nullable()])) as Record<Key,z.ZodNullable<z.ZodNumber>>;
 const date=z.union([z.literal(""),z.iso.date()]);
 const key=z.enum(keys as [Key,...Key[]]);
-const evidence=z.strictObject({status:z.enum(["assumed","quoted","verified"]),source:z.string().max(400),date,reviewer:z.string().max(160).optional()})
+const evidence=z.strictObject({status:z.enum(["assumed","quoted","verified"]),source:z.string().max(400),date,url:z.url().startsWith("https://").max(2500).optional(),reviewer:z.string().max(160).optional()})
   .refine(e=>e.status==="assumed" || Boolean(e.source.trim() && e.date),"Quoted or verified inputs need a dated source.");
 const inputs=z.strictObject({
   values:z.strictObject(bounds),evidence:z.partialRecord(key,evidence),

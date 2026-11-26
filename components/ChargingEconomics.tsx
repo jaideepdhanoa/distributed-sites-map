@@ -131,6 +131,7 @@ function Editor({data,reload,revision,explain,updateHistory}:{updateHistory:(row
         <label>Evidence status<select className="secondary" value={e.status} onChange={x=>stamp(key,{status:x.target.value as Evidence["status"]})}>
           <option value="assumed">Assumed</option><option value="quoted">Quoted</option><option value="verified">Verified</option></select></label>
         <label>Source<input className="field" maxLength={400} value={e.source} onChange={x=>stamp(key,{source:x.target.value})}/></label>
+        <label>Source document URL<input className="field" type="url" maxLength={2500} placeholder="https://" value={e.url??""} onChange={x=>stamp(key,{url:x.target.value||undefined})}/></label>
         <label>Evidence date<input className="field" type="date" value={e.date} onChange={x=>stamp(key,{date:x.target.value})}/></label></details>
     </div>;
   }

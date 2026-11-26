@@ -48,7 +48,8 @@ export function ChargingExplanation({draft,seed,result:r,trace,reference,referen
   }
   const [entry,setEntry]=useState("");
   function choose(key:Key){setInspect(key);setEntry(draft.values[key]?.toString()??"");}
-  const observation=inspect && sourceValue(draft,inspect);
+  const observation=inspect ? sourceValue(draft,inspect) : undefined;
+  const sourceLink=observation?.evidence.url || (observation?.evidence.source.startsWith("https://")?observation.evidence.source:"");
   return <section className="cost-explanation" aria-label="Cost per charge explanation">
     <div className="cost-reading">
       <div><span>This site per completed charge</span><strong>{money(r.siteCost)}</strong><small>{r.siteCost==null?(missing.length?missing.length+" inputs to review":"Check staffed throughput"):"Annual net cost ÷ completed charges"}</small></div>
@@ -95,6 +96,7 @@ export function ChargingExplanation({draft,seed,result:r,trace,reference,referen
       {inspect && observation && <div className="calc-observation" key={inspect}>
         <p><strong>{status(observation.value,observation.evidence)} · {number(observation.value,3)}</strong><br/>{observation.value==null?"No source value recorded":observation.evidence.source || "Source unrecorded"}{observation.evidence.date && " · "+observation.evidence.date}
           {observation.evidence.reviewer && " · Reviewed by "+observation.evidence.reviewer}</p>
+        {sourceLink?.startsWith("https://") && <a className="text-link" href={sourceLink} target="_blank" rel="noopener noreferrer">Open source document ↗</a>}
         <p>Used in this case · {number(draft.values[inspect],3)} · {draft.sourceValues?.[inspect]?"Scenario override":legacy && (draft.evidence[inspect]??planning).status==="assumed"?"Saved assumption":"Follows source"}</p>
         {legacy && !draft.sourceValues?.[inspect] && <small>Earlier revision · only the saved value and its recorded evidence are available.{author?" Case saved by "+author+".":""}</small>}
         {stale && seed.evidence[inspect]?.source && observation.evidence.source===seed.evidence[inspect]?.source && seed.values[inspect]!==observation.value && <p>Current filed value · {number(seed.values[inspect],3)} · {seed.evidence[inspect]?.date||"Date unrecorded"}</p>}

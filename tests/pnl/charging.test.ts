@@ -112,3 +112,13 @@ test("a saved quote survives trials, edits to the underlying source, copies and 
   const rows=await saveCase(sql,site,"different",{...input,id:randomUUID(),requestId:randomUUID()});
   assert.equal(rows[0].inputs.sourceValues?.conversion?.evidence.reviewer,"reviewer");assert.equal((await activeCases(sql)).length,0);
 });
+
+test("a dated public asking quote retains its document and scope while workbook amounts remain assumptions",()=>{
+  const research={quote:125000,basis:"Public quote; scope restricted or unresolved",source:"https://example.org/offering",reviewedOn:"2026-01-07"};
+  const site={selectionResearch:research} as unknown as DealProps;
+  const c=initialCase(site);
+  assert.deepEqual(c.evidence.ask,{status:"quoted",source:research.basis,url:research.source,date:research.reviewedOn});
+  assert.equal(sourceValue(changeValue(c,"ask",100000),"ask").evidence.url,research.source);
+  research.basis="Workbook asking price";
+  assert.equal(initialCase(site).evidence.ask?.status,"assumed");
+});

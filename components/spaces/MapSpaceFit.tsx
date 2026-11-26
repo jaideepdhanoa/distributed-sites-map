@@ -1,5 +1,5 @@
 import { kinds, type Aerial, type Zone } from "@/lib/spaces/options";
-import { checkSpaceFit } from "@/lib/spaces/fitCheck";
+import { checkSpaceFit, fitChecks } from "@/lib/spaces/fitCheck";
 import type { Review } from "@/lib/spaces/optionReview";
 
 const availability: Record<Zone["kind"], string> = {
@@ -23,12 +23,12 @@ export default function MapSpaceFit({
   image?: Aerial;
   review?: Review|null;
 }) {
-  const {dimensions:dims,inside:range,adjacent:edge} = checkSpaceFit(zone,image);
+  const {dimensions:dims,inside:range,adjacent:edge,check} = checkSpaceFit(zone,image);
   const adjacent = edge && range && edge[1] > range[1] ? edge : null;
   return (
     <div className="map-space-fit">
       <strong>
-        {adjacent
+        {zone.fitHold && check === zone.fitHold ? fitChecks[check] : adjacent
           ? rangeText(adjacent) + " stalls with an adjacent aisle"
           : range
             ? rangeText(range) +
@@ -55,7 +55,8 @@ export default function MapSpaceFit({
         </dd>
         {review?.measured && <><dt>Recorded measurement</dt><dd>{review.measured.stalls} stalls · {review.measured.source}</dd></>}
         <dt>Availability</dt>
-        <dd>{review?.reason || zone.check || availability[zone.kind] || kinds[zone.kind].check}</dd>
+        <dd>{zone.check || availability[zone.kind] || kinds[zone.kind].check}</dd>
+        {review?.reason && <><dt>Team review</dt><dd>{review.reason}</dd></>}
       </dl>
     </div>
   );

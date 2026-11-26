@@ -95,11 +95,12 @@ test("open an analyzed space on the main map and adjust a source-plan corner", a
   const id = "PIPE-PHX-9999";
   const frame = {id:"1234567890abcdef", source:"Example site plan", date:"", kind:"site-plan"};
   const zone = {kind:"parking", label:"East parking row", points:[[15,30],[68,30],[68,54],[15,54]],edited:false};
-  const site = {id,name:"Example service site",market:"PHX",cohort:"active",revision:"abcdef012345",frame,center:null,zones:[zone]};
+  const held = {...zone, label:"Segment to recheck", fitHold:"footprint", check:"Verify the surface on the operating plan."};
+  const site = {id,name:"Example service site",market:"PHX",cohort:"active",revision:"abcdef012345",frame,center:null,zones:[zone,held]};
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="260"><rect width="400" height="260" fill="#bbc5ab"/><path d="M32 38h320v175H32z" fill="#787c75"/><path d="M60 75h214v72H60z" fill="none" stroke="#f6edbd"/><path d="M91 76v70m31-70v70m31-70v70m31-70v70m31-70v70m31-70v70" stroke="#f6edbd"/></svg>';
   await page.route("**/layout-example.svg",r=>r.fulfill({contentType:"image/svg+xml",body:svg}));
   await page.route("**/api/data/space-options?view=map",r=>r.fulfill({json:{reviewsAvailable:true,sites:[site]}}));
-  await page.route("**/api/data/space-options?site=*",r=>r.fulfill({json:{assessment:{row:{zones:[zone],revision:site.revision,image:{...frame,src:"/layout-example.svg",width:400,height:260}}}}}));
+  await page.route("**/api/data/space-options?site=*",r=>r.fulfill({json:{assessment:{row:{zones:site.zones,revision:site.revision,image:{...frame,src:"/layout-example.svg",width:400,height:260}}}}}));
   await page.route("**/api/actions/status",r=>r.fulfill({json:{enabled:true,actionRole:"contributor",username:"reviewer"}}));
   await page.goto("/?spaces=1");
   const work = page.getByTestId("map-spaces-workspace");
@@ -107,6 +108,11 @@ test("open an analyzed space on the main map and adjust a source-plan corner", a
   const fit = work.getByLabel("Physical fit filter");
   await fit.selectOption("interior");
   await expect(result).toHaveCount(0);
+  await fit.selectOption("footprint");
+  await result.click();
+  await expect(work.getByTestId("map-space-title")).toHaveText("Segment to recheck");
+  await expect(work).toContainText("Verify the surface on the operating plan.");
+  await work.getByRole("button",{name:"Browse spaces"}).click();
   await fit.selectOption("measure");
   await expect(result).toBeVisible();
   await expect(work).toContainText("1 space across 1 site");

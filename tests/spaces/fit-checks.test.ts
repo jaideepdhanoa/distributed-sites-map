@@ -19,3 +19,16 @@ test("holds unscaled, irregular and interior footprints for measurement", () => 
   assert.equal(checkSpaceFit({...row, points:row.points.slice(0,3)},frame).check,"measure");
   assert.equal(checkSpaceFit({...row, kind:"bay"},frame).check,"interior");
 });
+
+test("withholds footprint or aisle projections when imagery contradicts the assumed use", () => {
+  const outdoor = footprint(53,28);
+  const wrongSurface = checkSpaceFit({...outdoor, fitHold:"footprint"},frame);
+  assert.equal(wrongSurface.check,"footprint");
+  assert.equal(wrongSurface.inside,null);
+  assert.equal(wrongSurface.adjacent,null);
+  const blockedAisle = checkSpaceFit({...outdoor,fitHold:"aisle"},frame);
+  assert.equal(blockedAisle.check,"aisle");
+  assert.deepEqual(blockedAisle.inside,[0,0]);
+  assert.equal(blockedAisle.adjacent,null);
+  assert.equal(checkSpaceFit({...footprint(55,51),fitHold:"aisle"},frame).check,"inside");
+});

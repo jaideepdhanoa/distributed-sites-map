@@ -29,6 +29,8 @@ def build(book, register=None):
         option = dict(route=route, disposition=decision, rank=rank, rationale=why, next=check,
                       reviewedOn=date_text(reviewed), owner=owner, revisitOn=date_text(revisit),
                       evidence=evidence, offering=listing)
+        if decision == "Dropped" and headers != HEADERS and not cells[-1]:
+            raise ValueError(f"Choose a drop reason on opportunity row {number}.")
         if len(cells) > len(HEADERS) and cells[-1]:
             option["dropReason"] = cells[-1]
         if role == "Alternative":

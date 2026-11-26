@@ -946,7 +946,7 @@ function OutcomeForm({
           {allowAccept ? <option value="accepted">Accept</option> : null}
           {allowWaiting ? <option value="agreed_waiting">Agreed, waiting on…</option> : null}
           <option value="rejected">Reject</option>
-          <option value="overtaken">Closed, overtaken</option>
+          <option value="overtaken">Proposal superseded</option>
           <option value="reply">Reply only</option>
         </select>
       </label>
@@ -955,7 +955,11 @@ function OutcomeForm({
       {showReply ? (
         <label>
           {stageAccept ? "Reason" : "Reply"}
-          <textarea className="field" aria-label={stageAccept ? "Reason" : "Reply to the proposer"} data-testid="decision-note" value={reply} onChange={(event) => onReply(event.target.value)} rows={2} maxLength={2000} required={replyNeeded || reasonMissing} />
+          {stageAccept && !stageMove ? <select className="secondary" aria-label="Drop reason" value={reply} onChange={event => onReply(event.target.value)} required>
+            <option value="" disabled>Choose a reason</option>
+            {reply && !dropReasons.some(r => r.label === reply) && <option>{reply}</option>}
+            {dropReasons.map(r => <option key={r.code}>{r.label}</option>)}
+          </select> : <textarea className="field" aria-label={stageAccept ? "Reason" : "Reply to the proposer"} data-testid="decision-note" value={reply} onChange={(event) => onReply(event.target.value)} rows={2} maxLength={2000} required={replyNeeded || reasonMissing} />}
         </label>
       ) : (
         <button type="button" className="text-link" aria-expanded="false" onClick={() => setNoteOpen(true)}>Add a note</button>

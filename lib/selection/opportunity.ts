@@ -44,19 +44,23 @@ export function parseOpportunities(value: unknown) {
 }
 
 export function reviewAtStage(review: OpportunitySite | undefined, stage: string, reason?: string) {
-  if (!review || !/^dropped\b/i.test(stage) || review.primary.disposition !== "Suggest drop") return review;
+  if (!review || !/^dropped\b/i.test(stage)) return review;
+  const previous = review.primary.disposition;
+  if (!["Suggest drop", "Shortlist", "Service diligence", "Reserve"].includes(previous)) return review;
   const primary: Opportunity = {...review.primary, disposition: "Dropped", rank: null};
+  if (previous !== "Suggest drop") primary.next = "A reviewer approves reopening after new evidence changes the drop reason.";
   if (reason && isDropReason(reason)) primary.dropReason = reason;
   return {...review, primary};
 }
 
-export function matchingOption(review: OpportunitySite | undefined, decision: string, route: string) {
+export function matchingOption(review: OpportunitySite | undefined, decision: string, route: string, reason = "") {
   if (!review) return undefined;
   const options = [review.primary, ...review.alternatives];
   if (!decision && !route && review.primary.disposition === "Dropped") {
     return options.find(option => ["Shortlist", "Service diligence", "Reserve"].includes(option.disposition));
   }
-  return options.find(option => (!decision || decision === option.disposition) && (!route || route === option.route));
+  return options.find(option => (!decision || decision === option.disposition) && (!route || route === option.route)
+    && (!reason || reason === option.dropReason));
 }
 
 export function compareAttention(a?: Opportunity, b?: Opportunity) {

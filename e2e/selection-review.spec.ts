@@ -113,6 +113,9 @@ test("commercial diligence order, alternate routes and archived reviews", async 
   await page.getByRole("button",{name:"Show all active sites"}).click();
   await page.getByLabel("Commercial decision").selectOption("Dropped");
   await expect(page.getByText("2 sites with a dropped opportunity")).toBeVisible();
+  await page.getByLabel("Drop reason",{exact:true}).selectOption("No longer for sale");
+  await expect(page.getByText("0 sites with a dropped opportunity")).toBeVisible();
+  await page.getByLabel("Drop reason",{exact:true}).selectOption("Tenant lease");
   await expect(page.getByText("Drop reason · Tenant lease").first()).toBeVisible();
   await page.getByText("Decision evidence and alternative routes").first().click();
   await expect(page.getByRole("heading",{name:"Host agreement · Conditional"}).first()).toBeVisible();

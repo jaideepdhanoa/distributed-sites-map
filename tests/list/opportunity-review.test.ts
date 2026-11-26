@@ -34,4 +34,8 @@ test("an accepted drop updates a pending review without changing the source or a
   assert.equal(resolved?.primary.dropReason, "No longer for sale");
   assert.equal(reviewAtStage(pending, "Desk screen"), pending);
   assert.equal(pending.primary.disposition, "Suggest drop");
+  const ranked = reviewAtStage(entry, "Dropped", "No longer for sale");
+  assert.equal(ranked?.primary.rank, null);
+  assert.equal(matchingOption(ranked,"Dropped","","No longer for sale")?.route, offer.route);
+  assert.equal(matchingOption(ranked,"Dropped","","Tenant lease"),undefined);
 });

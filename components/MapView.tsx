@@ -1647,7 +1647,6 @@ export default function MapView(props: Props) {
       if (map.getLayer("deal-halo")) map.setFilter("deal-halo", ["==", ["get", "deal_id"], props.selectedId || ""]);
       if (map.getLayer("deal-ring")) map.setFilter("deal-ring", ["==", ["get", "deal_id"], props.selectedId || ""]);
       if (map.getLayer("unscreened-selected")) map.setFilter("unscreened-selected", ["==", ["get", "listing_id"], props.selectedId || ""]);
-      map.resize();
       const phone = window.matchMedia("(max-width: 767px)").matches;
       const reviewing = Boolean(props.reviewFocus) || (props.reviewMarkers || []).length > 0;
       const drawing = Boolean(propsRef.current.spaceDrawing);

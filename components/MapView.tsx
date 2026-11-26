@@ -854,6 +854,8 @@ export default function MapView(props: Props) {
     keptCamera.current = null;
     heldView.current = kept;
     if (kept) {
+      // Keep later data loads from reframing a location restored after a style change.
+      if (!draw) holdCamera.current = true;
       skipViewReset.current = true;
       freezeCamera.current = true;
     }

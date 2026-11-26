@@ -62,6 +62,7 @@ function SelectionList() {
         order === "earlier" ? (b.charging?.result.earlyMin??-1)-(a.charging?.result.earlyMin??-1) : 0;
       return priority || (scope && order !== "market" ? scope.get(a.id)! - scope.get(b.id)! : 0) || (order === "attention" ? diligenceOrder(a.charging?.merit,b.charging?.merit) : 0) || a.city.localeCompare(b.city) || a.name.localeCompare(b.name);
     });
+  const droppedCount = scoped.length + (showFiled ? filed.length : 0);
   return <main ref={pane} className="space-review-page">
     <a className="text-link" href={back}>← Pipeline list</a>
     <h1>Selection review</h1><p>Choose the next diligence check. Investment approval requires verified site rights, usable space, power, retained cash flow and network benefit.</p>
@@ -69,7 +70,7 @@ function SelectionList() {
     <div className="space-review-filters">
       {hasReviews && <label>Commercial decision<select className="secondary" value={decision} onChange={e=>setReviewFilter("disposition",e.target.value)}>
         <option value="">Current opportunities</option>{[...dispositions,"Unreviewed"].map(d=><option key={d}>{d}</option>)}</select></label>}
-      {droppedView && <label>Drop reason<select className="secondary" value={reason} onChange={e=>setReviewFilter("reason",e.target.value)}>
+      {droppedView && <label>Drop reason<select aria-label="Drop reason" className="secondary" value={reason} onChange={e=>setReviewFilter("reason",e.target.value)}>
         <option value="">All drop reasons</option>{dropReasons.map(r=><option key={r.code}>{r.label}</option>)}</select></label>}
       <label>Market<select aria-label="Market" className="secondary" value={market} onChange={e=>setReviewFilter("market",e.target.value)}><option value="">All markets</option>{[...new Set([...rows, ...(data?.filed || [])].map(r=>r.city))].sort().map(c=><option key={c}>{c}</option>)}</select></label>
       <label>Find a site<input className="field" value={query} onChange={e=>setReviewFilter("q",e.target.value)} placeholder="Name or site ID" /></label>
@@ -91,7 +92,7 @@ function SelectionList() {
     {scope && <button type="button" className="text-link" onClick={()=>setReviewFilter("scope","")}>Show all active sites</button>}
     {!data && !error && <p role="status">Loading pipeline…</p>}
     {error && <p role="alert">Pipeline could not be loaded. <button className="text-link" onClick={()=>setAttempt(a=>a+1)}>Retry</button></p>}
-    {data && <><p aria-live="polite">{droppedView ? `${scoped.length + (showFiled ? filed.length : 0)} sites with a dropped opportunity` : `${scoped.length} of ${rows.length} active sites`}</p>
+    {data && <><p aria-live="polite">{droppedView ? `${droppedCount} ${droppedCount === 1 ? "site" : "sites"} with a dropped opportunity` : `${scoped.length} of ${rows.length} active sites`}</p>
       {!data.hasInputs && <p>Workbook screen pending. Some unlocated sites use their dated assessment cohort.</p>}
       {data.hasInputs && <details className="disclosure"><summary className="disclosure">Data details{data.mismatches > 0 && " · Stage differences"}</summary><p>{data.mismatches} stage differences across the joined records. The application stage is shown when available.</p></details>}
       {!scoped.length && !(droppedView && showFiled && filed.length) && <p>{investment?"No current site case qualifies for investment ranking in this view.":"No sites match these filters."}</p>}

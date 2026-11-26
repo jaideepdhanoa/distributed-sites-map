@@ -33,7 +33,7 @@ const derived:Record<number,string> = {
   "81": "Scorecard section",
   "82": "Rank"
 };
-const guards:Record<number,string> = {0:"Site",3:"Segment",4:"Stage",36:"Real estate in the sale",43:"Stalls that fit",
+const guards:Record<number,string> = {0:"Site",3:"Segment",4:"Stage",10:"Archetype",36:"Real estate in the sale",43:"Stalls that fit",
   56:"Deal notes",58:"Financials status",84:"Business check",87:"Tenant lease blocks site",88:"Site ID"};
 export const reviewFields = [...Object.values(derived), ...Object.values(guards)].map(header=>[header]);
 type Edit = {row:number; column:number; id:string; formula?:string};
@@ -60,6 +60,7 @@ export function planSelectionFormulas(table:SheetTable):Edit[] {
     if(seen.has(id)) throw Error("Duplicate selection formula target.");
     seen.add(id);
     if(!/^[12] (Desk|Financial) screen$/i.test(cells[4])) continue;
+    if (/^land only/i.test(cells[10] || "") || /^land only/i.test(cells[84] || "") || cells[80]==="Land only") continue;
     const old=formulas[64] || "";
     if(old && confidence(old)!==old) edits.push({row,column:64,id,formula:confidence(old)});
     if(!["Auto repair","Quick lube"].includes(cells[3]) || cells[81] || formulas[81]) continue;

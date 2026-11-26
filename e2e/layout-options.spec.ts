@@ -131,6 +131,10 @@ test("open a released outline in the main map on both source types", async ({pag
   expect(response.ok()).toBeTruthy();
   const catalog = await response.json() as import("../lib/spaces/mapCatalog").SpaceCatalog;
   expect(catalog.reviewsAvailable).toBe(true);
+  const lotResponse=await page.request.get("/api/data/spaces");
+  expect(lotResponse.ok()).toBe(true);
+  const lots=await lotResponse.json() as {spaces:unknown[]};
+  console.log("Saved team-drawn lots:",lots.spaces.length);
   const active=catalog.sites.filter(s=>s.cohort==="active");
   const count=(rows:typeof active)=>rows.reduce((n,s)=>n+s.zones.filter(z=>z.kind!=="clear").length,0);
   console.log("Active spaces:",count(active),"sites:",active.length,"aligned:",count(active.filter(s=>s.frame.bounds)),

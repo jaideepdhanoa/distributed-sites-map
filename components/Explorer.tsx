@@ -472,7 +472,7 @@ export default function Explorer() {
   const pillParam = params.get("pill");
   const [pinPref, setPinPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
   const [preferredBasemap, setBasemap] = useState<"positron" | "satellite">("positron");
-  const basemap = marking ? "satellite" : preferredBasemap;
+  const basemap = marking || params.get("spaces")==="1" ? "satellite" : preferredBasemap;
   const [marketPref, setMarketPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
   const [marketReady, setMarketReady] = useState(false);
   const appliedMarket = useRef(false);

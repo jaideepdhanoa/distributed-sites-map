@@ -323,7 +323,7 @@ export default function MainMapSpaces({
         )
       ) : (
         <div className="space-map-open" data-testid="map-spaces-workspace">
-          <header className="space-map-bar">
+          <div className="space-map-header"><header className="space-map-bar">
             <button type="button" className="paper-btn" onClick={() => leave(() => navigate(false))}>
               <ChevronLeft size={16} />
               Main map
@@ -362,6 +362,7 @@ export default function MainMapSpaces({
               ))}
             </div>
           )}
+          </div>
           {site && !draft && (
             <button
               type="button"

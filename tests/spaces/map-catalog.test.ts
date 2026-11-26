@@ -51,6 +51,8 @@ test("analysis footprints keep their source and acquire an edit only from a matc
   assert.deepEqual(mapZones(site, row, [{ target_id: site, body }]), [
     { ...clean, points: changed, edited: true },
   ]);
+  const decision=reviewBody({option:"outdoor", disposition:"Dismiss option",area:"East row",revision:row.revision,frame:row.image!.id,reason:"Access is unavailable."});
+  assert.deepEqual(mapZones(site,row,[{target_id:site,body:decision},{target_id:site,body}])[0].points,changed);
   assert.deepEqual(row.zones[0].points, original);
   const url = new URL(spacesMapHref(site, outlineId(clean)), "http://localhost");
   assert.equal(url.searchParams.get("spaceArea"), outlineId(clean));

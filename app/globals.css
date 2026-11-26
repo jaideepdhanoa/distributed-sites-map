@@ -4504,3 +4504,13 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   .map-space-fit > strong { font-size:20px; }
   .map-space-fit { margin:8px 0; padding-top:7px; }
 }
+
+@media(min-width:760px){
+  .space-map-header { position:absolute; top:14px; left:14px; right:354px; display:flex; flex-wrap:wrap; gap:7px 12px; align-items:center; }
+  .space-map-header .space-map-bar,.space-map-header .space-map-layouts { position:static; }
+  .space-map-header .space-map-layouts { flex:1 1 340px; margin:0; }
+  .space-map-header .segmented { text-align:center; }
+}
+@media(max-width:759px) {
+  .stage-map:has(.space-map-open) .maplibregl-ctrl-top-right { top:158px; }
+}

@@ -38,12 +38,12 @@ export default function PricingSection({ deal }: { deal: DealProps }) {
       <h4>Asking price</h4><strong className="price-lead">{deal.asking_price_display || deal.asking_price?.toLocaleString("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}) || "Not on file"}</strong>
       <AskingSplit deal={deal} />
       <div className="metrics">
-        <article>
+        <article data-financial-measure="Land estimate">
           <span>Land estimate</span>
           <strong title={landShown ? deal.land_estimate_tip || undefined : undefined}>{deal.land_estimate_display || "—"}</strong>
           <Mark badge={landShown ? "Estimate" : ""} reason={landShown ? "" : deal.land_estimate_reason} />
         </article>
-        <article>
+        <article data-financial-measure="Implied business price">
           <span>Implied business price</span><small>Asking less estimated land value</small>
           <strong>{businessValue || "—"}</strong>
           <Mark reason={businessValue ? "" : deal.business_value_reason} />
@@ -58,12 +58,12 @@ export default function PricingSection({ deal }: { deal: DealProps }) {
           <strong>{revenueShown || "—"}</strong>
           <Mark badge={deal.revenue_multiple_basis} reason={revenueShown ? "" : deal.revenue_multiple_reason} />
         </article>
-        <article>
+        <article data-financial-measure="Asking / earnings">
           <span>{earningsName}</span>
           <strong>{earningsShown || "—"}</strong>
           <Mark badge={deal.earnings_multiple_basis} reason={earningsShown ? "" : deal.earnings_multiple_reason} />
         </article>
-        <article className="wide">
+        <article data-financial-measure="Business-only multiple" className="wide">
           <span>Implied business price / {deal.earnings_multiple_which || "cash flow"}</span>
           <strong>{businessShown || "—"}</strong>
           <small>{[deal.earnings_period, deal.earnings_basis].filter(Boolean).join(" · ")}</small>

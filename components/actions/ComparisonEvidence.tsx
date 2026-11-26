@@ -68,7 +68,7 @@ export default function ComparisonEvidence({target, title, context = "Not on fil
     : item ? <section aria-label="Existing follow-up">
       <p role="status">{statuses[item.status] || item.status} · {item.owner || "Unassigned"}{item.due && " · Due " + item.due}</p>
       {showThread ? <RecordActions kind={item.targetKind || target.targetKind} id={item.targetId || target.targetId} threadId={item.note} />
-        : <button type="button" className="primary" onClick={()=>target.measure === "power" ? setShowThread(true) : inspect(item.note)}>View follow-up</button>}
+        : <button type="button" className="primary" onClick={()=>["power","on_site_service","frontage_hosting"].includes(target.measure) ? setShowThread(true) : inspect(item.note)}>View follow-up</button>}
     </section> : canWrite(access.actionRole) ? <form onSubmit={submit}>
       <label>Evidence needed<textarea className="field" required maxLength={500} value={description} disabled={pending} onChange={e=>setDescription(e.target.value)} /></label>
       <label>Owner<select className="secondary" value={owner} disabled={pending} onChange={e=>setOwner(e.target.value)}><option value="">Unassigned</option>

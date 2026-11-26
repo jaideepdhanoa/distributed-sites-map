@@ -208,7 +208,7 @@ export default function KeyStrip({
         <Metric icon={Trees} label="Open land" value={spare.value} note={spare.note} title={isOpenLandBlank(spare.value) ? "Not on file" : undefined} />
         <Metric icon={Ruler} label="Bays that fit" value={bays ? bays.replace("Bays that fit ", "") : "—"} title={bays ? undefined : "Not on file"} />
       </div>
-      <PowerEvidence deal={deal} signedIn={signedIn} />
+      <PowerEvidence deal={deal} site={universeSite} signedIn={signedIn} />
       <h3 className="job">Attractiveness</h3>
       <div className="metrics">
         {signedIn && showFinancials ? (

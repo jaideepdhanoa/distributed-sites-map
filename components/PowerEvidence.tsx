@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { DealProps, SiteProps } from "@/lib/types";
-import { factsForDeal, factsForSite } from "@/lib/keyNumbers";
+import { comparisonPower, factsForDeal, factsForSite } from "@/lib/keyNumbers";
 import { derivePowerRating } from "@/lib/score/power-rating";
 import { useActionStatus } from "./actions/panel";
 import ComparisonEvidence from "./actions/ComparisonEvidence";
@@ -28,15 +28,19 @@ export default function PowerEvidence({deal, site, signedIn}: {deal?: DealProps 
   const record = deal || site;
   const facts = deal ? factsForDeal(deal) : factsForSite(site);
   const rating = derivePowerRating({...record, market:record?.city});
-  const siteCapacity = rating.inputs.find(input => input.layer === "C" && input.value.endsWith(" MW"));
-  const hasService = Boolean(siteCapacity || facts.some(item => item.id === "c"));
-  const names = { c:"On-site service", b:"Utility hosting at street and nearby", a:"Grid proximity", d:"Load history" };
-  return <section className="power-evidence" data-evidence="power"><span className="eyebrow">Power</span><h3>{hasService ? "Recorded on-site service" : "On-site capacity unconfirmed"}</h3>
-    <dl className="record-economics">{(["c","b","a","d"] as const).map(id => {
-      const fact = facts.find(item => item.id === id);
-      if (!fact && !(id === "c" && siteCapacity)) return null;
-      return <div key={id}><dt>{names[id]}</dt><dd>{[id === "c" && siteCapacity?.value, fact?.lines.join(" · ")].filter(Boolean).join(" · ") || "Unconfirmed"}{(fact || (id === "c" && siteCapacity)) && <small>{fact?.basis || [siteCapacity?.source,siteCapacity?.confidence,siteCapacity?.asOf].filter(Boolean).join(" · ") || "Source not recorded"}</small>}</dd></div>;
-    })}</dl>
+  const { service, frontage } = comparisonPower(deal, site);
+  const names = { b:"Other utility hosting evidence", a:"Grid proximity", d:"Load history" };
+  return <section className="power-evidence" data-evidence="power"><span className="eyebrow">Power</span><h3>{service?.verified ? "Verified on-site service" : service?.complete ? "Recorded on-site service" : service ? "Partial on-site service record" : "On-site capacity unconfirmed"}</h3>
+    <dl className="record-economics">
+      <div data-evidence="on-site-service"><dt>On-site service</dt><dd>{service?.value || "Unconfirmed"}{service && <small>{service.source || "Source not recorded"}</small>}</dd></div>
+      <div data-evidence="street-hosting"><dt>Street-frontage hosting</dt><dd>{frontage?.value || "Not on file"}{frontage && <small>{frontage.source || "Source not recorded"}</small>}</dd></div>
+      {(["b","a","d"] as const).map(id => {
+        const fact = facts.find(item => item.id === id);
+        const lines = fact?.lines.filter(line => !line.startsWith("Frontage hosting "));
+        if (!lines?.length) return null;
+        return <div key={id}><dt>{names[id]}</dt><dd>{lines.join(" · ")}<small>{fact?.basis || "Source not recorded"}</small></dd></div>;
+      })}
+    </dl>
     <p><strong>Power rating</strong> · {rating.reason}</p>
     {signedIn && <PowerFollowUp deal={deal} site={site} />}
   </section>;

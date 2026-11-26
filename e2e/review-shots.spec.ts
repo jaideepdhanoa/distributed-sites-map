@@ -237,12 +237,13 @@ test("screen five sites in Phoenix and return to the same selection", async ({ p
   }
   const compactCount = await measureRows.count();
   expect(compactCount).toBeGreaterThan(0);
-  for (const label of ["Open land","Power","Asking","Cash flow","Reporting period","Next check"]) {
+  for (const label of ["Open land","On-site service","Street-frontage hosting","Asking","Cash flow","Reporting period","Next check"]) {
     await expect(matrix.locator(`[data-compare-row="${label}"]`)).toBeAttached();
   }
   await page.getByTestId("compare-tray").screenshot({ path: `review-shots/${info.project.name}-shortlist-compare.png` });
   await page.getByRole("button", { name: "Show all measures" }).click();
   expect(await measureRows.count()).toBeGreaterThan(compactCount);
+  await expect(matrix.locator('[data-compare-row="Power"]')).toBeAttached();
   for (const name of ["Site fit", "Financials", "Diligence"]) await expect(matrix.getByRole("rowgroup", { name })).toBeAttached();
   await expect(matrix.getByText("Not on file", { exact: true }).first()).toBeAttached();
   await page.getByRole("button", { name: "Show decision criteria" }).click();

@@ -1,4 +1,5 @@
 import { basisBadge } from "./pricing.ts";
+import { explicitMw, lineVolts, phaseKind, serviceAmps } from "./score/power-rating.ts";
 import { packageOnFile } from "./pnl/package.ts";
 import type { DealProps, SiteProps } from "./types";
 
@@ -306,6 +307,35 @@ export function factsForSite(site: CapacityRecord | null | undefined, deal?: Cap
   const own = capacityFacts(site, "site");
   if (own.length || !deal) return own;
   return capacityFacts(deal, "site");
+}
+
+/** Keep readings and provenance together. Prefer the deal's service record when linked. */
+export function comparisonPower(deal?: DealProps | null, site?: SiteProps | null) {
+  const records = [deal, site].filter((record): record is DealProps | SiteProps => Boolean(record));
+  const service = records.flatMap(record => {
+    const mw = explicitMw(record.cap_c_amps) ?? explicitMw(record.cap_c_volts) ?? explicitMw(record.cap_c_phase);
+    const amps = serviceAmps(record.cap_c_amps);
+    const volts = lineVolts(record.cap_c_volts);
+    const phase = phaseKind(record.cap_c_phase);
+    const panels = factNumber(record.cap_c_panels);
+    const readings = [
+      mw != null && mw >= 0 ? factCount(mw) + " MW" : "",
+      amps != null ? factCount(amps, 0) + " A" : "",
+      volts != null ? factCount(volts, 0) + " V" : "",
+      phase === "three" ? "3-phase" : phase === "single" ? "Single-phase" : "",
+      panels != null ? factCount(panels, 0) + (panels === 1 ? " panel" : " panels") : "",
+    ].filter(Boolean);
+    if (!readings.length) return [];
+    const complete = (mw != null && mw >= 0) || (amps != null && volts != null && Boolean(phase));
+    const source = cleanFactText(record.cap_c_source);
+    const verified = complete && Boolean(source) && record.cap_c_confidence?.trim().toLowerCase() === "verified";
+    return [{ value: readings.join(" · "), source: factBasis(source || "Source not recorded", record.cap_c_confidence, record.cap_c_as_of),
+      verified, complete }];
+  })[0];
+  const street = records.find(record => factNumber(record.cap_b_frontage) != null);
+  const frontage = street ? { value: factCount(street.cap_b_frontage!) + " MW",
+    source: factBasis(cleanFactText(street.cap_b_source) || "Source not recorded", street.cap_b_confidence, street.cap_b_as_of) } : undefined;
+  return {service, frontage};
 }
 
 export const UNKNOWN = "—";

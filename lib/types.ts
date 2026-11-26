@@ -64,6 +64,13 @@ export type SiteProps = {
   cap_b_source?: string | null;
   cap_b_as_of?: string | null;
   cap_b_confidence?: string | null;
+  cap_c_amps?: number | null;
+  cap_c_volts?: number | null;
+  cap_c_phase?: string | null;
+  cap_c_panels?: number | null;
+  cap_c_source?: string | null;
+  cap_c_as_of?: string | null;
+  cap_c_confidence?: string | null;
   land_control: string;
   network_status: string | null;
   reconciliation_tier: string;

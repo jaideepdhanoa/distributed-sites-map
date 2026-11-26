@@ -24,7 +24,7 @@ export default function Economics({
   return (
     <section className="investment-economics"><h3>What does the asking price buy?</h3>
       {deal && deal.kind !== "land" && <PricingSection deal={deal} />}
-      <h4>Savings versus hub at screening price</h4><p>{deal?.saving_vs_hub?.trim() || "Screening comparison not on file"}</p>
+      <h4 data-financial-measure="Savings versus hub">Savings versus hub at screening price</h4><p>{deal?.saving_vs_hub?.trim() || "Screening comparison not on file"}</p>
       <h4>Financial evidence · deal record</h4>
       {deal && deal.kind !== "land" && pnl?.statement?.status === "ready" && <FinancialsEntry dealId={deal.deal_id} loaded={pnl} compact="link" />}
       <dl className="record-economics">

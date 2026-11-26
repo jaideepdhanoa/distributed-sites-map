@@ -1,5 +1,6 @@
 "use client";
 
+import { PIN_SPLIT_ZOOM } from "@/lib/mapClusters";
 import dynamic from "next/dynamic";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -33,7 +34,9 @@ import { areaQuery, inMapArea, savedListArea, parseMapArea, type MapArea } from 
 import { isProtectedId, omitProtectedSites } from "@/lib/protectedSite";
 import { relatedRecords } from "@/lib/related";
 import { readSearches, readShortlists, removeSearch, removeShortlist } from "@/lib/savedSets";
-import { OVERLAYS, overlayFeatures, parseOverlays, type OverlayId } from "@/lib/overlays";
+import { marketEvidence, marketLabels, readMarketMetric, type MarketMetric, type MarketRow } from "@/lib/marketContext";
+import MarketMapPanel from "./MarketMapPanel";
+import type { WashInspection } from "./MarketEvidence";
 import { displayAddress, folderHref, leadSourceLine, listingHref } from "@/lib/format";
 import { dealSearchParts, matchesQuery, partyMatch, siteSearchParts } from "@/lib/search";
 import { paletteGroups } from "@/lib/search/palette";
@@ -604,7 +607,7 @@ export default function Explorer() {
     setPreviewId(null);
     const inspectedId = source?.get("site") || id;
     setSelected(inspectedId);
-    const panel = measure === "Open evidence gaps" ? "discussion" : numberEvidence[measure] === "open-land" ? "open-land" : numberEvidence[measure] || measure === "Bays that fit" ? "numbers" : null;
+    const panel = marketLabels.some(label=>label===measure) ? "market-context" : measure === "Open evidence gaps" ? "discussion" : numberEvidence[measure] === "open-land" ? "open-land" : numberEvidence[measure] || measure === "Bays that fit" ? "numbers" : null;
     replaceSearch(comparisonOrigin.current, { site: inspectedId, measure, panel:source?.get("panel") || (["Revenue","Cash flow","EBITDA","Implied business price","Business-only multiple","Savings versus hub","Land estimate","Asking / earnings"].includes(measure) ? "economics" : panel), note:source?.get("note") || null, sheet: "full" }, true);
   }
   function returnComparison() {
@@ -842,7 +845,7 @@ export default function Explorer() {
   }, [city]);
 
   const linkedId = params.get("site") || "";
-  const needCatalog = fullUniverseNeeded(allCities, query) || (/^WB-[A-Z]{2,4}-\d+$/.test(linkedId) && !catalog);
+  const needCatalog = (Boolean(linkedId) && readMarketMetric(params) === "washes") || fullUniverseNeeded(allCities, query) || (/^WB-[A-Z]{2,4}-\d+$/.test(linkedId) && !catalog);
   useEffect(() => {
     if (!needCatalog || catalog) return;
     let cancel = false;
@@ -960,7 +963,7 @@ export default function Explorer() {
   useEffect(() => {
     const apply = () => {
       const panel = params.get("panel");
-      const linked = panel === "finding" || panel === "economics" || panel === "open-land" || panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal" || panel === "financials" || panel === "intel" || panel === "space-options";
+      const linked = panel === "finding" || panel === "market-context" || panel === "economics" || panel === "open-land" || panel === "discussion" || panel === "numbers" || panel === "activity" || panel === "proposal" || panel === "financials" || panel === "intel" || panel === "space-options";
       if (linked && window.matchMedia("(max-width: 767px)").matches) {
         setSheetSnap("full");
         return;
@@ -1359,16 +1362,13 @@ export default function Explorer() {
     return coords ? inMapArea(coords[0], coords[1], mapArea) : false;
   });
   const drawnDeals = areaDeals;
-  const overlaysOn = parseOverlays(params.get("overlay"));
-  function toggleOverlay(id: OverlayId) {
-    const next = overlaysOn.includes(id) ? overlaysOn.filter((item) => item !== id) : [...overlaysOn, id];
-    write({ overlay: next.length ? next.join("|") : null });
+  const marketMetric = readMarketMetric(params);
+  const washRadius = params.get("washRadius") === "3" ? 3 : 1;
+  function chooseMarketMetric(next: MarketMetric | null) {
+    write({marketMetric: next, overlay: null, washRadius: null});
+    chooseLayers(false);
+    closeMenus();
   }
-  const overlayPoints = overlayFeatures(drawnDeals, overlaysOn).flatMap((feature) => {
-    const coords = feature.geometry?.coordinates;
-    if (!coords) return [];
-    return [{ label: feature.properties.label, coordinates: [coords[0], coords[1]] as [number, number] }];
-  });
   const handedOff = useRef("");
   const stepKey = `${funnel}|${stage}|${pipeStage}|${listed}|${allStages}|${allPipes}|${outsideGroup}`;
   const seenStep = useRef(stepKey);
@@ -1413,18 +1413,14 @@ export default function Explorer() {
   const selectedSquare = selectedDeal ? asSquare(selectedDeal) : null;
   if (selectedSquare && !drawnDeals.some((feature) => feature.properties.deal_id === selectedDeal?.deal_id)) drawnDeals.push(selectedSquare);
   const selectedUnscreened = unscreened.find((feature) => feature.properties.listing_id === selected)?.properties ?? null;
+  const washOrigin = selected && marketMetric === "washes" ? spacePoint() : null;
   const washPoints = (() => {
-    if (!overlaysOn.includes("washes") || (!selectedDeal && !selectedSite)) return [];
-    const origin = selectedDeal ? dealPoint(selectedDeal) : (() => {
-      const coords = poolById.get(selectedSite?.site_id || "")?.geometry?.coordinates;
-      return coords ? [coords[0], coords[1]] as [number, number] : null;
-    })();
-    if (!origin) return [];
+    if (!washOrigin) return [];
     const pool = catalog && catalog.length ? catalog : features;
     const exclude = new Set<string>();
     if (selectedSite) exclude.add(selectedSite.site_id);
     if (selectedDeal?.universe_id) exclude.add(selectedDeal.universe_id);
-    const rows: WashSite[] = pool.map((feature) => ({
+    const rows: WashSite[] = pool.filter(feature=>!feature.properties.duplicate_of && feature.properties.counts_as_site !== false).map((feature) => ({
       id: feature.properties.site_id,
       name: feature.properties.name || feature.properties.address || feature.properties.site_id,
       lng: feature.geometry?.coordinates?.[0] ?? null,
@@ -1433,7 +1429,7 @@ export default function Explorer() {
       verdict: feature.properties.verdict,
       landOnly: Boolean(feature.properties.land_only),
     }));
-    return nearbyWashPoints(origin, rows, exclude);
+    return nearbyWashPoints(washOrigin, rows, exclude).filter(row => row.miles <= washRadius);
   })();
   const withheldHere = showUnscreened ? unscreened.filter((feature) => shownInMarket(feature.properties.city) && !feature.properties.pinned) : [];
 
@@ -2041,6 +2037,21 @@ export default function Explorer() {
   const unplacedInView = locationRows.filter(row => !row.point);
   const mappedShortlist = locationRows.flatMap(row => row.point ? [{ city: row.city, point: row.point }] : []);
   const mappedCount = mappedShortlist.length;
+  const activeMetric = !inReview && !listView && !marking ? marketMetric : null;
+  const marketRows: MarketRow[] = activeMetric ? locationRows.flatMap(row => {
+    if (!row.point) return [];
+    const site = siteById.get(row.id);
+    const deal = site ? dealForSite(site) : dealBundle.byId.get(row.id);
+    return [{...row, point: row.point, evidence: marketEvidence(deal, site || siteById.get(deal?.universe_id || ""))}];
+  }) : [];
+  const washInspection: WashInspection | undefined = selected && !selectedUnscreened && spacePoint() ? {
+    radius: activeMetric === "washes" ? washRadius : null,
+    mapped: washOrigin && (catalog || features.some(f=>f.properties.city === (selectedDeal?.city || selectedSite?.city))) ? washPoints.length : null,
+    select: miles => {
+      closeMenus(); chooseLayers(false); setPreviewId(selected); setSheetSnap("half");
+      write({marketMetric:"washes", washRadius:String(miles), overlay:null, view:null, panel:null, sheet:"half"});
+    },
+  } : undefined;
   function summaryText() {
     if (funnel !== "pipeline") return "";
     const home = !outsideGroup && (allPipes || pipelineWide || Boolean(who));
@@ -2885,8 +2896,10 @@ export default function Explorer() {
           shortlistPoints={mappedShortlist}
           area={mapArea}
           onArea={(next) => write(areaQuery(next))}
-          overlayPoints={overlayPoints}
-          washPoints={washPoints}
+          marketMetric={activeMetric}
+          marketRows={marketRows}
+          washRing={activeMetric === "washes" && washOrigin ? {point:washOrigin, miles:washRadius} : null}
+          washPoints={activeMetric === "washes" ? washPoints : []}
           gridFeatures={gridFeatures.filter((feature) => feature.properties.deal_id === selected || (feature.properties.site_id && feature.properties.site_id === selected))}
           areas={data.areas.features}
           depots={data.depots.features}
@@ -2911,7 +2924,7 @@ export default function Explorer() {
           reviewMarkers={reviewMarkers}
           queueIds={openQueueIds}
           reviewFocus={reviewFocus}
-          pinLabel={pinLabel}
+          pinLabel={activeMetric ? "none" : pinLabel}
           onPinLabel={setPinLabel}
           basemap={basemap}
           onBasemap={chooseBasemap}
@@ -3162,27 +3175,22 @@ export default function Explorer() {
                   <span className="layer-mark"><i className="pin-sample line" /></span>
                   <span className="layer-nest">Depot rings</span>
                 </label>
-                <p className="eyebrow">Area data</p>
-                {(["traffic", "population", "growth", "income", "washes"] as const).map((id) => {
-                  const item = OVERLAYS.find((entry) => entry.id === id);
-                  if (!item) return null;
-                  return (
-                    <label key={item.id} className="layer-row" title={LAYER_TITLES[item.id]}>
-                      <input className="check" type="checkbox" checked={overlaysOn.includes(item.id)} onChange={() => toggleOverlay(item.id)} />
-                      <span className="layer-mark" />
-                      {item.label}
-                    </label>
-                  );
-                })}
               </div>
             </>
           ) : (
-            <button type="button" className="paper-btn" aria-expanded={false} onClick={() => { chooseLayers(true); setFiltersOpen(false); setMenuOpen(false); }}>Layers</button>
+            <div className="market-layer-tools">
+              {!inReview && !listView && !marking && <button type="button" className={activeMetric ? "tool on" : "tool"} aria-pressed={Boolean(activeMetric)}
+                onClick={()=>chooseMarketMetric(activeMetric ? null : "traffic")}>Market context</button>}
+              <button type="button" className="paper-btn" aria-expanded={false} onClick={() => { chooseLayers(true); setFiltersOpen(false); setMenuOpen(false); }}>Layers</button>
+            </div>
           )}
         </aside>
         {!listView ? (
           <div className="map-corner">
-            {mapZoom >= 6 && liveArea?.kind === "polygon" && !selected && !inReview && !marking && !stepsOpen && !filtersOpen && !layersOpen && !ndaVisible && !loopsVisible && compareIds.length < 2 && (
+            {activeMetric && !selected && !stepsOpen && !filtersOpen && !unplacedOpen && !layersOpen && !ndaVisible && !loopsVisible && compareIds.length < 2 &&
+              <MarketMapPanel metric={activeMetric} choose={chooseMarketMetric} clustered={mapZoom < PIN_SPLIT_ZOOM} missingLocations={unplacedInView.length}
+                showMissing={()=>{closeMenus();setUnplacedOpen(true);}} rows={marketRows} area={liveArea} spot={highlightNearby} pick={id=>nearbyPicker.current?.(id)} />}
+            {!activeMetric && mapZoom >= 6 && liveArea?.kind === "polygon" && !selected && !inReview && !marking && !stepsOpen && !filtersOpen && !layersOpen && !ndaVisible && !loopsVisible && compareIds.length < 2 && (
               <NearbySites key={selectedMarket + "/" + funnel} locations={locationRows} area={liveArea}
                 onSpot={highlightNearby} fact={id => {
                   const site = siteById.get(id);
@@ -3226,7 +3234,6 @@ export default function Explorer() {
                 {showSpaces && <li><i className="swatch space-proposal-swatch" />Analyzed space</li>}
                 {showSpaces && markedSpaces.length > 0 && <li><i className="swatch l10" />Team-drawn lot</li>}
                 {showUnscreened && <li><i className="swatch nearby" />Unscreened listing</li>}
-                {OVERLAYS.filter(item => overlaysOn.includes(item.id)).map(item => <li key={item.id}>{item.label}</li>)}
               </ul>
             </aside>
           </div>
@@ -3251,6 +3258,7 @@ export default function Explorer() {
         {showingPreview ? (
           <MapSitePreview
             compared={Boolean(selected && compareIds.includes(selected))}
+            marketMode={Boolean(activeMetric)} washInspection={washInspection}
             comparisonFull={compareIds.length >= 4}
             onCompare={selected && !selectedUnscreened ? () => {
               const next = compareIds.includes(selected) ? compareIds.filter(id => id !== selected) : [...compareIds, selected];
@@ -3300,6 +3308,7 @@ export default function Explorer() {
             spaceSqft={spaceSqft}
             onMarkSpace={me ? beginMark : undefined}
             spaceNote={mapNote}
+            washInspection={washInspection}
             onLayoutOverlay={setLayoutOverlay}
             extras={<RecordActions kind="deal" id={selectedDeal.deal_id} />}
             onOpenNda={(id) => write({ nda: id })}
@@ -3348,6 +3357,7 @@ export default function Explorer() {
             spaceSqft={spaceSqft}
             onMarkSpace={me ? beginMark : undefined}
             spaceNote={mapNote}
+            washInspection={washInspection}
             onLayoutOverlay={setLayoutOverlay}
             figuresReady={figuresReady}
             outsideFilter={Boolean(selectedSite && !siteInCategories(selectedSite, links, categories))}

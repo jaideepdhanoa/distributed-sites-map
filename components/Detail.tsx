@@ -23,6 +23,7 @@ import { aerialTile, streetViewHref } from "@/lib/aerial";
 import KeyStrip, { CapacityFacts, SitePacket } from "./KeyStrip";
 import PanelSections, { RecordNavigation } from "./PanelSections";
 import Economics from "./Economics";
+import MarketEvidence, {type WashInspection} from "./MarketEvidence";
 import RecordBrief from "./RecordBrief";
 import SitePhotos from "./SitePhotos";
 import SpaceOptions, { type MapOutline } from "./spaces/SpaceOptions";
@@ -550,9 +551,11 @@ export default function Detail({
   onMarkSpace,
   spaceNote,
   onLayoutOverlay,
+  washInspection,
   decisionFirst = false,
   onOpenNda,
 }: {
+  washInspection?: WashInspection;
   decisionFirst?: boolean;
   site: SiteProps | null;
   depotMiles?: number | null;
@@ -699,9 +702,11 @@ export default function Detail({
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections
+        market={<MarketEvidence deal={linkedDeal} site={site} inspection={washInspection} expanded />}
         economics={<Economics pnl={pnl} deal={linkedDeal} site={site} signedIn={signedIn} />}
         overview={
           <>
+            <MarketEvidence deal={linkedDeal} site={site} inspection={washInspection} />
             <details className="disclosure">
               <summary className="disclosure">Record</summary>
               <p>{site.site_id}{site.linked_deal_id ? ` · ${site.linked_deal_id}` : ""}</p>
@@ -892,9 +897,11 @@ export function DealDetail({
   onMarkSpace,
   spaceNote,
   onLayoutOverlay,
+  washInspection,
   decisionFirst = false,
   onOpenNda,
 }: {
+  washInspection?: WashInspection;
   decisionFirst?: boolean;
   deal: DealProps;
   peers?: DealProps[];
@@ -1019,9 +1026,11 @@ export function DealDetail({
       {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
       {related}
       <PanelSections
+        market={<MarketEvidence deal={deal} site={universeSite} inspection={washInspection} expanded />}
         economics={<Economics pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />}
         overview={
           <>
+            <MarketEvidence deal={deal} site={universeSite} inspection={washInspection} />
             <details className="disclosure">
               <summary className="disclosure">Record</summary>
               <p>{deal.deal_id}{deal.universe_id ? ` · ${deal.universe_id}` : ""}</p>

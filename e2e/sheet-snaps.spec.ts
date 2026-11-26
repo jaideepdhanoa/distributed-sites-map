@@ -149,7 +149,7 @@ test("phone layers list scrolls between the header and the sheet", async ({ page
   await note.scrollIntoViewIfNeeded();
   await expect(note).toBeVisible();
   await expect(panel.getByText("On the map")).toBeVisible();
-  await expect(panel.getByText("Area data")).toBeVisible();
+  await expect(panel.getByText("Area data")).toHaveCount(0);
   await expect(panel.getByText("Key")).toHaveCount(0);
   await expect(panel.getByText("Also show")).toHaveCount(0);
   await expect(panel.getByText("Land sites")).toHaveCount(0);

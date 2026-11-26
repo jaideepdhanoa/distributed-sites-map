@@ -102,6 +102,7 @@ jobs:
             sleep 10
           done
           npx playwright test e2e/map-journey.spec.ts
+          npx playwright test e2e/layout-options.spec.ts --grep "open a released outline"
       - if: steps.gate.outputs.run == 'true' && github.event_name != 'push'
         uses: actions/upload-artifact@v4
         with:

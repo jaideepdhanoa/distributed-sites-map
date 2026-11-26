@@ -60,3 +60,33 @@ test("find a bay review in the portfolio, including a site without a map pin", a
   await expect(page.getByRole("heading",{name:"Example repair business"})).toBeVisible();
   await expect(page.getByTestId("space-options")).toContainText("No aerial assessment on file");
 });
+
+test("open a released outline and discussion without writing to the site", async ({ page }) => {
+  test.skip(process.env.MAP_PRODUCTION_CHECK !== "1", "Requires the published assessments.");
+  const response = await page.request.get("/api/data/space-options?view=portfolio");
+  expect(response.ok()).toBeTruthy();
+  const { rows } = await response.json();
+  const candidates = rows.filter((r: { options: string[] }) => r.options.includes("outdoor"));
+  const target = candidates.find((r: { mapped: boolean }) => !r.mapped) || candidates[0];
+  expect(Boolean(target)).toBeTruthy();
+  const status = await (await page.request.get("/api/actions/status")).json();
+  let attemptedWrite = false;
+  await page.route(/\/api\/(changes|actions\/notes)(\?|$)/, async route => {
+    if (route.request().method() === "GET") return route.continue();
+    attemptedWrite = true;
+    return route.abort();
+  });
+  await page.goto("/space-review?"+new URLSearchParams({site:target.id,panel:"space-options"}));
+  const panel = page.getByTestId("space-options");
+  await panel.getByRole("button", {name:"Convert outdoor space",exact:true}).click();
+  const thread = panel.getByRole("button", {name:"Comment",exact:true,expanded:false});
+  await expect(thread).toBeVisible();
+  if (status.enabled && ["contributor","reviewer"].includes(status.actionRole)) {
+    await panel.getByRole("button",{name:"Adjust outline"}).click();
+    await expect(panel.getByRole("button",{name:"Save outline"})).toBeDisabled();
+    await panel.getByRole("button",{name:"Cancel",exact:true}).click();
+  }
+  await thread.click();
+  await expect(panel.getByRole("button", {name:"Comment",exact:true,expanded:true})).toBeVisible();
+  expect(attemptedWrite).toBe(false);
+});

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import {
+  LngLatBounds,
   Marker,
   type GeoJSONSource,
   type Map,
@@ -206,7 +207,16 @@ export default function SpaceGeography(props: Props) {
             : [x, y, x, y];
         }, null)
       : null;
-  const cameraBounds = (bounds || extent)?.join(",");
+  const selectedBounds = useMemo(() => {
+    if (!bounds || !active?.points.length) return bounds;
+    const footprint = new LngLatBounds();
+    for (const point of active.points) footprint.extend(worldPoint(point, bounds));
+    // Keep the approach and the neighboring aisle visible around the selected footprint.
+    const context = LngLatBounds.fromLngLat(footprint.getSouthWest(), 15);
+    context.extend(LngLatBounds.fromLngLat(footprint.getNorthEast(), 15));
+    return [context.getWest(), context.getNorth(), context.getEast(), context.getSouth()];
+  }, [bounds, active]);
+  const cameraBounds = (selectedBounds || extent)?.join(",");
   useEffect(() => {
     if (!map || !cameraBounds || !workspace || muted) return;
     const [w, n, e, s] = cameraBounds.split(",").map(Number);

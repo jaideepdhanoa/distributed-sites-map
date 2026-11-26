@@ -1353,7 +1353,7 @@ export default function MapView(props: Props) {
     const observed = node.current;
     const preserveView = Boolean(kept);
     const recenter = () => {
-      if (propsRef.current.reviewFocus || propsRef.current.spacesOpen) return;
+      if (propsRef.current.reviewFocus || propsRef.current.spacesOpen || propsRef.current.gridFocusId) return;
       const id = propsRef.current.selectedId;
       if (!id) return;
       const deal = propsRef.current.deals.find((feature) => feature.properties.deal_id === id);
@@ -1664,7 +1664,7 @@ export default function MapView(props: Props) {
       if (map.getLayer("deal-halo")) map.setFilter("deal-halo", ["==", ["get", "deal_id"], props.selectedId || ""]);
       if (map.getLayer("deal-ring")) map.setFilter("deal-ring", ["==", ["get", "deal_id"], props.selectedId || ""]);
       if (map.getLayer("unscreened-selected")) map.setFilter("unscreened-selected", ["==", ["get", "listing_id"], props.selectedId || ""]);
-      if (propsRef.current.spacesOpen) return;
+      if (propsRef.current.spacesOpen || propsRef.current.gridFocusId) return;
       const phone = window.matchMedia("(max-width: 767px)").matches;
       const reviewing = Boolean(props.reviewFocus) || (props.reviewMarkers || []).length > 0;
       const drawing = Boolean(propsRef.current.spaceDrawing);
@@ -2009,14 +2009,28 @@ export default function MapView(props: Props) {
       zoom:map.getZoom(), bearing:map.getBearing(), pitch:map.getPitch(), padding:map.getPadding()};
     const points = [pin,...coords];
     const xs = points.map(p=>p[0]), ys = points.map(p=>p[1]);
-    const pad = pointPadding(map);
-    const bounds: [[number,number],[number,number]] = [[Math.min(...xs),Math.min(...ys)],[Math.max(...xs),Math.max(...ys)]];
-    // Fit only the uncovered canvas. Remove the old padding before computing the new view.
-    map.jumpTo({padding:{top:0,bottom:0,left:0,right:0},bearing:0,pitch:0});
-    const canvas = map.getContainer().getBoundingClientRect();
-    const edge = Math.max(0,Math.min(32,(canvas.height-pad.top-pad.bottom)/5,(canvas.width-pad.left-pad.right)/5));
-    map.fitBounds(bounds,{padding:{top:pad.top+edge,bottom:pad.bottom+edge,left:pad.left+edge,right:pad.right+edge},
-      maxZoom:16,duration:0});
+    const bounds: [[number, number], [number, number]] = [[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]];
+    const container = map.getContainer();
+    const preview = container.closest(".shell")?.querySelector(".map-preview");
+    function frameGrid() {
+      if (!map || propsRef.current.gridFocusId !== id) return;
+      const canvas = container.getBoundingClientRect();
+      const pad = pointPadding(map);
+      if (preview && !window.matchMedia("(max-width: 767px)").matches) {
+        pad.right = Math.max(0, canvas.right - preview.getBoundingClientRect().left);
+      }
+      const edge = Math.max(0, Math.min(32, (canvas.height - pad.top - pad.bottom) / 5, (canvas.width - pad.left - pad.right) / 5));
+      map.fitBounds(bounds, {
+        absolutePadding: true,
+        padding: { top: pad.top + edge, bottom: pad.bottom + edge, left: pad.left + edge, right: pad.right + edge },
+        bearing: 0, pitch: 0, maxZoom: 16, duration: 0,
+      });
+    }
+    frameGrid();
+    const observer = new ResizeObserver(frameGrid);
+    observer.observe(container);
+    if (preview) observer.observe(preview);
+    return () => observer.disconnect();
   }, [mapGeneration,props.gridFocusId,props.selectedId,props.previewName,gridToken,previewLng,previewLat]);
 
   useEffect(() => {

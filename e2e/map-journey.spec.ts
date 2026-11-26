@@ -334,13 +334,14 @@ test("screen property, street and grid evidence from a selected pin", async ({pa
     const map = (window as unknown as MapWindow).__sitesMap;
     const canvas = map.getCanvas().getBoundingClientRect();
     const sheet = document.querySelector(".map-preview")!.getBoundingClientRect();
-    return [[lng,lat],[lng-.006,lat+.003]].every(([x,y]) => {
+    return [[lng,lat],[lng-.006,lat+.003]].map(([x,y]) => {
       const pt = map.project([x,y]);
       const left = pt.x + canvas.left, top = pt.y + canvas.top;
-      return left >= canvas.left && left <= canvas.right && top >= canvas.top && top <= canvas.bottom
-        && (left < sheet.left || left > sheet.right || top < sheet.top || top > sheet.bottom);
+      const onMap = left >= canvas.left && left <= canvas.right && top >= canvas.top && top <= canvas.bottom;
+      const covered = left >= sheet.left && left <= sheet.right && top >= sheet.top && top <= sheet.bottom;
+      return onMap && !covered ? "visible" : `${onMap ? "under sheet" : "off map"} at ${Math.round(left)},${Math.round(top)}`;
     });
-  }, center)).toBe(true);
+  }, center)).toEqual(["visible", "visible"]);
   await card.getByRole("button",{name:"Return to site view"}).click();
   await expect.poll(()=>camera(page)).toEqual(original);
   await page.locator(".map-preview").evaluate(el=>{el.scrollTop=0;});

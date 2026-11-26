@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useId } from "react";
 import { useSearchParams } from "next/navigation";
 import { Layers3 } from "lucide-react";
-import { firstOption, kinds, options, outlineDimensions, fitRange, threshold, optionZones, recordedFit, type Assessment, type Option, type Point } from "@/lib/spaces/options";
+import { firstOption, kinds, options, outlineDimensions, fitRange, edgeFitRange, threshold, optionZones, recordedFit, type Assessment, type Option, type Point } from "@/lib/spaces/options";
 import OptionAerial from "./OptionAerial";
 import { imageCandidates, isPanoUrl, type PhotoCard } from "@/lib/photos";
 import OptionReview, { useOptionReviews } from "./OptionReview";
@@ -53,6 +53,7 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
   const activePoint = (visible[which]?.points)?.[corner];
   const dims = outlineDimensions(visible.find(z => z.label === zone?.label), row.image?.bounds);
   const range = dims && fitRange(dims[0], dims[1], Math.min(6, dims[1]), "stalls_90");
+  const edge = dims && range && range[1] < 4 ? edgeFitRange(dims[0], dims[1], Math.min(6, dims[1]), 24, "stalls_90") : null;
   const originalDims = outlineDimensions(zone, row.image?.bounds);
   const predicted = originalDims && fitRange(originalDims[0], originalDims[1], Math.min(6, originalDims[1]), "stalls_90");
   const held = row.status !== "reviewed";
@@ -74,6 +75,7 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
       {isPanoUrl(photos?.frontageUrl || "") && <p><a className="text-link" href={photos!.frontageUrl} target="_blank" rel="noopener noreferrer">Inspect the street frontage</a></p>}
     </details>}
     {range && dims && <div className="space-fit-range"><strong>{range[0] === range[1] ? range[0] : range.join("–")} stalls · outline-only test</strong><p>{threshold(...range)}. Approx. {dims[0]} × {dims[1]} ft; 90° stalls and aisle inside this outline. The lower case reserves up to 6 ft in each dimension. Rights and operating hours still need evidence.</p></div>}
+    {edge && edge[1] >= 4 && <p className="space-gate"><strong>An adjacent aisle could change the decision.</strong> The outline could serve {edge[0] === edge[1] ? edge[0] : edge.join("–")} stalls in one row if a continuous 24 ft outside aisle is usable. Verify its width, turning access and availability at peak.</p>}
     {zone && !range && <p className="space-gate"><strong>Four-stall fit unresolved.</strong> {zone.kind === "bay" ? "Interior dimensions and access are needed." : "Measure the clear rectangle and its aisle."}</p>}
     {zone && <div className="space-next"><strong>What would settle fit and availability</strong><p>{zone.check || kinds[zone.kind].check}</p></div>}
     {editing && activePoint && zone && <div className="space-edit"><strong>Adjust a corner</strong><p>Choose a corner, then tap the image or enter its position.</p>

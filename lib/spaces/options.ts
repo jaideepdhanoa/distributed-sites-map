@@ -1,5 +1,5 @@
 import { geodesicInverse } from "./measure";
-import { estimateSlots } from "./slots";
+import { estimateEdgeRow, estimateSlots } from "./slots";
 import type { SpaceLayout } from "./vocab";
 
 export const options = {
@@ -45,6 +45,10 @@ export function worldPoint([x, y]: Point, [west, north, east, south]: Bounds): P
 export function fitRange(length: number, depth: number, reserve: number, layout: SpaceLayout) {
   if (![length, depth, reserve].every(Number.isFinite) || length <= 0 || depth <= 0 || reserve < 0 || reserve > Math.min(length, depth)) return null;
   return [estimateSlots(length - reserve, depth - reserve, layout), estimateSlots(length, depth, layout)] as const;
+}
+export function edgeFitRange(length: number, depth: number, reserve: number, aisle: number, layout: SpaceLayout) {
+  if (layout === "pull_through" || !Number.isFinite(aisle) || aisle < 0 || !fitRange(length, depth, reserve, layout)) return null;
+  return [estimateEdgeRow(length - reserve, depth - reserve, aisle, layout), estimateEdgeRow(length, depth, aisle, layout)] as const;
 }
 export function threshold(low: number, high: number) {
   if (high < 4) return "Below four in both cases";

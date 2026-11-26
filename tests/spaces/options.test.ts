@@ -43,3 +43,12 @@ test("a cited zero can overturn the earlier four-stall screen without changing i
   assert.equal(fitOutcome({stalls:4,source:"Visit",predicted:[1,3]}),"Aerial missed a four-stall layout");
   assert.equal(fitOutcome({stalls:3,source:"Visit",predicted:[3,5]}),"Measurement falls below four stalls");
 });
+
+test("an outside aisle can change four-stall fit only when its full width and stall depth are available", async () => {
+  const { edgeFitRange } = await import("../../lib/spaces/options");
+  assert.deepEqual(fitRange(43,29,6,"stalls_90"),[0,0]);
+  assert.deepEqual(edgeFitRange(43,29,6,24,"stalls_90"),[4,4]);
+  assert.deepEqual(edgeFitRange(43,29,6,23,"stalls_90"),[0,0]);
+  assert.deepEqual(edgeFitRange(43,15,6,30,"stalls_90"),[0,0]);
+  assert.equal(edgeFitRange(43,29,6,24,"pull_through"),null);
+});

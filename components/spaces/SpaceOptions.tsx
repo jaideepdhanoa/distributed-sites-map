@@ -13,7 +13,7 @@ const missing: Record<Option, string> = {
   outdoor: "No outdoor area outlined. Check for parking, vacuums or staging that could be released at the hours the fleet needs.",
   bays: "No bay footprint established. Obtain the service layout and confirm which positions could be released.",
 };
-export type MapOutline = { site: string; frame: NonNullable<Assessment["image"]>["bounds"]; zones: Assessment["zones"] };
+export type MapOutline = { site: string; frame: NonNullable<Assessment["image"]>["bounds"]; zones: Assessment["zones"]; corrected?: string };
 
 function Workspace({ site, data, onOverlay }: { site: string; data: Loaded; onOverlay?: (v: MapOutline | null) => void }) {
   const { row, reviewedOn } = data;
@@ -33,9 +33,9 @@ function Workspace({ site, data, onOverlay }: { site: string; data: Loaded; onOv
   const painted = [...visible, ...clear];
   const overlayKey = JSON.stringify(painted);
   useEffect(() => {
-    if (onOverlay && row.image?.bounds) onOverlay({ site, frame: row.image.bounds, zones: JSON.parse(overlayKey) });
+    if (onOverlay && row.image?.bounds) onOverlay({ site, frame: row.image.bounds, zones: JSON.parse(overlayKey), corrected: !draft && savedOutline ? zone?.label : undefined });
     return () => onOverlay?.(null);
-  }, [site, row.image?.bounds, overlayKey, onOverlay]);
+  }, [site, row.image?.bounds, overlayKey, onOverlay, draft, savedOutline?.toString(), zone?.label]);
   const reset = () => { setDraft(undefined); setEditing(false); setCorner(0); };
   function changePoint(point: Point) {
     const current = draft || savedOutline || zone?.points;
@@ -107,20 +107,23 @@ export default function SpaceOptions({ site, compact, onOpen, onOverlay }: { sit
   const opt = row ? firstOption(row) : "retain";
   const first = row && optionZones(row, opt)[0];
   const summary = row ? recordedFit(row) : "";
-  return <section ref={ref} aria-labelledby={titleId} className={"space-options" + (compact ? " compact" : "")} data-testid="space-options">
+  if (compact) {
+    if (!row && !canDraft) return null;
+    return <div className="space-options-pin"><Layers3 size={16} aria-hidden="true"/><button className="text-link" type="button" onClick={onOpen}>Compare space options</button>{first && <span>{first.label}</span>}</div>;
+  }
+  return <section ref={ref} aria-labelledby={titleId} className="space-options" data-testid="space-options">
     <div className="space-heading"><Layers3 size={19} aria-hidden="true"/><h3 id={titleId}>Space options</h3></div>
-    {row && <div className="space-top">
+    {row && !open && <div className="space-top">
       {row.image && !open && <div className="space-thumb"><OptionAerial image={row.image} zones={first ? [first] : []}/></div>}
       <div><strong>{first ? first.label : row.status === "hold" ? "Parcel or imagery check" : row.status === "needs-image" ? "Aerial needed" : "Layout needs measurement"}</strong>
       <p>{summary}</p>{first && <small>{options[opt]} · potential fit</small>}</div>
     </div>}
+    {open && row && <p className="space-recorded">{summary}</p>}
     {!row && <p>{error ? "Space review could not be loaded." : loaded === undefined ? "Loading space review…" : "No aerial assessment on file. A parcel-matched aerial or dimensioned site plan is needed."}</p>}
     {canDraft && !compact && <button type="button" className="paper-btn" disabled={drafting} onClick={() => void draftOptions()}>{drafting ? "Reviewing aerial…" : "Draft options from the filed aerial"}</button>}
-    {canDraft && compact && !row && <button className="text-link" type="button" onClick={onOpen}>Review site aerial</button>}
     {draftError && <p role="alert">{draftError}</p>}
     {error && <button type="button" className="text-link" onClick={() => setRetry(n=>n+1)}>Retry</button>}
-    {row && (compact ? <button type="button" className="text-link" onClick={onOpen}>Compare space options</button> :
-      <button type="button" className="text-link" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? "Close layout comparison" : "Compare space options"}</button>)}
+    {row && <button type="button" className="text-link" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? "Close layout comparison" : "Compare space options"}</button>}
     {open && !compact && loaded && <Workspace data={loaded} site={site} onOverlay={onOverlay} />}
   </section>;
 }

@@ -2109,14 +2109,15 @@ export default function MapView(props: Props) {
       if (!source && !layer?.frame) return;
       const features = (layer?.zones || []).map(zone => {
         const ring = zone.points.map(point => worldPoint(point, layer!.frame!));
-        return { type: "Feature" as const, properties: { kind: zone.kind }, geometry: { type: "Polygon" as const, coordinates: [[...ring, ring[0]]] } };
+        return { type: "Feature" as const, properties: { kind: zone.kind, solid: zone.kind === "clear" || zone.label === layer?.corrected }, geometry: { type: "Polygon" as const, coordinates: [[...ring, ring[0]]] } };
       });
       const data = { type: "FeatureCollection" as const, features };
       if (source) { source.setData(data); return; }
       map.addSource("layout-options", { type: "geojson", data });
       const color: ExpressionSpecification = ["match", ["get", "kind"], "clear", "#f7f1df", "bay", "#ffc870", "#56d8ac"];
       map.addLayer({ id: "layout-option-fill", type: "fill", source: "layout-options", paint: { "fill-color": color, "fill-opacity": 0.32 } });
-      map.addLayer({ id: "layout-option-line", type: "line", source: "layout-options", paint: { "line-color": color, "line-width": 2.5, "line-dasharray": [3,2] } });
+      map.addLayer({ id: "layout-option-line", type: "line", source: "layout-options", filter: ["==", ["get", "solid"], false], paint: { "line-color": color, "line-width": 2.5, "line-dasharray": [3,2] } });
+      map.addLayer({ id: "layout-option-reviewed", type: "line", source: "layout-options", filter: ["==", ["get", "solid"], true], paint: { "line-color": color, "line-width": 2.5 } });
     };
     if (map.isStyleLoaded() || map.getSource("layout-options")) paint(); else map.once("load", paint);
     return () => { map.off("load", paint); };

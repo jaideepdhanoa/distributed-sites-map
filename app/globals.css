@@ -4411,3 +4411,5 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .space-decisions { margin:10px 0; }
 @media(max-width:767px){.space-options .segmented,.space-options .text-link,.space-options .paper-btn { min-height:44px; }.space-options{scroll-margin-top:52px;}}
 .space-fit-range,.space-gate { padding:8px 10px; border-left:3px solid #a77631; background:#f5efdf; margin:8px 0; }
+.space-options-pin { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:.82rem; padding:4px 0; color:#264c3d; }
+.space-options-pin span { color:var(--ink-3); }

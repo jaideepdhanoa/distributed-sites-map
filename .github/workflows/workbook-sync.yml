@@ -93,6 +93,9 @@ jobs:
           python scripts/sync_workbook.py
           python scripts/build_data.py
           python -m scripts.selection_inputs
+          if [ -f data/source/selection-evidence.json ]; then
+            cp data/source/selection-evidence.json data/generated/selection-evidence.json
+          fi
           if [ -f data/source/space-layouts.json ]; then
             cp data/source/space-layouts.json data/generated/space-layouts.json
           fi
@@ -160,7 +163,9 @@ jobs:
         id: checks
         if: steps.same.outputs.unchanged != 'true' && steps.live.outputs.unchanged != 'true'
         continue-on-error: true
-        run: python scripts/run_sync_checks.py /tmp/sync-test-results.md
+        run: |
+          python scripts/run_sync_checks.py /tmp/sync-test-results.md
+          node --import tsx scripts/verify-selection-evidence.mjs
       - name: Report failed data checks
         if: steps.checks.outcome == 'failure'
         run: |
@@ -352,6 +357,12 @@ jobs:
               echo "Could not dispatch $workflow on $BRANCH."
             fi
           done
+      - name: Read back published selection research
+        if: github.ref == 'refs/heads/main' && steps.publish.outputs.published == 'true' && hashFiles('data/generated/selection-evidence.json') != ''
+        env:
+          E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: node --import tsx scripts/verify-selection-evidence.mjs --live
       - name: Check whether this layout file has passed signed-in production readback
         id: layouts
         if: github.ref == 'refs/heads/main' && hashFiles('data/generated/space-layouts.json') != '' && (steps.publish.outputs.published == 'true' || steps.same.outputs.unchanged == 'true' || steps.live.outputs.unchanged == 'true')

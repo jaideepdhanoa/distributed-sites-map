@@ -564,7 +564,7 @@ export default function MainMapSpaces({
                   {prior?.review && <span>{prior.review.disposition==="Dismiss option" ? "Dismissed" : "Kept for diligence"}</span>}
                   <span>{site.frame.bounds ? "Map aligned" : "Source image · alignment needed"}</span>
                 </div>
-                {!draft && <MapSpaceFit zone={active} image={image} review={prior?.review?.reason} />}
+                {!draft && <MapSpaceFit zone={active} image={image} review={prior?.review} />}
                 <div className="space-actions">
                   {!draft && assessment && (
                     <button

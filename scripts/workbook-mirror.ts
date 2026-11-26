@@ -54,6 +54,7 @@ import {
   type SheetTable,
 } from "../lib/changes/mirror";
 import { loadSheetTable, readBackCells, readBackOutcome, readSheetRanges, sheetsFetch } from "../lib/changes/sheetTable";
+import { checkSelectionFormulas, formulaRequests, planSelectionFormulas, reviewFields } from "../lib/selection/formulas";
 import { writeFormulaBatch, readGrids } from "./power-sheet-read";
 
 function summary(text: string): void {
@@ -149,6 +150,18 @@ async function main(): Promise<void> {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim() || "";
   if (!raw) throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not set.");
   const token = await sheetsToken(raw);
+  if (selected.includes("site")) {
+    const load = () => loadTable(token, "Pipeline", 4, reviewFields, true);
+    const edits = planSelectionFormulas(await load());
+    if (edits.length && !dryRun) {
+      const grid = (await readGrids(token)).find(g => g.title === "Pipeline");
+      if (!grid) throw Error("Pipeline grid missing.");
+      await writeFormulaBatch(token, formulaRequests(edits,grid.sheetId));
+      checkSelectionFormulas(await load(),edits);
+    }
+    console.log(JSON.stringify({event:"selection_formulas",cells:edits.length,
+      sections:edits.filter(edit=>edit.column===81).length,dryRun}));
+  }
   const refused: string[] = [];
   const held: { id: string; header: string }[] = [];
   let skippedProtected = 0;

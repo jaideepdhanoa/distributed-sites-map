@@ -14,6 +14,7 @@ test("inspect acquisition evidence and switch the operating case", async ({page}
   expect(Boolean(record)).toBeTruthy();
   const id = record.properties.deal_id;
   Object.assign(record.properties, {
+    selectionResearch:{reviewedOn:"2026-01-01",priority:"Check parking rights",check:"Read the exclusive-use exhibit.",scope:"Example property",quote:null,basis:"Price unresolved",note:"No released bay.",source:null,cases:[]},
     name:"Example operating site", asking_price:example.inputs.ask, purchase:example,
     figures_status:"shown", financials_open:true, statementCoverage:"empty", figures_source:"",
     earnings_period:"", earnings_basis:"", stated_cash_flow:null, cash_flow_label:"",
@@ -30,6 +31,9 @@ test("inspect acquisition evidence and switch the operating case", async ({page}
   const prefix=process.env.MAP_DEPLOYED_PREVIEW ? "deployed-" : "";
   // Only the substituted model and its context appear in the artifact.
   await panel.locator(".purchase-summary").screenshot({path:"review-shots/"+info.project.name+"-"+prefix+"financial-purchase.png",animations:"disabled"});
+  await panel.getByText("Offering and downside",{exact:false}).click();
+  await expect(panel.getByText("Read the exclusive-use exhibit.")).toBeVisible();
+  await expect(panel.getByText("Unpriced",{exact:true})).toBeVisible();
   await panel.getByRole("button",{name:"Workbook input"}).click();
   await expect(panel.locator(".purchase-lead")).toContainText("$65,000");
   await panel.getByText("Test a layout or operating change",{exact:true}).click();

@@ -4,6 +4,7 @@ import type { DealProps } from "@/lib/types";
 import { actionsEnabled, withSql } from "@/lib/actions/db";
 import { createHash } from "node:crypto";
 import { mapCatalog } from "@/lib/spaces/mapCatalogLoad";
+import { selectionResearch } from "@/lib/selection/researchLoad";
 import { purchaseFile } from "@/lib/purchaseReviewLoad";
 import { canReadFinancials } from "@/lib/agent/access";
 import { attachPackageHrefs } from "@/lib/financials";
@@ -35,6 +36,7 @@ export async function loadMapDeals(role: ActionRole, includePurchase = true) {
   const features = omitProtectedDeals(attachPackageHrefs(chipped.features || [], packageHrefMap(), canReadFinancials(role)).map((feature) => withPricing(feature)));
   const purchase = includePurchase && canReadFinancials(role) ? purchaseFile() : null;
   const allowed = includePurchase && canReadFinancials(role);
+  const research = allowed ? selectionResearch() : null;
   const captured = allowed && actionsEnabled() ? await withSql(async sql => {
     const result = await sql.query<{site_id:string}>("SELECT DISTINCT site_id FROM pnl_lines WHERE deleted_at IS NULL AND amount IS NOT NULL AND updated_by <> 'fixture'");
     return new Set(result.rows.map(row => row.site_id));
@@ -53,7 +55,7 @@ export async function loadMapDeals(role: ActionRole, includePurchase = true) {
     const inputs = purchase?.sites[d.deal_id];
     if (!allowed || d.kind !== "pipeline") return feature;
     const statementCoverage = !captured ? "unavailable" : captured.has(d.deal_id) || captured.has(d.universe_id || "") ? "present" : "empty";
-    return {...feature,properties:{...d,statementCoverage,...(inputs && purchase ? {purchase:{inputs,assumptions:purchase.assumptions,
+    return {...feature,properties:{...d,statementCoverage,selectionResearch:research?.get(d.deal_id),...(inputs && purchase ? {purchase:{inputs,assumptions:purchase.assumptions,
       layout:layouts.get(d.deal_id)}} : {})}};
   });
   // Live decisions can change while the published workbook snapshot stays the same.

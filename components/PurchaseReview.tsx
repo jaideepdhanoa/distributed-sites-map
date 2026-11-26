@@ -5,6 +5,7 @@ import type { DealProps } from "@/lib/types";
 import { amount, financialEvidence, layoutName, purchaseCase, purchaseCheck, purchaseConstraints, type PurchaseScenario } from "@/lib/purchaseReview";
 import { usePurchaseScenario } from "./PurchaseScenarios";
 import FinancialsEntry, { type usePnlTiles } from "./FinancialsEntry";
+import SelectionResearch from "./SelectionResearch";
 import FinancialsPanel from "./FinancialsPanel";
 import ComparisonEvidence from "./actions/ComparisonEvidence";
 import { useActionStatus } from "./actions/panel";
@@ -80,6 +81,7 @@ export default function PurchaseReview({deal,pnl}:{deal:DealProps;pnl:ReturnType
       withheld ? "View the existing request or refusal before another follow-up." : w?.fit===0 ? "The recorded layout fits zero stalls. Review an alternative footprint before using the network ceiling." :
       result?.cash==null ? "Open the available evidence and identify a full operating period." : "Confirm that the income, occupancy costs and available space belong to the same purchase setup."}</p>{constraints.length>0 && <ul>{constraints.map(c=><li key={c}>{c}</li>)}</ul>}</div>
     </div>
+    {deal.selectionResearch && <SelectionResearch row={deal.selectionResearch}/>}
     {data && w && a && result && <>
       <h4>Cash from operations</h4>
       {w.normalized!=null && <div className="segmented" role="group" aria-label="Earnings basis">{(["workbook","normalized"] as const).map(b=><button type="button" key={b} aria-pressed={b===scenario.basis} className={b===scenario.basis?"segmented on":"segmented"} onClick={()=>switchCase({basis:b})}>{b==="workbook"?"Workbook input":"Normalized recast"}</button>)}</div>}

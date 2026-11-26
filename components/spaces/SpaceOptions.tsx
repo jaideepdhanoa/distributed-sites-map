@@ -3,7 +3,8 @@
 import { useEffect, useState, useRef, useId } from "react";
 import { useSearchParams } from "next/navigation";
 import { Layers3 } from "lucide-react";
-import { firstOption, kinds, options, outlineDimensions, usableOutline, fitRange, edgeFitRange, threshold, optionZones, recordedFit, type Assessment, type Option, type Point } from "@/lib/spaces/options";
+import { checkSpaceFit, fitChecks } from "@/lib/spaces/fitCheck";
+import { firstOption, kinds, options, outlineDimensions, usableOutline, fitRange, threshold, optionZones, recordedFit, type Assessment, type Option, type Point } from "@/lib/spaces/options";
 import OptionAerial from "./OptionAerial";
 import { imageCandidates, isPanoUrl, type PhotoCard } from "@/lib/photos";
 import { spacesMapHref } from "@/lib/spaces/mapCatalog";
@@ -80,9 +81,11 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
     }
   }
   const activePoint = (visible[which]?.points)?.[corner];
-  const dims = outlineDimensions(visible.find(z => z.label === zone?.label), row.image?.bounds, row.image);
-  const range = dims && fitRange(dims[0], dims[1], Math.min(6, dims[1]), "stalls_90");
-  const edge = dims && range && range[1] < 4 ? edgeFitRange(dims[0], dims[1], Math.min(6, dims[1]), 24, "stalls_90") : null;
+  const shown = visible.find(z => z.label === zone?.label);
+  const fit = shown && checkSpaceFit(shown, row.image);
+  const dims = fit?.dimensions ?? null;
+  const range = fit?.inside;
+  const edge = fit?.adjacent;
   const originalDims = outlineDimensions(zone, row.image?.bounds, row.image);
   const predicted = originalDims && fitRange(originalDims[0], originalDims[1], Math.min(6, originalDims[1]), "stalls_90");
   const held = row.status !== "reviewed";
@@ -116,8 +119,9 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
       {isPanoUrl(photos?.frontageUrl || "") && <p><a className="text-link" href={photos!.frontageUrl} target="_blank" rel="noopener noreferrer">Inspect the street frontage</a></p>}
     </details>}
     {range && dims && <div className="space-fit-range"><strong>{range[0] === range[1] ? range[0] : range.join("–")} stalls · outline-only test</strong><p>{threshold(...range)}. Approx. {dims[0]} × {dims[1]} ft; 90° stalls and aisle inside this outline. The lower case reserves up to 6 ft in each dimension. Rights and operating hours still need evidence.</p></div>}
-    {edge && edge[1] >= 4 && <p className="space-gate"><strong>An adjacent aisle could change the decision.</strong> The outline could serve {edge[0] === edge[1] ? edge[0] : edge.join("–")} stalls in one row if a continuous 24 ft outside aisle is usable. Verify its width, turning access and availability at peak.</p>}
-    {zone && !range && <p className="space-gate"><strong>Four-stall fit unresolved.</strong> {zone.kind === "bay" ? "Interior dimensions and access are needed." : "Measure the clear rectangle and its aisle."}</p>}
+    {edge && range && range[1] < 4 && edge[1] >= 4 && <p className="space-gate"><strong>An adjacent aisle could change the decision.</strong> The outline could serve {edge[0] === edge[1] ? edge[0] : edge.join("–")} stalls in one row if a continuous 24 ft outside aisle is usable. Verify its width, turning access and availability at peak.</p>}
+    {zone?.fitHold && <p className="space-gate"><strong>{fitChecks[zone.fitHold]}</strong></p>}
+    {zone && !zone.fitHold && !range && <p className="space-gate"><strong>Four-stall fit unresolved.</strong> {zone.kind === "bay" ? "Interior dimensions and access are needed." : "Measure the clear rectangle and its aisle."}</p>}
     {zone && <div className="space-next"><strong>What would settle fit and availability</strong><p>{zone.check || kinds[zone.kind].check}</p></div>}
     {history.state === "unavailable" && <p role="status">Team reviews unavailable. <button type="button" className="text-link" onClick={history.retry}>Retry</button></p>}
     <OptionReview key={option + area} site={site} option={option} row={row} area={area} prior={prior} dimensions={dims} predicted={predicted} ready={history.state === "ready"}

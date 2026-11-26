@@ -174,6 +174,7 @@ export type SiteProps = {
 
 export type DealProps = {
   statementCoverage?: "present" | "empty" | "unavailable";
+  selectionResearch?: import("./selection/research").SelectionResearch;
   purchase?: import("./purchaseReview").PurchaseData;
   deal_id: string;
   kind: "pipeline" | "land";

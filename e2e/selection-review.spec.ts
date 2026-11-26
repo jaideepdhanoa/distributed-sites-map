@@ -4,6 +4,7 @@ import { mkdir } from "node:fs/promises";
 test("selection review distinguishes an unanswered check from zero savings", async ({page},info) => {
   const row = {id:"PIPE-PHX-9999",name:"Example service center",city:"PHX",mapped:false,stage:"1 Desk screen",mirrorStage:"1 Desk screen",
     readiness:"Base case below 30% hurdle",priority:"Test conversion",instruction:"Measure the bay and confirm retained operations.",geometry:"0 stalls in the earlier screen",option:"Service building",
+    research:{reviewedOn:"2026-01-01",priority:"Confirm aisle rights",check:"Check the exclusive yard.",scope:"Example property",note:"Example floor plan.",quote:100000,basis:"Illustrative price",source:null,cases:[{stalls:4,base:0,stress:-0.1}]},
     section:"Missing section",amount:0,financeVisible:true,assessed:true,evidenceDate:"",quickLube:false};
   await page.route("**/api/data/selection-review", r=>r.fulfill({json:{rows:[row,{...row,id:"PIPE-LAS-9999",city:"LAS",name:"Example wash",amount:null}],mismatches:0,hasInputs:true}}));
   await page.goto("/selection-review");
@@ -12,6 +13,8 @@ test("selection review distinguishes an unanswered check from zero savings", asy
   await expect(page.getByText("1 of 2 active sites")).toBeVisible();
   await expect(page.getByText("Workbook base savings: 0.0%")).toBeVisible();
   await expect(page.getByRole("link",{name:"Review layout evidence"})).toHaveAttribute("href",/space-review\?site=/);
+  await page.getByText("Offering and downside",{exact:false}).click();
+  await expect(page.getByRole("row",{name:"4 0.0% -10.0%"})).toBeVisible();
   expect(await page.locator("main").evaluate(el=>el.scrollWidth<=el.clientWidth)).toBeTruthy();
   await mkdir("review-shots",{recursive:true});
   await page.screenshot({path:"review-shots/"+info.project.name+"-selection-review.png",animations:"disabled"});

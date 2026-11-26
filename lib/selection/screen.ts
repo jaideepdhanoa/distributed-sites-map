@@ -8,6 +8,7 @@ export type Inputs = {
 export type SelectionRow = {
   id: string; name: string; city: string; mapped: boolean; stage: string; mirrorStage: string;
   priority: string; instruction: string; geometry: string; section: string; amount: number | null;
+  research?: import("./research").SelectionResearch;
   readiness: string; financeVisible: boolean; option: string; evidenceDate: string; assessed: boolean; quickLube: boolean;
 };
 

@@ -16,19 +16,31 @@ type Props={
 export function ChargingExplanation({draft,seed,result:r,trace,reference,referenceBasis,priorNetwork,baseline,trial,onTrial,reset,reviewSource,stale,author,legacy}:Props){
   const [inspect,setInspect]=useState<Key|null>(null);
   const inspector=useRef<HTMLElement>(null);
+  const evidenceList=useRef<HTMLDetailsElement>(null);
   const [focusInput,setFocusInput]=useState(0);
   useEffect(()=>{if(focusInput){inspector.current?.scrollIntoView({block:"center"});inspector.current?.querySelector("select")?.focus({preventScroll:true});}},[focusInput]);
   function chip(key:Key){
     return <button type="button" className="text-link" key={key} onClick={()=>{choose(key);setFocusInput(n=>n+1);}}>{fields[key].label}</button>;
   }
+  const maxAnnual=Math.max(0,...trace.annual.map(row=>Math.abs(row.value??0)));
+  const material=new Set<Key>(["days","hostWeek","ownWeek","hostEnd","ownEnd","weekdayHours","weekendHours","depot",...trace.annual.filter(row=>!row.excluded).flatMap(row=>row.keys),...trace.throughput.flatMap(row=>row.keys)]);
+  const counts:Record<string,number>={Verified:0,Quoted:0,Assumed:0,Missing:0};
+  let overrides=0;
+  for(const k of material){
+    const src=sourceValue(draft,k);
+    counts[status(src.value,src.evidence)]++;
+    if(draft.sourceValues?.[k])overrides++;
+  }
   function line(row:CalculationLine,hourly=false){
     const limiting=hourly && trace.perHour!=null && row.value===trace.perHour;
     return <details className="disclosure calc-item" key={row.label}><summary className="disclosure"><span>{row.label}{limiting && <small>Limits throughput</small>}</span>
+      {!hourly && maxAnnual>0 && row.value!=null && <span aria-hidden="true" className="calc-bar"><i className={row.value<0?"offset":""} style={{width:Math.abs(row.value)/maxAnnual*100+"%"}}/></span>}
       <b>{row.excluded?"Excluded":hourly?number(row.value,2):money(row.value,0)}</b></summary>
       <div className="calc-inputs">{row.keys.map(chip)}</div></details>;
   }
   const missing=keys.filter(k=>r.missing.includes(fields[k].label));
   if(draft.values[draft.terms==="lease"?"rent":"ask"]==null)missing.push(draft.terms==="lease"?"rent":"ask");
+  const atParity=r.difference!=null && Math.abs(r.difference)<1e-8;
   const earlier=r.earlyMin==null||r.earlyMax==null?"Pending":number(r.earlyMin,0)+"–"+number(r.earlyMax,0);
   function impact(label:string,now:number|null,before:number|null,currency=true){
     const format=currency?money:number;
@@ -42,7 +54,16 @@ export function ChargingExplanation({draft,seed,result:r,trace,reference,referen
       <div><span>This site per completed charge</span><strong>{money(r.siteCost)}</strong><small>{r.siteCost==null?(missing.length?missing.length+" inputs to review":"Check staffed throughput"):"Annual net cost ÷ completed charges"}</small></div>
       <div><span>{draft.comparator==="workbook"?"Miami depot proxy":"Local depot"} per charge</span><strong>{money(r.depot)}</strong><small>{draft.energyScope==="excluded"?"Electricity excluded":"Energy and demand costs included"}</small></div>
     </div>
-    <p className="cost-verdict">{r.difference==null?"Parity comparison pending":r.difference===0?"At depot parity":money(Math.abs(r.difference))+(r.difference>0?" above":" below")+" depot per charge"} · {draft.comparator==="workbook"?"Workbook benchmark":draft.comparable?"Comparable scope recorded":"Confirm benchmark scope"}</p>
+    <p className="cost-verdict" data-state={r.difference==null?"pending":r.difference>1e-8?"above":"parity"}>{r.difference==null?"Parity comparison pending":atParity?"At depot parity":money(Math.abs(r.difference))+(r.difference>0?" above":" below")+" depot per charge"} · {draft.comparator==="workbook"?"Workbook benchmark":draft.comparable?"Comparable scope recorded":"Confirm benchmark scope"}</p>
+    <button className="text-link cost-evidence-link" type="button" onClick={()=>{
+      if(evidenceList.current){evidenceList.current.open=true;evidenceList.current.querySelector("summary")?.focus();}
+    }}>Cost input sources · {Object.entries(counts).filter(([,count])=>count>0).map(([label,count])=>count+" "+label.toLowerCase()).join(" · ")}{overrides?" · "+overrides+" overridden":""}</button>
+      <section className="calc-next" aria-label="Next validation"><span className="eyebrow">Verify next</span><h3>{r.next}</h3>
+
+        {r.neededSessions!=null && <p>At these terms, parity needs {number(Math.ceil(r.neededSessions),0)} completed charges per year.</p>}
+        {r.upgradeLimit!=null && <p>{r.upgradeLimit<0?"The case exceeds depot cost even with a free utility upgrade.":"Maximum utility upgrade at parity · "+money(r.upgradeLimit,0)}</p>}
+        {missing.length>0 && <details className="disclosure"><summary className="disclosure">Inputs to review ({missing.length})</summary><div className="calc-inputs">{missing.map(chip)}</div></details>}
+      </section>
     <div className="cost-sections">
       <details className="disclosure cost-section" open><summary className="disclosure">How this site is calculated</summary>
         <div className="calc-equation"><div><span>Annual net cost</span><b>{money(trace.total,0)}</b></div><i>÷</i><div><span>Annual completed charges</span><b>{number(r.sessions,0)}</b></div><i>=</i><div><span>Cost per charge</span><b>{money(r.siteCost)}</b></div></div>
@@ -59,18 +80,14 @@ export function ChargingExplanation({draft,seed,result:r,trace,reference,referen
           {reference.lines.map((l,i)=><div className="calc-row" key={l.label}><span>{l.label}{i===0?" · "+reference.hostHours+" host hours/day":""}</span><b>{i?signed(l.value):money(l.value)}</b></div>)}
           <div className="calc-row calc-total"><span>Network cost minus workbook depot</span><b>{signed(reference.cost-reference.depot)}</b></div>
           <p className="layer-meta">Depot reference {money(reference.depot)}. This calculation uses the filed network volume and staffing rates.</p></>:<p>A filed purchase case at this stall count and a complete 24-hour coverage plan are required.</p>}</details>
-      <details className="disclosure cost-section"><summary className="disclosure">Evidence and scenario inputs</summary>
+      <details ref={evidenceList} className="disclosure cost-section"><summary className="disclosure">Evidence and scenario inputs</summary>
+        <p className="layer-meta">Inspect a source to see its recorded value, date and the value used in this case.</p>
         {groups.map(group=><details className="disclosure calc-group" key={group}><summary className="disclosure">{group}</summary>
           {keys.filter(k=>fields[k].group===group && !(k==="rent" && draft.terms==="purchase") && !(k==="ask" && draft.terms==="lease")).map(k=>{
             const src=sourceValue(draft,k);
             return <button type="button" className="action calc-evidence-row" onClick={()=>{choose(k);setFocusInput(n=>n+1);}} key={k}><span>{fields[k].label}<small>{status(src.value,src.evidence)}{draft.sourceValues?.[k]?" · Scenario override":legacy && src.evidence.status==="assumed"?" · Saved assumption":" · Source value"}</small></span><b>{number(draft.values[k],3)}</b></button>;
           })}</details>)}</details>
-      <section className="calc-next"><span className="eyebrow">Verify next</span><h3>{r.next}</h3>
-        {draft.rights!=="controlled" && <p>Confirm the footprint before relying on its throughput or offer ceiling.</p>}
-        {r.neededSessions!=null && <p>At these terms, parity needs {number(Math.ceil(r.neededSessions),0)} completed charges per year.</p>}
-        {r.upgradeLimit!=null && <p>{r.upgradeLimit<0?"The case exceeds depot cost even with a free utility upgrade.":"Maximum utility upgrade at parity · "+money(r.upgradeLimit,0)}</p>}
-        {missing.length>0 && <details className="disclosure"><summary className="disclosure">Inputs to review ({missing.length})</summary><div className="calc-inputs">{missing.map(chip)}</div></details>}
-      </section>
+
     </div>
     <section ref={inspector} className="calc-trial" aria-label="Try a change">
       <label>Inspect an input or try a change<select className="secondary" value={inspect??""} onChange={e=>e.target.value?choose(e.target.value as Key):setInspect(null)}>

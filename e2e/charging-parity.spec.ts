@@ -9,6 +9,7 @@ test("edit, save, reopen and compare a charging case",async({page},info)=>{
   Object.assign(inputs.values,{stalls:6,supply:500,load:100,charger:75,dwell:35,energy:42,efficiency:90,uptime:95,
     demand:5,peak:6,peakCover:6,shortfall:55,posts:1,wage:24,build:600000,upgrade:80000,cash:50000,fixed:25000,
     tax:1,rate:10,closing:2,years:10,depot:12});
+  inputs.values.conversion=18000;
   inputs.openEarly="2027-03-01";inputs.openLate="2027-04-01";inputs.depotDate="2027-08-01";
   inputs.comparator="local";inputs.rights="controlled";inputs.rightsSource="Illustrative site plan";inputs.rightsDate="2026-11-01";
   const original:SavedCase={id:"00000000-0000-4000-8000-000000000099",revision:1,author:"Example reviewer",
@@ -36,6 +37,9 @@ test("edit, save, reopen and compare a charging case",async({page},info)=>{
   await explanation.getByRole("button",{name:"Apply trial"}).click();
   await expect(explanation).toContainText("Scenario override");
   await expect(explanation).toContainText("Before trial");
+  await mkdir("review-shots",{recursive:true});
+  const capturePrefix="review-shots/"+info.project.name+"-"+(process.env.MAP_DEPLOYED_PREVIEW?"deployed-":"");
+  await explanation.getByRole("region",{name:"Try a change"}).screenshot({path:capturePrefix+"charging-source.png",animations:"disabled"});
   await page.getByLabel("Case name",{exact:true}).fill("Trial conversion");
   await page.getByRole("button",{name:"Save named alternative"}).click();
   await expect(page.getByRole("status")).toContainText("Saved Trial conversion");
@@ -45,11 +49,16 @@ test("edit, save, reopen and compare a charging case",async({page},info)=>{
   await explanation.getByLabel("Inspect an input or try a change").selectOption("conversion");
   await expect(explanation).toContainText("Synthetic contractor quote");
   await explanation.getByRole("button",{name:"Review source and date"}).click();
-  await expect(page.getByLabel("Recorded source value")).toHaveValue("0");
+  await expect(page.getByLabel("Recorded source value")).toHaveValue("18000");
   await page.getByRole("button",{name:"Explanation",exact:true}).click();
   await explanation.getByText("What limits completed charges?",{exact:true}).click();
-  expect(await explanation.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  const overflowing=await explanation.evaluate(el=>{
+    const right=el.getBoundingClientRect().right+1;
+    return Array.from(el.querySelectorAll("*")).filter(node=>node.getBoundingClientRect().right>right).map(node=>node.tagName+"."+node.className).slice(0,8);
+  });
+  expect(overflowing).toEqual([]);
   await mkdir("review-shots",{recursive:true});
+  await page.getByRole("heading",{name:site.name}).scrollIntoViewIfNeeded();
   const screenshotName=info.project.name+"-"+(process.env.MAP_DEPLOYED_PREVIEW?"deployed-":"")+"charging-explanation.png";
   await page.screenshot({path:"review-shots/"+screenshotName,animations:"disabled"});
   await page.goto(url);

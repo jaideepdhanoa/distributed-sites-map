@@ -34,3 +34,14 @@
   .calc-inputs .text-link { display:inline-flex; align-items:center; text-align:left; }
   .charging-editor .calc-trial .charging-metrics>div:last-child { grid-column:auto; }
 }
+.calc-trial select,.calc-trial input,.calc-trial label,.calc-trial form { min-width:0; max-width:100%; }
+.calc-trial select { width:100%; text-overflow:ellipsis; }
+.charging-page .cost-verdict[data-state=pending] { background:#e9e4da; color:var(--ink); }
+.charging-page .cost-verdict[data-state=above] { background:#f4e7d2; color:#654113; }
+.calc-next { border:0; border-left:3px solid #bc9a61; margin:.7rem 0 1rem; padding:.2rem .8rem; }
+.calc-item .calc-bar { margin-left:auto; width:clamp(25px,10%,85px); height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+.calc-bar i { display:block; height:100%; background:#557460; }
+.calc-bar i.offset { background:#9c7b49; }
+.calc-bar+b { min-width:6.5rem; margin-left:0 !important; text-align:right; }
+.cost-evidence-link.text-link { display:block; max-width:100%; text-align:left; font-size:.84rem; min-height:36px; }
+@media(max-width:700px){ .cost-evidence-link.text-link { min-height:44px; } }

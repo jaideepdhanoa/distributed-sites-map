@@ -56,7 +56,7 @@ export default function MapSitePreview(props: PreviewProps) {
       <h2 id="pin-preview-title" ref={titleRef} tabIndex={-1}>{record.name || address || id}</h2>
       {record.name && address && address !== record.name && <p className="preview-address">{address}</p>}
       {deal?.universe_id && <p className="preview-address">Linked to a census site</p>}
-      {canSeePower && <div className="segmented power-tabs" role="group" aria-label="Pin details">
+      {canSeePower && !props.grid.open && <div className="segmented power-tabs" role="group" aria-label="Pin details">
         <button type="button" className={`segmented ${!showingPower ? "on" : ""}`} aria-pressed={!showingPower} onClick={() => {if (props.grid.open) props.onGrid(); setTab("site");}}>Site fit</button>
         <button type="button" className={`segmented ${showingPower ? "on" : ""}`} aria-pressed={showingPower} onClick={() => setTab("power")}>Power</button>
       </div>}
@@ -65,7 +65,7 @@ export default function MapSitePreview(props: PreviewProps) {
         <div><dt>Next check</dt><dd>{review}{missing && !props.loading && <small className="preview-missing">{missing}</small>}</dd></div>
       </dl>}
       {!showingPower && props.signedIn && !listing && !site?.land_only && powerDeal?.kind === "pipeline" && <SpaceOptions key={powerDeal.deal_id} site={powerDeal.deal_id} compact onOpen={() => onOpen("space-options")} />}
-      <div className="preview-actions">
+      {!props.grid.open && <div className="preview-actions">
       {!showingPower && power && <PowerFollowUp deal={props.powerDeal} site={props.powerSite} primary />}
       {!showingPower && evidence?.kind === "county" && <a className="primary preview-open" href={evidence.href} target="_blank" rel="noopener noreferrer">Open county record <span aria-hidden="true">↗</span><span className="sr"> (opens in a new tab)</span></a>}
       {!showingPower && evidence?.kind === "space" && <button className="primary preview-open" type="button" onClick={() => onOpen("open-land")}>Check open land</button>}
@@ -75,7 +75,7 @@ export default function MapSitePreview(props: PreviewProps) {
       {props.onSatellite && <button className="text-link preview-open" type="button" onClick={props.onSatellite}>View satellite</button>}
       {props.signedIn && !listing && access.enabled && canWrite(access.actionRole) && <button type="button" className="text-link preview-open" onClick={() => onOpen("finding")}>Record finding</button>}
       <button type="button" className={showingPower || evidence || power ? "text-link preview-open" : "primary preview-open"} onClick={() => onOpen()}>Open site record <ArrowRight size={16} aria-hidden="true" /></button>
-      </div>
+      </div>}
     </aside>
   );
 }

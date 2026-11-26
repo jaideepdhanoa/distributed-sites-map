@@ -322,6 +322,18 @@ test("screen property, street and grid evidence from a selected pin", async ({pa
   const original=await camera(page);
   await card.getByRole("button",{name:"Show nearby grid"}).click();
   await expect.poll(()=>camera(page)).not.toEqual(original);
+  // Both positions must be in the uncovered map area, including above the phone sheet.
+  await expect.poll(() => page.evaluate(([lng,lat]) => {
+    const map = (window as unknown as MapWindow).__sitesMap;
+    const canvas = map.getCanvas().getBoundingClientRect();
+    const sheet = document.querySelector(".map-preview")!.getBoundingClientRect();
+    return [[lng,lat],[lng-.006,lat+.003]].every(([x,y]) => {
+      const pt = map.project([x,y]);
+      const left = pt.x + canvas.left, top = pt.y + canvas.top;
+      return left >= canvas.left && left <= canvas.right && top >= canvas.top && top <= canvas.bottom
+        && (left < sheet.left || left > sheet.right || top < sheet.top || top > sheet.bottom);
+    });
+  }, center)).toBe(true);
   await card.getByRole("button",{name:"Return to site view"}).click();
   await expect.poll(()=>camera(page)).toEqual(original);
   await page.locator(".map-preview").evaluate(el=>{el.scrollTop=0;});
@@ -337,4 +349,15 @@ test("released Power view filters open and clear on the market map", async ({pag
   await expect(filters.getByLabel("Utility coverage")).toHaveValue("with");
   await filters.getByRole("button",{name:"Clear power filters"}).click();
   await expect(filters.getByLabel("Utility coverage")).toHaveValue("all");
+  await page.getByRole("button",{name:"Close layers"}).click();
+  const nearby=page.getByRole("complementary",{name:"Nearby sites"});
+  const toggle=nearby.getByRole("button",{name:/Nearby sites/});
+  if (await toggle.getAttribute("aria-expanded")==="false") await toggle.click();
+  await nearby.locator("[data-nearby-id]").first().click();
+  const card=page.getByRole("region",{name:"Site power"});
+  for (const name of ["At the property","On the street","Nearby grid","Next check"]) {
+    await expect(card.getByRole("heading",{name})).toBeVisible();
+  }
+  await expect(card.getByText("Checking mapped locations…")).toHaveCount(0);
+  await expect(card.getByRole("button",{name:"Retry grid map"})).toHaveCount(0);
 });

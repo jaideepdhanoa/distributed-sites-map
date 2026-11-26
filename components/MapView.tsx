@@ -1977,7 +1977,12 @@ export default function MapView(props: Props) {
     const xs = points.map(p=>p[0]), ys = points.map(p=>p[1]);
     const pad = pointPadding(map);
     const bounds: [[number,number],[number,number]] = [[Math.min(...xs),Math.min(...ys)],[Math.max(...xs),Math.max(...ys)]];
-    fitMap(map,bounds,{padding:{top:pad.top+30,bottom:pad.bottom+32,left:pad.left+32,right:pad.right+32},maxZoom:16,duration:0});
+    // Fit only the uncovered canvas. Remove the old padding before computing the new view.
+    map.jumpTo({padding:{top:0,bottom:0,left:0,right:0},bearing:0,pitch:0});
+    const canvas = map.getContainer().getBoundingClientRect();
+    const edge = Math.max(0,Math.min(32,(canvas.height-pad.top-pad.bottom)/5,(canvas.width-pad.left-pad.right)/5));
+    map.fitBounds(bounds,{padding:{top:pad.top+edge,bottom:pad.bottom+edge,left:pad.left+edge,right:pad.right+edge},
+      maxZoom:16,duration:0});
   }, [mapGeneration,props.gridFocusId,props.selectedId,props.previewName,gridToken,previewLng,previewLat]);
 
   useEffect(() => {

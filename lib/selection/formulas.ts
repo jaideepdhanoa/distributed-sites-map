@@ -44,7 +44,8 @@ function confidence(formula:string) {
   return formula.includes(legacy) && formula.includes(documented) && formula.includes('COLUMN($BG$1)') ? formula.replace(legacy,corrected) : formula;
 }
 function parityPoints(r:number) {
-  return `=IF($A${r}="","",IF(ISNUMBER(BQ${r}),IF(BQ${r}>=0,Assumptions!$B$77,0),0))`;
+  const gap=`INDEX('Charging cases'!$O:$O,MATCH($CK${r},'Charging cases'!$A:$A,0))`;
+  return `=IFERROR(IF(OR($A${r}="",COUNT(${gap})=0),"",IF(${gap}<=0,Assumptions!$B$77,0)),"")`;
 }
 function pendingSection(r:number) {
   return `=IF($A${r}="","",IF(REGEXMATCH(LOWER(E${r}),"dropped"),"3 Dropped",IF(REGEXMATCH(LOWER(E${r}),"off[ -]?market"),"4 Off market",IF(OR(CC${r}<>"",CJ${r}="Yes"),"2 Knocked out",IF(AND(ISNUMBER(AR${r}),AR${r}>=Assumptions!$B$68,AK${r}="Yes",ISNUMBER(BQ${r}),CG${r}<>"",CG${r}<>"Not confirmed"),"1 Ranked","5 Evidence pending")))))`;

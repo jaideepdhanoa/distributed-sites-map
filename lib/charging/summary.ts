@@ -8,6 +8,11 @@ export function summarize(deal:DealProps,sourceRevision:string,active?:SavedCase
   return {screen:paidScreen(deal),name:active?.name??"Moove staffed · planning",sourceRevision,selected:active?active.id+":"+active.revision:null,
     stale:!!active && (active.sourceRevision!==sourceRevision || active.model!==modelVersion),result:active?.result??calculate(inputs),term:inputs.terms,comparator:inputs.comparator};
 }
+export function filedScreenLabel(screen:ReturnType<typeof paidScreen>) {
+  if(!screen.length)return "Comparable filed price needed for the layout screen.";
+  const first=[...screen].sort((a,b)=>a.stalls-b.stalls).find(c=>c.downside>=0);
+  return first?"Paid Moove coverage reaches depot parity in the filed downside at "+first.stalls+" hypothetical stalls. Confirm a usable footprint.":"Every filed stall count exceeds depot cost under the paid Moove downside.";
+}
 export function chargingRows(d:DealProps) {
   const c=d.charging;
   if(!c)return [];

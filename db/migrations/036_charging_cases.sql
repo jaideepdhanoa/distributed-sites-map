@@ -8,6 +8,8 @@ CREATE TABLE charging_case_revisions (
   saved_at timestamptz NOT NULL DEFAULT now(),
   model_version text NOT NULL,
   source_revision text NOT NULL,
+  selection_intent boolean NOT NULL,
+  expected_selection text,
   inputs jsonb NOT NULL,
   result jsonb NOT NULL,
   PRIMARY KEY (site_id, case_id, revision)

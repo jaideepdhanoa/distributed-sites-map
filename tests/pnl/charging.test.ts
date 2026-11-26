@@ -14,7 +14,7 @@ function example():Inputs {
   Object.assign(c.values,{stalls:4,days:365,weekdayHours:10,weekendHours:10,ownWeek:10,ownEnd:10,posts:1,wage:20,
     supply:400,charger:100,dwell:30,energy:40,efficiency:100,uptime:100,demand:6,peak:8,peakCover:8,
     depot:10,years:10,ask:100000,shortfall:40});
-  c.rights="controlled";c.rightsSource="Measured exhibit";c.openEarly="2027-04-01";c.openLate="2027-05-01";c.depotDate="2027-06-01";
+  c.rights="controlled";c.rightsSource="Measured exhibit";c.rightsDate="2026-01-15";c.openEarly="2027-04-01";c.openLate="2027-05-01";c.depotDate="2027-06-01";
   return c;
 }
 test("one site limits sessions by service, usable stalls, staffed hours and demand",()=>{
@@ -52,7 +52,23 @@ test("saved history reopens exactly, rejects stale revisions and retains the sel
   assert.ok(validateInputs(input.inputs).success);
   let rows=await saveCase(sql,site,"reviewer",input);assert.equal(rows.length,1);assert.equal(rows[0].selected,true);
   assert.equal((await saveCase(sql,site,"reviewer",input)).length,1);
+  await assert.rejects(saveCase(sql,site,"reviewer",{...input,name:"Different"}),/conflicts/);
   await assert.rejects(saveCase(sql,site,"reviewer",{...input,requestId:randomUUID()}),/newer revision/);
   rows=await saveCase(sql,site,"second",{...input,requestId:randomUUID(),base:1,name:"Revised",expectedSelection:input.id+":1"});
   assert.equal(rows.length,2);assert.equal((await activeCases(sql))[0].revision,2);assert.equal((await caseHistory(sql,site))[0].author,"second");
+});
+
+test("an unpriced offering stays unknown and avoids borrowing an unrelated workbook price",()=>{
+  const site={asking_price:10000,selectionResearch:{quote:null,cases:[]}} as unknown as DealProps;
+  assert.equal(initialCase(site).values.ask,null);
+  assert.equal(initialCase({asking_price:0}).values.ask,0);
+});
+test("billed peak, temporary replacement and the upgrade threshold have distinct units",()=>{
+  const c=example();c.energyScope="included";Object.assign(c.values,{energyRate:0.1,demandRate:5,billedPeak:20,temporary:5000});
+  c.temporaryEnd="2027-06-01";c.temporarySource="Dated replacement example";
+  const initial=calculate(c);assert.ok(initial.avoidedTemp!>0);assert.ok(initial.neededSessions!>0);
+  c.values.billedPeak=40;
+  assert.ok(Math.abs((calculate(c).siteCost!-initial.siteCost!)*initial.sessions!-1200)<0.00001);
+  c.values.upgrade=calculate(c).upgradeLimit;assert.ok(Math.abs(calculate(c).difference!)<1e-8);
+  c.temporarySource="";assert.equal(calculate(c).avoidedTemp,null);
 });

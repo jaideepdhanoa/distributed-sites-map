@@ -62,7 +62,7 @@ export function initialCase(d: Pick<DealProps,"purchase"|"selectionResearch"|"as
   }
   return {values,evidence,sourceValues:{},layout:"Workbook footprint",rights:"unknown",rightsSource:"",rightsDate:"",comparable:false,sensitivityPct:10,terms:"purchase",comparator:"workbook",energyScope:"excluded",openEarly:"",openLate:"",depotDate:"",allOptionsReviewed:false,peakDay:"weekday",temporaryEnd:"",temporarySource:""};
 }
-export const decisions=["Evidence needed","Verify a condition","Reprice","Advance diligence","Recommend closing"] as const;
+export const decisions=["Evidence needed","Verify a condition","Reprice","Advance diligence","Suggest drop"] as const;
 export type Decision=typeof decisions[number];
 export type CalculationLine = {label:string; keys:Key[]; value:number|null; excluded?:boolean};
 export type CalculationTrace = {annual:CalculationLine[]; throughput:CalculationLine[]; total:number|null; hours:number|null; perHour:number|null};
@@ -147,7 +147,7 @@ export function calculate(c:Inputs, trace?:CalculationTrace) {
   let decision:Decision="Evidence needed", next="";
   const confirmed=(key:Key)=>Boolean(c.evidence[key]?.source.trim() && c.evidence[key]?.date && c.evidence[key]?.status!=="assumed");
   if(c.rights==="unavailable"){
-    decision=c.allOptionsReviewed && c.rightsSource.trim() && c.rightsDate?"Recommend closing":"Verify a condition";next="Check an alternative controlled footprint or document why every layout is unavailable.";
+    decision=c.allOptionsReviewed && c.rightsSource.trim() && c.rightsDate?"Suggest drop":"Verify a condition";next="Check an alternative controlled footprint or document why every layout is unavailable.";
   }else if(c.rights!=="controlled" || !c.rightsSource.trim() || !c.rightsDate){
     next="Obtain the measured layout and written rights to the stalls, aisle and hours.";decision="Verify a condition";
   }else if(missing.length){next="Confirm "+missing[0]+".";}
@@ -158,7 +158,7 @@ export function calculate(c:Inputs, trace?:CalculationTrace) {
     const belowFloor=room!=null && v.floorTerms!=null && confirmed("floorTerms") && room<v.floorTerms*factor;
     const economicsProved=c.comparator==="local" && c.comparable && ["depot","stalls","supply","demand","build","cash","loss","upgrade","fixed"].every(k=>confirmed(k as Key));
     if(c.allOptionsReviewed && belowFloor && economicsProved){
-      decision="Recommend closing";next="The documented minimum terms exceed parity across the reviewed alternatives. Submit the case for human review.";
+      decision="Suggest drop";next="The documented minimum terms exceed parity across the reviewed alternatives. Submit the case for human review.";
     }else next=annualGap>0?"Close the annual gap of "+amounts(annualGap)+" even at zero property cost.":"Test "+amounts(ceiling)+(c.terms==="lease"?" per month":"")+" with the owner.";
   }else if(c.comparator==="workbook" || !c.comparable || !confirmed("depot")){
     decision="Verify a condition";next="Obtain the local depot comparison on the same energy and session basis.";

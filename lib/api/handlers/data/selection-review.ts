@@ -8,6 +8,7 @@ import { overlayStageFile } from "@/lib/stageOverlayLoad";
 import { readGeneratedOptional } from "@/lib/snapshot/read";
 import { assessedSiteIds, layoutAssessment } from "@/lib/spaces/assessmentLoad";
 import { triage } from "@/lib/spaces/triage";
+import { reviewAtStage } from "@/lib/selection/opportunity";
 import { opportunityRegister } from "@/lib/selection/opportunityLoad";
 import { selectionResearch } from "@/lib/selection/researchLoad";
 import { investmentScreen, screenSummary, type ScreenSummary, type Inputs, type SelectionRow } from "@/lib/selection/screen";
@@ -41,6 +42,7 @@ export async function loadSelectionReview(role:ActionRole) {
   const financeVisible = canReadFinancials(role);
   const register = financeVisible ? opportunityRegister() : undefined;
   const stages = new Map<string,string>();
+  const reasons = new Map<string,string>();
   const evidence = financeVisible ? selectionResearch() : null;
   const active=financeVisible && missing.length ? await selectedCases():null;
   for (const feature of all) {
@@ -50,6 +52,9 @@ export async function loadSelectionReview(role:ActionRole) {
     const input = raw?.[id];
     const stage = String(p.stage || "");
     stages.set(id,stage);
+    const deal = p as unknown as DealProps;
+    const reason = deal.decision_reason || deal.chips?.find(c => c.family === "drop_reason")?.label;
+    if (reason) reasons.set(id, reason);
     if (input?.stage && stage !== input.stage) mismatches++;
     if (!stage || /dropped|off[ -]?market/i.test(stage) || p.stage_group === "dropped") continue;
     const city = String(p.city || id.split("-")[1]);
@@ -66,6 +71,10 @@ export async function loadSelectionReview(role:ActionRole) {
   }
   const activeIds = new Set(rows.map(r => r.id));
   const filed = Object.entries(register?.sites ?? {}).filter(([id]) => !activeIds.has(id))
-    .map(([id,review]) => ({id, city:id.split("-")[1], stage:stages.get(id) || "Stage unavailable", review}));
+    .map(([id,review]) => {
+      const stage = stages.get(id) || "Stage unavailable";
+      return {id, city:id.split("-")[1], stage, review:reviewAtStage(review, stage, reasons.get(id))!,
+        decisionReason:reasons.get(id), hasRecord:mapped.has(id)};
+    });
   return {rows,filed,registerUrl:register?.register,mismatches,hasInputs:Boolean(raw)};
 }

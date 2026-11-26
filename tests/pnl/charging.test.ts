@@ -35,7 +35,7 @@ test("parity price, unknown ask, host fees, interruption and permission to use a
   assert.ok(calculate(c).hostLimit!>2);
   c.values.loss=1e8;assert.equal(calculate(c).ceiling,0);assert.ok(calculate(c).annualGap>0);
   c.rights="unavailable";assert.equal(calculate(c).decision,"Verify a condition");
-  c.allOptionsReviewed=true;assert.equal(calculate(c).decision,"Recommend closing");
+  c.allOptionsReviewed=true;assert.equal(calculate(c).decision,"Suggest drop");
 });
 test("reference matches the filed network and independently prices host labor and conversion",()=>{
   const c=example();Object.assign(c.values,{ask:100,hostWeek:12,hostEnd:12,ownWeek:12,ownEnd:12});

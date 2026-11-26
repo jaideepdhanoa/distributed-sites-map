@@ -39,19 +39,24 @@ def attach_visit_plans(book, sites):
 
 def build(book, register=None):
     rows = iter(book["Opportunities"].values)
-    if tuple(next(rows, ())) != HEADERS:
+    headers = tuple(next(rows, ()))
+    if headers not in (HEADERS, HEADERS + ("Drop reason",)):
         raise ValueError("The opportunity register headers have changed.")
     sites = {}
     for number, cells in enumerate(rows, 2):
         if not any(v is not None for v in cells):
             continue
-        site_id, name, role, route, decision, rank, why, check, reviewed, owner, revisit, evidence, listing = cells
+        site_id, name, role, route, decision, rank, why, check, reviewed, owner, revisit, evidence, listing = cells[:len(HEADERS)]
         row = sites.setdefault(site_id, {"name": name, "primary": None, "alternatives": []})
         if not site_id or row["name"] != name or role not in ("Primary", "Alternative"):
             raise ValueError(f"Check site identity and role on opportunity row {number}.")
         option = dict(route=route, disposition=decision, rank=rank, rationale=why, next=check,
                       reviewedOn=date_text(reviewed), owner=owner, revisitOn=date_text(revisit),
                       evidence=evidence, offering=listing)
+        if decision == "Dropped" and headers != HEADERS and not cells[-1]:
+            raise ValueError(f"Choose a drop reason on opportunity row {number}.")
+        if len(cells) > len(HEADERS) and cells[-1]:
+            option["dropReason"] = cells[-1]
         if role == "Alternative":
             row["alternatives"].append(option)
         elif row["primary"] is None:

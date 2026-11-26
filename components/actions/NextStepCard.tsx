@@ -1,5 +1,6 @@
 "use client";
 
+import { dropReasons } from "@/lib/selection/dropReasons";
 import GapThreadLink from "./GapThreadLink";
 
 import { useEffect, useRef, useState } from "react";
@@ -457,7 +458,7 @@ export function NextStepCard({
     setType(item.detail ? stepType : "work_item");
     setTitle(item.title || "");
     setReason(item.reason || "");
-    setReasonCode(tagFamily(item.detail === "knock_off" ? "drop_reason" : "advance_reason")?.codes.find((code) => item.reason === code.label)?.code || "");
+    setReasonCode((item.detail === "knock_off" ? dropReasons : tagFamily("advance_reason")?.codes)?.find((code) => item.reason === code.label)?.code || "");
     setStage(item.detail === "bring_back" || item.detail === "stage_move" ? item.proposedValue : "");
     setSurvivor(item.detail === "mark_duplicate" ? item.proposedValue : "");
     setSameParcel(item.detail === "mark_duplicate");
@@ -466,7 +467,7 @@ export function NextStepCard({
   }
 
   function reasonLabel(family: "drop_reason" | "advance_reason") {
-    return tagFamily(family)?.codes.find((item) => item.code === reasonCode)?.label || "";
+    return (family === "drop_reason" ? dropReasons : tagFamily(family)?.codes)?.find((item) => item.code === reasonCode)?.label || "";
   }
 
   function payloadFor(stepType: NextStepTypeId) {
@@ -513,7 +514,7 @@ export function NextStepCard({
       ) : null}
       {type === "knock_off" ? (
         <>
-          <ReasonPicker label="Drop reason" testId="drop-reason" options={tagFamily("drop_reason")?.codes || []} value={reasonCode} onChange={setReasonCode} />
+          <ReasonPicker label="Drop reason" testId="drop-reason" options={dropReasons} value={reasonCode} onChange={setReasonCode} />
           <label>
             Note
             <textarea className="field" aria-label="Note" value={reason} onChange={(event) => setReason(event.target.value)} rows={3} maxLength={400} />
@@ -634,7 +635,7 @@ export function NextStepCard({
               <input className="field" aria-label="Close reason" value={closeReason} onChange={(event) => setCloseReason(event.target.value)} maxLength={200} required />
             </label>
             <div className="proposal-send">
-              <button type="submit" className="paper-btn" disabled={pending || !closeReason.trim()}>Close</button>
+              <button type="submit" className="paper-btn" disabled={pending || !closeReason.trim()}>{focus.detail === "knock_off" ? "Withdraw proposal" : "Close"}</button>
             </div>
           </form>
         ) : null}
@@ -945,7 +946,7 @@ function OutcomeForm({
           {allowAccept ? <option value="accepted">Accept</option> : null}
           {allowWaiting ? <option value="agreed_waiting">Agreed, waiting on…</option> : null}
           <option value="rejected">Reject</option>
-          <option value="overtaken">Closed, overtaken</option>
+          <option value="overtaken">Proposal superseded</option>
           <option value="reply">Reply only</option>
         </select>
       </label>
@@ -954,7 +955,11 @@ function OutcomeForm({
       {showReply ? (
         <label>
           {stageAccept ? "Reason" : "Reply"}
-          <textarea className="field" aria-label={stageAccept ? "Reason" : "Reply to the proposer"} data-testid="decision-note" value={reply} onChange={(event) => onReply(event.target.value)} rows={2} maxLength={2000} required={replyNeeded || reasonMissing} />
+          {stageAccept && !stageMove ? <select className="secondary" aria-label="Drop reason" value={reply} onChange={event => onReply(event.target.value)} required>
+            <option value="" disabled>Choose a reason</option>
+            {reply && !dropReasons.some(r => r.label === reply) && <option>{reply}</option>}
+            {dropReasons.map(r => <option key={r.code}>{r.label}</option>)}
+          </select> : <textarea className="field" aria-label={stageAccept ? "Reason" : "Reply to the proposer"} data-testid="decision-note" value={reply} onChange={(event) => onReply(event.target.value)} rows={2} maxLength={2000} required={replyNeeded || reasonMissing} />}
         </label>
       ) : (
         <button type="button" className="text-link" aria-expanded="false" onClick={() => setNoteOpen(true)}>Add a note</button>

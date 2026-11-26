@@ -8,6 +8,7 @@ import { triage } from "@/lib/spaces/triage";
 import { chargingHold,screenSummary, type Inputs } from "@/lib/selection/screen";
 import { readGeneratedOptional } from "@/lib/snapshot/read";
 import { mapCatalog } from "@/lib/spaces/mapCatalogLoad";
+import { reviewAtStage } from "@/lib/selection/opportunity";
 import { opportunityRegister } from "@/lib/selection/opportunityLoad";
 import { selectionResearch } from "@/lib/selection/researchLoad";
 import { purchaseFile } from "@/lib/purchaseReviewLoad";
@@ -75,7 +76,7 @@ export async function loadMapDeals(role: ActionRole, includePurchase = true) {
     const screening = active && (row || selection?.[d.deal_id]) ? screenSummary(d.city,selection?.[d.deal_id],view,d) : undefined;
     if (!allowed) return {...feature, properties:{...d,screening}};
     const statementCoverage = !captured ? "unavailable" : captured.has(d.deal_id) || captured.has(d.universe_id || "") ? "present" : "empty";
-    const record:DealProps={...d,chargingHold:chargingHold(selection?.[d.deal_id]),screening,statementCoverage,opportunityReview:reviews?.[d.deal_id],selectionResearch:research?.get(d.deal_id),...(inputs && purchase ? {purchase:{inputs,assumptions:purchase.assumptions,
+    const record:DealProps={...d,chargingHold:chargingHold(selection?.[d.deal_id]),screening,statementCoverage,opportunityReview:reviewAtStage(reviews?.[d.deal_id], d.stage, d.decision_reason || d.chips?.find(c => c.family === "drop_reason")?.label),selectionResearch:research?.get(d.deal_id),...(inputs && purchase ? {purchase:{inputs,assumptions:purchase.assumptions,
       layout:layouts.get(d.deal_id)}} : {})};
     if (active && !/^dropped/i.test(d.stage || "") && record.opportunityReview?.primary.disposition === "Suggest drop") {
       record.suggested_drop = record.opportunityReview.primary.rationale;

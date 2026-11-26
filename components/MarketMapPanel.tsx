@@ -12,10 +12,9 @@ type Props = {
 };
 
 export default function MarketMapPanel({metric, choose, rows, area, pick, spot, clustered, missingLocations, showMissing}: Props) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(() => typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches);
   const [limit,setLimit] = useState(12);
   const [sort,setSort] = useState<{key:MarketMetric; desc:boolean} | null>(null);
-  useEffect(()=>{setOpen(window.matchMedia("(min-width: 768px)").matches);},[]);
   useEffect(()=>()=>spot(null),[spot]);
   const measure = marketMeasures[metric];
   const inView = rows.filter(row=>inMapArea(...row.point,area));

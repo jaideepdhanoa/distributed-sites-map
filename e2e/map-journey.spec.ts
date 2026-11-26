@@ -275,7 +275,9 @@ test("scan market readings and open the mapped wash radius", async ({page}, info
   await page.getByRole("button", {name:"Market context",exact:true}).click();
   const panel = page.getByRole("complementary",{name:"Market context map"});
   const list = panel.getByRole("button",{name:/Sites in view/});
-  if (await list.getAttribute("aria-expanded") === "false") await list.click();
+  const phone = info.project.name === "mobile";
+  await expect(list).toHaveAttribute("aria-expanded",phone ? "false" : "true");
+  if (phone) await list.click();
   const first = panel.locator("[data-market-site]").first();
   await expect(first).toBeVisible();
   await panel.getByRole("button",{name:/Washes · 1 mi/}).click();

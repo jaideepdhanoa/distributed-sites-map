@@ -4514,3 +4514,6 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 @media(max-width:759px) {
   .stage-map:has(.space-map-open) .maplibregl-ctrl-top-right { top:158px; }
 }
+@media(max-width:767px){
+  .space-map-launch.tool { left:8px; top:calc(var(--bar-h, 138px) + 8px); bottom:auto; min-height:44px; }
+}

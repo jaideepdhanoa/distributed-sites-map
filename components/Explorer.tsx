@@ -1,5 +1,6 @@
 "use client";
 
+import { PIN_SPLIT_ZOOM } from "@/lib/mapClusters";
 import dynamic from "next/dynamic";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -3182,8 +3183,9 @@ export default function Explorer() {
         </aside>
         {!listView ? (
           <div className="map-corner">
-            {activeMetric && !selected && !stepsOpen && !filtersOpen && !layersOpen && !ndaVisible && !loopsVisible && compareIds.length < 2 &&
-              <MarketMapPanel metric={activeMetric} choose={chooseMarketMetric} rows={marketRows} area={liveArea} spot={highlightNearby} pick={id=>nearbyPicker.current?.(id)} />}
+            {activeMetric && !selected && !stepsOpen && !filtersOpen && !unplacedOpen && !layersOpen && !ndaVisible && !loopsVisible && compareIds.length < 2 &&
+              <MarketMapPanel metric={activeMetric} choose={chooseMarketMetric} clustered={mapZoom < PIN_SPLIT_ZOOM} missingLocations={unplacedInView.length}
+                showMissing={()=>{closeMenus();setUnplacedOpen(true);}} rows={marketRows} area={liveArea} spot={highlightNearby} pick={id=>nearbyPicker.current?.(id)} />}
             {!activeMetric && mapZoom >= 6 && liveArea?.kind === "polygon" && !selected && !inReview && !marking && !stepsOpen && !filtersOpen && !layersOpen && !ndaVisible && !loopsVisible && compareIds.length < 2 && (
               <NearbySites key={selectedMarket + "/" + funnel} locations={locationRows} area={liveArea}
                 onSpot={highlightNearby} fact={id => {

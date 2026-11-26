@@ -19,15 +19,16 @@ export default function MarketEvidence({deal, site, inspection, expanded = false
       <div><dt>Washes within 3 mi</dt><dd>{formatMarket(e.washes3,"washes")}</dd></div>
     </dl>
     {e.trafficNote && <p className="market-source">{e.trafficNote}</p>}
+    <p className="market-maximum">Busiest road within 800 m <strong>{e.maximum == null ? "Not on file" : formatMarket(e.maximum,"traffic") + " vehicles/day"}</strong></p>
     {inspection && <div className="market-inspect"><span>Map washes within</span>
       <div className="segmented" role="group" aria-label="Map wash radius">{([1,3] as const).map(n =>
         <button type="button" key={n} className={inspection.radius === n ? "segmented on" : "segmented"} aria-pressed={inspection.radius === n}
           onClick={()=>inspection.select(n)}>{n} mi</button>)}</div>
-      {inspection.radius && <small>{inspection.mapped == null ? "Checking mapped census locations…" : inspection.mapped + " mapped census locations"} · {workbookSource} counts above</small>}
+      {inspection.radius && <small>{inspection.mapped == null ? "Checking mapped census locations…" : inspection.mapped + (inspection.mapped === 1 ? " mapped census location" : " mapped census locations")} · {workbookSource} counts above</small>}
     </div>}
     <button className="text-link" type="button" aria-expanded={details} onClick={()=>setDetails(!details)}>{details ? "Hide trade-area evidence" : "See trade-area evidence"}</button>
     {details && <div className="market-more">
-      <dl><div><dt>Busiest road within 800 m</dt><dd>{formatMarket(e.maximum,"traffic")} vehicles/day</dd></div>
+      <dl>
         <div><dt>Population within 3 mi</dt><dd>{formatMarket(e.population,"population")}</dd></div>
         <div><dt>Population growth within 3 mi</dt><dd>{formatMarket(e.growth,"growth")}</dd></div>
         <div><dt>Median household income within 3 mi</dt><dd>{formatMarket(e.income,"income")}</dd></div></dl>

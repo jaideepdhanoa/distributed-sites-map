@@ -5,10 +5,13 @@ import { formatMarket, marketColor, marketColors, marketMeasures, missingColor, 
 
 type Props = {
   metric: MarketMetric; choose: (metric: MarketMetric | null) => void; rows: MarketRow[]; area: MapArea | null;
+  clustered: boolean;
+  missingLocations: number;
+  showMissing: () => void;
   pick: (id: string) => void; spot: (point: [number,number] | null) => void;
 };
 
-export default function MarketMapPanel({metric, choose, rows, area, pick, spot}: Props) {
+export default function MarketMapPanel({metric, choose, rows, area, pick, spot, clustered, missingLocations, showMissing}: Props) {
   const [open, setOpen] = useState(false);
   const [limit,setLimit] = useState(12);
   const [sort,setSort] = useState<{key:MarketMetric; desc:boolean} | null>(null);
@@ -40,6 +43,8 @@ export default function MarketMapPanel({metric, choose, rows, area, pick, spot}:
       {(["population","growth","income"] as const).map(key=><option key={key} value={key}>{marketMeasures[key].title} · 3 miles</option>)}</select>}
     <p className="market-unit">{measure.title} · {measure.unit}</p>
     <div className="market-legend">{[...measure.bands,"Missing"].map((label,i)=><span key={label}><i style={{background:marketColors[i] || missingColor}}/>{label}</span>)}</div>
+    {clustered && <p className="market-unit">Group labels show readings / mapped sites.</p>}
+    {missingLocations > 0 && <button type="button" className="text-link market-unplaced only-mobile" onClick={showMissing}>{missingLocations} {missingLocations === 1 ? "site needs" : "sites need"} a location</button>}
     <button type="button" className="paper-btn market-view-toggle" aria-expanded={open} onClick={()=>{setOpen(!open);spot(null);}}>
       <span>Sites in view <b>{inView.length}</b></span><small>{known} with data</small><ChevronDown size={16}/></button>
     {open && <div className="market-table-scroll">
@@ -47,7 +52,7 @@ export default function MarketMapPanel({metric, choose, rows, area, pick, spot}:
         <tbody>{ordered.slice(0,limit).map(row=><tr key={row.id} onMouseEnter={()=>spot(row.point)} onMouseLeave={()=>spot(null)}>
           <th scope="row"><button className="text-link" type="button" data-market-site={row.id} onFocus={()=>spot(row.point)} onBlur={()=>spot(null)} onClick={()=>pick(row.id)}>
             <i style={{background:marketColor(metric,row.evidence[metric])}}/>{row.name}</button></th>
-          {columns.map(key=><td key={key}>{formatMarket(row.evidence[key],key)}</td>)}
+          {columns.map(key=><td key={key}>{formatMarket(row.evidence[key],key)}{key === "traffic" && row.evidence.trafficBasis === "Site traffic record" && <small>Site reading</small>}</td>)}
         </tr>)}</tbody></table> : <p>No matching sites in this map area.</p>}
       {ordered.length > limit && <button type="button" className="text-link" onClick={()=>setLimit(limit+24)}>Show more sites</button>}
     </div>}

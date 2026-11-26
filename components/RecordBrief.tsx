@@ -43,7 +43,8 @@ export default function RecordBrief({ target, pnl, power, ...input }: BriefProps
   return (
     <section className="record-brief" aria-label="Screening decision">
       <div className="brief-decision"><span>{input.deal ? "Pipeline stage" : "Screening status"}</span><h3>{status}</h3></div>
-      {input.signedIn && input.deal?.opportunityReview && <OpportunityReview review={input.deal.opportunityReview}/>}
+      {input.signedIn && input.deal?.opportunityReview && <OpportunityReview review={input.deal.opportunityReview}
+        charging={input.deal.charging} active={Boolean(input.deal.stage) && !/dropped|off[ -]?market/i.test(input.deal.stage!) && input.deal.stage_group !== "dropped"}/>}
       {reason && reason !== status && <p>{reason}</p>}
       <dl>
         <div><dt>{origin}</dt><dd>{evidence?.kind === "county"

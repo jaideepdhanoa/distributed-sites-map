@@ -62,6 +62,16 @@ function SelectionList() {
     <a className="text-link" href={back}>← Pipeline list</a>
     <h1>Selection review</h1><p>Choose the next diligence check. Investment approval requires verified site rights, usable space, power, retained cash flow and network benefit.</p>
     {data?.registerUrl && <p><a className="text-link" href={data.registerUrl} target="_blank" rel="noreferrer">Open the team’s review register</a> to file new evidence, assign the next check or revise a decision.</p>}
+    {scoped.some(r => r.review && match(r.review)?.disposition === "Shortlist") &&
+      <details className="disclosure"><summary className="disclosure">How to decide on visits, utility studies and offers</summary>
+        <ol>
+          <li><b>Prepare in parallel.</b> Confirm seller access and the offered parcel, sketch the controlled footprint, request operating evidence and prepare the utility load brief. Compare completed peak sessions with the local alternative.</li>
+          <li><b>Review the visit.</b> Agree who will attend and what measurement or observation could change the decision. Record access and a busy-hour window before booking.</li>
+          <li><b>Scope the power study.</b> Ask for available service after existing load, managed and full loads, upgrade cost split, tariff and earliest and latest energization. Record the utility reference and estimate basis. Review owner consent, study fees and deposits before authorizing formal design.</li>
+          <li><b>Review an indicative LOI.</b> Set a price range, expiry, evidence access and conditions for footprint, utility, retained cash and timing. Obtain commercial and legal review before sending. An early indication to unlock documents should state the unresolved assumptions.</li>
+          <li><b>Approve firm terms.</b> Compare base and joint downside to the local cost for the same service. Include peak demand, opening delay, peak funding and independent property support. Submit the supported price and open conditions to the investment approver.</li>
+        </ol>
+      </details>}
     <div className="space-review-filters">
       {hasReviews && <label>Commercial decision<select className="secondary" value={decision} onChange={e=>setReviewFilter("disposition",e.target.value)}>
         <option value="">All commercial decisions</option>{[...dispositions,"Unreviewed"].map(d=><option key={d}>{d}</option>)}</select></label>}
@@ -91,7 +101,7 @@ function SelectionList() {
       {!scoped.length && <p>{investment?"No current site case qualifies for investment ranking in this view.":"No sites match these filters."}</p>}
       <ul className="space-review-results">{scoped.map(r=><li id={r.id} tabIndex={-1} key={r.id} onClick={()=>rememberReviewPosition(pane.current,r.id)}><div>
         <small>{r.city} · {r.stage} · {r.section}</small><h2>{r.name}</h2>{r.review?.name && r.review.name !== r.name && <small>{r.review.name}</small>}
-        {r.review?.primary.disposition === "Previously dropped" && <p><strong>Reconcile stage history before reopening.</strong></p>}{r.review ? <OpportunityReview review={r.review} matched={match(r.review)}/> : <><strong>{r.charging?.merit.action ?? r.priority}</strong><p>{r.charging?.merit.next ?? r.instruction}</p></>}{investment && <p>{r.city} #{sequence.get(r.id)!.rank} · {amounts(sequence.get(r.id)!.value)} incremental value · {sequence.get(r.id)!.peak} residual peak charges</p>}<small>{r.id}</small></div><div><strong>{r.readiness}</strong>
+        {r.review?.primary.disposition === "Previously dropped" && <p><strong>Reconcile stage history before reopening.</strong></p>}{r.review ? <OpportunityReview review={r.review} matched={match(r.review)} active charging={r.charging}/> : <><strong>{r.charging?.merit.action ?? r.priority}</strong><p>{r.charging?.merit.next ?? r.instruction}</p></>}{investment && <p>{r.city} #{sequence.get(r.id)!.rank} · {amounts(sequence.get(r.id)!.value)} incremental value · {sequence.get(r.id)!.peak} residual peak charges</p>}<small>{r.id}</small></div><div><strong>{r.readiness}</strong>
         {r.mirrorStage && r.stage !== r.mirrorStage && <p>Workbook stage: {r.mirrorStage}</p>}
         {r.financeVisible && <p>Workbook base savings: {r.amount === null ? "Unmodeled" : (r.amount*100).toFixed(1)+"%"}</p>}
         {r.charging && <div className="charging-preview"><strong>Charging · {r.charging.merit.action}</strong>{r.review && r.charging.merit.next !== match(r.review)?.next && <p>{r.charging.merit.next}</p>}

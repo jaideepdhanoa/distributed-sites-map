@@ -218,6 +218,28 @@ class SyncFetchTest(unittest.TestCase):
             self.assertFalse(stale.exists())
             self.assertTrue(Path(tmp, "pipeline_sync.xlsx").is_file())
 
+    def test_visit_decisions_join_by_id_and_reject_duplicate_or_unknown_rows(self) -> None:
+        from openpyxl import Workbook
+        from scripts.opportunity_reviews import HEADERS, VISIT_COLUMNS, build
+        book = Workbook()
+        book.active.title = "Opportunities"
+        book.active.append(HEADERS)
+        for site in ("PIPE-LAS-9001", "PIPE-LAS-9002"):
+            book.active.append([site, "Example premises", "Primary", "Operating acquisition",
+                                "Shortlist", None, "Test the layout", "Measure the bay",
+                                "2026-01-01", None, None, "https://example.org", None])
+        self.assertNotIn("visitPlan", build(book)["sites"]["PIPE-LAS-9001"])
+        plans = book.create_sheet("Visit decisions")
+        plans.append(["Site ID", *VISIT_COLUMNS])
+        fields = list(VISIT_COLUMNS)
+        plans.append(["PIPE-LAS-9002", *fields])
+        self.assertEqual(build(book)["sites"]["PIPE-LAS-9002"]["visitPlan"]["reason"], "Why visit?")
+        for invalid in ("PIPE-LAS-9002", "PIPE-LAS-9003"):
+            plans.append([invalid, *fields])
+            with self.assertRaises(ValueError):
+                build(book)
+            plans.delete_rows(3)
+
     def test_logs_do_not_name_skipped_files(self) -> None:
         listing = Listing(_files())
         sync._get = listing.get

@@ -1517,7 +1517,7 @@ export default function MapView(props: Props) {
       }
       const labelData = {
         type: "FeatureCollection" as const,
-        features: dealLabelFeatures(props.deals, props.pinLabel ?? "asking"),
+        features: metric ? [] : dealLabelFeatures(props.deals, props.pinLabel ?? "asking"),
       };
       const labelSource = map.getSource("deal-labels") as GeoJSONSource | undefined;
       if (labelSource) labelSource.setData(labelData);
@@ -1705,11 +1705,12 @@ export default function MapView(props: Props) {
         glide(map, [props.focusLng, props.focusLat], props.focusZoom);
       }
     };
-    if (map.isStyleLoaded()) push();
-    else map.once("load", push);
+    // Source updates can temporarily clear isStyleLoaded after the one-time load event.
+    // Apply changes as soon as the required sources exist.
+    push();
     return () => {
       cancel = true;
-      map.off("load", push);
+      map.off("idle", push);
     };
   }, [mapGeneration, props.sites, props.deals, props.areas, props.depots, props.parcels, props.offMarket, props.unscreened, props.selectedId, props.groupPins, props.pinLabel, props.shortlistPoints, props.fitAll, props.scopeOpen, props.preserveCamera, props.mapScope, props.previewName, props.marketMetric, props.marketRows, props.washRing, props.washPoints, props.gridFeatures, props.queueIds, focusToken, reviewToken, props.focusLng, props.focusLat, props.focusZoom, props.reviewFocus]);
 

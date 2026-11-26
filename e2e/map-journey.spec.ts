@@ -1,7 +1,7 @@
 import { isExcludedSite } from "../lib/alerts/excluded";
 import { expect, test, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
-import type { Map as SiteMap } from "maplibre-gl";
+import type { GeoJSONSource, Map as SiteMap } from "maplibre-gl";
 
 type MapWindow = Window & { __sitesMap: SiteMap };
 
@@ -286,11 +286,21 @@ test("scan market readings and open the mapped wash radius", async ({page}, info
   await panel.getByRole("combobox").selectOption("income");
   await expect(panel).toContainText("median within 3 mi");
   await panel.getByRole("button",{name:"Traffic",exact:true}).click();
-  await page.waitForFunction(()=>{
-    const map = (window as unknown as MapWindow).__sitesMap;
-    return map?.getLayer("market-readings") && !map.isMoving() && map.isSourceLoaded("pins");
-  });
   await expect(panel.getByRole("button",{name:"Traffic",exact:true})).toHaveAttribute("aria-pressed","true");
+  const sample = await first.evaluate(button => ({
+    id: button.getAttribute("data-market-site"),
+    traffic: button.closest("tr")?.querySelector("td")?.firstChild?.textContent,
+  }));
+  await page.waitForFunction(async ({id,traffic}) => {
+    const map = (window as unknown as MapWindow).__sitesMap;
+    if (!map?.getLayer("market-readings") || map.isMoving() || !map.isSourceLoaded("pins")) return false;
+    const data = await map.getSource<GeoJSONSource>("pins")?.getData();
+    if (data?.type !== "FeatureCollection") return false;
+    const pin = data.features.find((feature: {properties: {site_id?: string} | null}) => feature.properties?.site_id === id);
+    if (!pin || pin.properties?.market_label !== traffic) return false;
+    const drawn = map.queryRenderedFeatures({layers:["market-readings"],filter:["==",["get","site_id"],id]});
+    return drawn.every(feature => feature.properties.market_label === traffic);
+  }, sample);
   if (!process.env.MAP_PRODUCTION_CHECK) {
     await mkdir("review-shots",{recursive:true});
     const name = process.env.MAP_DEPLOYED_PREVIEW ? "preview" : "local";

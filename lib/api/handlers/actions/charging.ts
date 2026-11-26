@@ -36,7 +36,7 @@ export async function GET(request:Request) {
   if(actionsEnabled()){
     try {history=await withSql(sql=>caseHistory(sql,site.deal_id));}catch { /* A draft stays available when shared storage is offline. */ }
   }
-  return jsonOk({site,source:site.charging?.sourceRevision??sourceRevision(site),history,canWrite:session.actionRole!=="viewer" && history!==null});
+  return jsonOk({site,reviewer:session.u,source:site.charging?.sourceRevision??sourceRevision(site),history,canWrite:session.actionRole!=="viewer" && history!==null});
 }
 export async function POST(request:Request) {
   const session=await openActions("contributor");
@@ -48,6 +48,6 @@ export async function POST(request:Request) {
   if(!site)return jsonError("Site unavailable.",404);
   if(parsed.data.sourceRevision!==(site.charging?.sourceRevision??sourceRevision(site)))return jsonError("The site evidence changed. Reload and review the new inputs.",409);
   if(parsed.data.inputs.comparator==="workbook" && parsed.data.inputs.values.depot!==initialCase(site).values.depot)return jsonError("Refresh the filed depot proxy or select a local benchmark.",409);
-  const history=await runWrite(session,{action:"charging.case",targetId:site.deal_id},sql=>saveCase(sql,site.deal_id,session.u,parsed.data));
+  const history=await runWrite(session,{action:"charging.case",targetId:site.deal_id},sql=>saveCase(sql,site.deal_id,session.u,parsed.data,site));
   return isResponse(history)?history:jsonOk({history});
 }

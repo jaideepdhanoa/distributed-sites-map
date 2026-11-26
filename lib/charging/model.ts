@@ -28,10 +28,11 @@ export const fields = {
   shortfall:field("Unserved fleet sessions per day before depot opens",groups[0]),
 };
 export type Key = keyof typeof fields;
-export type Evidence = {status:"assumed"|"quoted"|"verified"; source:string; date:string};
+export type Evidence = {status:"assumed"|"quoted"|"verified"; source:string; date:string; url?:string; reviewer?:string};
 export type Inputs = {
   ranking?: import("./merit").RankingInputs;
   values:Record<Key,number|null>; evidence:Partial<Record<Key,Evidence>>;
+  sourceValues?:Partial<Record<Key,{value:number|null;evidence:Evidence}>>;
   layout:string; rights:"unknown"|"controlled"|"unavailable"; rightsSource:string; rightsDate:string;
   comparable:boolean; sensitivityPct:number; terms:"purchase"|"lease"; comparator:"workbook"|"local"; energyScope:"excluded"|"included";
   openEarly:string; openLate:string; depotDate:string; allOptionsReviewed:boolean; peakDay:"weekday"|"weekend"; temporaryEnd:string; temporarySource:string;
@@ -55,11 +56,17 @@ export function initialCase(d: Pick<DealProps,"purchase"|"selectionResearch"|"as
     const planning=(["days","hostWeek","hostEnd","ownWeek","ownEnd","weekdayHours","weekendHours","hostFee","conversion","interruption","loss"] as Key[]).includes(key);
     evidence[key]={status:"assumed",source:planning?"Planning assumption":key==="ask" && d.selectionResearch ? d.selectionResearch.basis : "Workbook screening input",date:planning?"":(key==="ask"?d.selectionResearch?.reviewedOn:"") || w?.checked || ""};
   }
-  return {values,evidence,layout:"Workbook footprint",rights:"unknown",rightsSource:"",rightsDate:"",comparable:false,sensitivityPct:10,terms:"purchase",comparator:"workbook",energyScope:"excluded",openEarly:"",openLate:"",depotDate:"",allOptionsReviewed:false,peakDay:"weekday",temporaryEnd:"",temporarySource:""};
+  const research=d.selectionResearch;
+  if(research?.quote!=null && research.source && research.reviewedOn && /^public (whole-property ask|quote\b)/i.test(research.basis)){
+    evidence.ask={status:"quoted",source:research.basis,url:research.source,date:research.reviewedOn};
+  }
+  return {values,evidence,sourceValues:{},layout:"Workbook footprint",rights:"unknown",rightsSource:"",rightsDate:"",comparable:false,sensitivityPct:10,terms:"purchase",comparator:"workbook",energyScope:"excluded",openEarly:"",openLate:"",depotDate:"",allOptionsReviewed:false,peakDay:"weekday",temporaryEnd:"",temporarySource:""};
 }
 export const decisions=["Evidence needed","Verify a condition","Reprice","Advance diligence","Recommend closing"] as const;
 export type Decision=typeof decisions[number];
-export function calculate(c:Inputs) {
+export type CalculationLine = {label:string; keys:Key[]; value:number|null; excluded?:boolean};
+export type CalculationTrace = {annual:CalculationLine[]; throughput:CalculationLine[]; total:number|null; hours:number|null; perHour:number|null};
+export function calculate(c:Inputs, trace?:CalculationTrace) {
   const v=c.values, missing:string[]=[];
   function need(key:Key, positive=false) {
     const x=v[key];
@@ -74,7 +81,8 @@ export function calculate(c:Inputs) {
   const delivered=need("energy",true), efficiency=need("efficiency",true)/100, stalls=need("stalls"),supply=need("supply"),siteLoad=need("load"),charger=need("charger",true);
   const kw=Math.min(Math.max(0,supply-siteLoad)*efficiency,stalls*charger);
   const dwell=need("dwell",true), demand=need("demand"), uptime=need("uptime")/100;
-  const perHour=Math.min(demand,Math.min(stalls*60/dwell,kw/delivered)*uptime);
+  const stallLimit=stalls*60/dwell*uptime, powerLimit=kw/delivered*uptime;
+  const perHour=Math.min(demand,stallLimit,powerLimit);
   const throughputKnown=missing.length===0;
   const sessions=throughputKnown?operatingHours*perHour:null;
   const peakHours=v.peak!=null && v.peakCover!=null ? Math.min(v.peak,v.peakCover,c.peakDay==="weekend"?coveredEnd:coveredWeek) : null;
@@ -88,11 +96,34 @@ export function calculate(c:Inputs) {
   const retained=need("cash")-need("loss"), fixed=need("fixed"),tax=need("tax")/100;
   const utility=c.energyScope==="included" ? (sessions??0)*delivered/efficiency*need("energyRate") + need("billedPeak")*12*need("demandRate") : 0;
   const perSessionEnergy=c.energyScope==="included" && efficiency>0 && v.energyRate!=null ? delivered*v.energyRate/efficiency:0;
-  const beforeProperty=(capital+interruption)*recovery+capital*tax+fixed+utility+labor-retained;
+  const investment=(capital+interruption)*recovery, infrastructureTax=capital*tax;
+  const beforeProperty=investment+infrastructureTax+fixed+utility+labor-retained;
   const closing=c.terms==="purchase"?need("closing")/100:0;
   const factor=c.terms==="purchase" ? recovery*(1+closing):12;
   const price=c.terms==="purchase"?v.ask:v.rent;
   const siteCost=sessions && sessions>0 && !missing.length && price!=null ? (beforeProperty+price*factor)/sessions:null;
+  if(trace){
+    const line=(label:string,value:number,keys:Key[],excluded=false):CalculationLine=>({
+      label,keys,excluded,value:excluded || !Number.isFinite(value) || keys.some(k=>v[k]==null || missing.includes(fields[k].label))?null:value
+    });
+    const laborKeys:Key[]=["days","ownWeek","ownEnd","hostWeek","hostEnd"];
+    if(ownAnnual)laborKeys.push("posts","wage");
+    if(hostAnnual)laborKeys.push("hostFee");
+    trace.annual=[
+      c.terms==="purchase"?line("Purchase and closing costs",(price??0)*factor,["ask","closing","rate","years"]):line("Annual rent",(price??0)*factor,["rent"]),
+      line("Construction and interruption",investment,["build","upgrade","conversion","interruption","rate","years"]),
+      line("Infrastructure tax",infrastructureTax,["build","upgrade","conversion","tax"]),
+      line("Staffing",labor,laborKeys),
+      line("Upkeep, insurance and supervision",fixed,["fixed"]),
+      line("Electricity and demand charges",sessions==null?NaN:utility,["energyRate","billedPeak","demandRate","energy","efficiency"],c.energyScope==="excluded"),
+      line("Retained operating cash",-retained,["cash","loss"])
+    ];
+    trace.throughput=[line("Fleet demand",demand,["demand"]),line("Stall turnover",stallLimit,["stalls","dwell","uptime"]),
+      line("Deliverable power",powerLimit,["supply","load","efficiency","stalls","charger","energy","uptime"])];
+    trace.hours=line("Staffed hours",operatingHours,["days","hostWeek","hostEnd","ownWeek","ownEnd","weekdayHours","weekendHours"]).value;
+    trace.perHour=throughputKnown?perHour:null;
+    trace.total=trace.annual.every(row=>row.excluded || row.value!=null)?beforeProperty+(price??0)*factor:null;
+  }
   const depot=need("depot",true);
   const room=sessions && sessions>0 && !missing.length ? depot*sessions-beforeProperty:null;
   const ceiling=room==null?null:Math.max(0,room/factor);
@@ -159,4 +190,4 @@ export function diligenceDrivers(c:Inputs, baseline=calculate(c)) {
   }).sort((a,b)=>Number(b.flips)-Number(a.flips) || (b.worst-b.best)-(a.worst-a.best));
 }
 export type Result=ReturnType<typeof calculate>;
-export type SavedCase={id:string;revision:number;name:string;author:string;at:string;model:string;sourceRevision:string;inputs:Inputs;result:Result;selected:boolean};
+export type SavedCase={id:string;revision:number;name:string;author:string;at:string;model:string;sourceRevision:string;inputs:Inputs;result:Result & {network?:ReturnType<typeof import("./reference").networkReference>};selected:boolean};

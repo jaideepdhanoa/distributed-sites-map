@@ -9,6 +9,7 @@ test("edit, save, reopen and compare a charging case",async({page},info)=>{
   Object.assign(inputs.values,{stalls:6,supply:500,load:100,charger:75,dwell:35,energy:42,efficiency:90,uptime:95,
     demand:5,peak:6,peakCover:6,shortfall:55,posts:1,wage:24,build:600000,upgrade:80000,cash:50000,fixed:25000,
     tax:1,rate:10,closing:2,years:10,depot:12});
+  inputs.values.conversion=18000;
   inputs.openEarly="2027-03-01";inputs.openLate="2027-04-01";inputs.depotDate="2027-08-01";
   inputs.comparator="local";inputs.rights="controlled";inputs.rightsSource="Illustrative site plan";inputs.rightsDate="2026-11-01";
   const original:SavedCase={id:"00000000-0000-4000-8000-000000000099",revision:1,author:"Example reviewer",
@@ -23,7 +24,45 @@ test("edit, save, reopen and compare a charging case",async({page},info)=>{
     }
     await route.fulfill({json:{site,source:latest,history,canWrite:true}});
   });
-  await page.goto("/charging?site="+site.deal_id);
+  const url="/charging?site="+site.deal_id;
+  inputs.evidence.conversion={status:"quoted",source:"Synthetic contractor quote",date:"2026-11-01",url:"https://example.org/contractor-estimate"};
+  await page.goto(url+"&view=explain&case="+original.id+"%3A1");
+  const explanation=page.getByRole("region",{name:"Cost per charge explanation"});
+  await expect(explanation).toBeVisible();
+  await explanation.getByText("Annual costs and retained cash",{exact:true}).click();
+  await explanation.getByText("Construction and interruption",{exact:true}).click();
+  await explanation.getByRole("button",{name:"Additional conversion works ($ once)",exact:true}).click();
+  await expect(explanation).toContainText("Synthetic contractor quote");
+  await expect(explanation.getByRole("link",{name:"Open source document"})).toHaveAttribute("href","https://example.org/contractor-estimate");
+  await explanation.getByLabel("Trial value").fill("72000");
+  await explanation.getByRole("button",{name:"Apply trial"}).click();
+  await expect(explanation).toContainText("Scenario override");
+  await expect(explanation).toContainText("Before trial");
+  await mkdir("review-shots",{recursive:true});
+  const capturePrefix="review-shots/"+info.project.name+"-"+(process.env.MAP_DEPLOYED_PREVIEW?"deployed-":"");
+  await explanation.getByRole("region",{name:"Try a change"}).screenshot({path:capturePrefix+"charging-source.png",animations:"disabled"});
+  await page.getByLabel("Case name",{exact:true}).fill("Trial conversion");
+  await page.getByRole("button",{name:"Save named alternative"}).click();
+  await expect(page.getByRole("status")).toContainText("Saved Trial conversion");
+  expect(history.find(r=>r.selected)?.name).toBe("Paid coverage");
+  await page.reload();
+  await expect(page.getByLabel("Case name",{exact:true})).toHaveValue("Trial conversion");
+  await explanation.getByLabel("Inspect an input or try a change").selectOption("conversion");
+  await expect(explanation).toContainText("Synthetic contractor quote");
+  await explanation.getByRole("button",{name:"Review source and date"}).click();
+  await expect(page.getByLabel("Recorded source value")).toHaveValue("18000");
+  await page.getByRole("button",{name:"Explanation",exact:true}).click();
+  await explanation.getByText("What limits completed charges?",{exact:true}).click();
+  const overflowing=await explanation.evaluate(el=>{
+    const right=el.getBoundingClientRect().right+1;
+    return Array.from(el.querySelectorAll("*")).filter(node=>node.getBoundingClientRect().right>right).map(node=>node.tagName+"."+node.className).slice(0,8);
+  });
+  expect(overflowing).toEqual([]);
+  await mkdir("review-shots",{recursive:true});
+  await page.getByRole("heading",{name:site.name}).scrollIntoViewIfNeeded();
+  const screenshotName=info.project.name+"-"+(process.env.MAP_DEPLOYED_PREVIEW?"deployed-":"")+"charging-explanation.png";
+  await page.screenshot({path:"review-shots/"+screenshotName,animations:"disabled"});
+  await page.goto(url);
   const editor=page.getByRole("region",{name:"Charging economics editor"});
   const metric=editor.locator(".charging-metrics");
   await expect(metric).toContainText("Local depot per charge");
@@ -73,12 +112,16 @@ test("open released charging assumptions from the portfolio",async({page})=>{
   const response=await page.request.get("/api/data/selection-review");
   expect(response.ok()).toBeTruthy();
   const {rows}=await response.json() as {rows:SelectionRow[]};
-  const record=rows.find(r=>r.charging && r.financeVisible);
+  const record=rows.find(r=>r.charging?.selected && r.financeVisible)??rows.find(r=>r.charging && r.financeVisible);
   expect(Boolean(record)).toBeTruthy();
   const res=await page.request.get("/api/actions/charging?site="+encodeURIComponent(record!.id));
   expect(res.ok()).toBeTruthy();
   const data=await res.json();
   expect(data.site.deal_id===record!.id).toBe(true);
-  await page.goto("/charging?site="+encodeURIComponent(record!.id));
+  const params=new URLSearchParams({view:"explain",site:record!.id});
+  if(record!.charging?.selected)params.set("case",record!.charging.selected);
+  await page.goto("/charging?"+params);
+  if(record!.charging?.selected)await expect(page.getByLabel("Work on a case")).toHaveValue(record!.charging.selected);
+  await expect(page.getByRole("region",{name:"Cost per charge explanation"})).toBeVisible();
   await expect(page.getByRole("region",{name:"Charging economics editor"})).toBeVisible();
 });

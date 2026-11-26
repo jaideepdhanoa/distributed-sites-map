@@ -1,3 +1,4 @@
+import { ChargingLink } from "./ChargingLink";
 import type { DealProps } from "@/lib/types";
 import { amounts,fields,type Inputs } from "@/lib/charging/model";
 import { actionColors,downsideKeys,emptyRanking,type Merit,type RankingInputs } from "@/lib/charging/merit";
@@ -9,7 +10,7 @@ export function MeritCard({deal}:{deal:DealProps}) {
   return <section className="charging-preview" aria-label="Site decision">
     <strong style={{color:actionColors[m.action]}}>{m.action}</strong><p>{m.next}</p>
     {m.netValue!=null && <small>{amounts(m.netValue)} downside network value · {m.servedPeak} peak charges</small>}
-    <a className="text-link" href={"/charging?site="+encodeURIComponent(deal.deal_id)}>Review site case</a>
+    <ChargingLink site={deal.deal_id} revision={c.selected}>Review site case</ChargingLink>
   </section>;
 }
 const measures=[

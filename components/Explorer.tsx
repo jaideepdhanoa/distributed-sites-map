@@ -413,7 +413,7 @@ export default function Explorer() {
   const pipeStage: PipeId = pipeView.stage;
   const outsideGroup = funnel === "pipeline" && params.get("outside") === "1" && allPipes;
   const mapRequested = params.get("view") !== "list";
-  const recoveringMap = Boolean(mapNote) && mapRequested && !params.has("review") && params.get("view") !== "review" && !params.has("loops") && !params.has("nda");
+  const recoveringMap = Boolean(mapNote) && params.get("spaces")!=="1" && mapRequested && !params.has("review") && params.get("view") !== "review" && !params.has("loops") && !params.has("nda");
   const listView = !mapRequested || recoveringMap;
   function retryMap() {
     setMapNote("");
@@ -2874,7 +2874,11 @@ export default function Explorer() {
           <ReviewFeedSheet sites={reviewList.map((site) => ({ ...site, score: listScoreText(dealRows.find((deal) => deal.deal_id === site.siteId || deal.universe_id === site.siteId)?.score) }))} currentId={reviewCurrent?.siteId || ""} onPick={goReview} onClose={() => setFeedSheet(false)} links={reviewLinks} />
         ) : null}
         {(needsMap || mapVisited) && <PanelBoundary name="Map">
-        <MapView key={mapAttempt}
+        <MapView key={mapAttempt} signedIn={Boolean(me)} spacesMarket={allCities?"all":city} spacesOpen={params.get("spaces")==="1"}
+          onDrawAt={me ? (siteId, center) => {
+            setShowSpaces(true); setPickedSpace(""); setMarking({siteId,lng:center[0],lat:center[1],nonce:Date.now()});
+            if (dealRows.some(deal=>deal.deal_id===siteId)) { setSelected(siteId); setPreviewId(siteId); setSheetSnap("peek"); }
+          } : undefined}
           sites={funnel === "pipeline" ? (showUniverse ? pipelineSites : []) : (showUniverse ? universeMapSites : [])}
           deals={drawnDeals}
           nearbyHighlight={nearbyHighlight} nearbyPicker={nearbyPicker}
@@ -3137,10 +3141,10 @@ export default function Explorer() {
                   <span className="layer-mark"><i className="swatch stage-dropped" /></span>
                   Dropped deals
                 </label>
-                <label className="layer-row" title="Lots drawn on the satellite view. Slot counts stay estimated until someone checks them.">
+                <label className="layer-row" title="Analyzed footprints and lots drawn by the team.">
                   <input className="check" type="checkbox" checked={showSpaces} onChange={(event) => setShowSpaces(event.target.checked)} data-testid="spaces-layer" />
                   <span className="layer-mark"><i className="swatch l10" /></span>
-                  Available lots
+                  Spaces
                 </label>
                 <p className="eyebrow">Context</p>
                 <label className="layer-row" title={LAYER_TITLES.areas}>
@@ -3219,7 +3223,8 @@ export default function Explorer() {
                 {showAreas && <li><i className="swatch current-area" />Service areas</li>}
                 {showDepots && <li><i className="pin-sample depot" />Depot</li>}
                 {showRings && <li><i className="pin-sample line" />Depot rings</li>}
-                {showSpaces && markedSpaces.length > 0 && <li><i className="swatch l10" />Available lot</li>}
+                {showSpaces && <li><i className="swatch space-proposal-swatch" />Analyzed space</li>}
+                {showSpaces && markedSpaces.length > 0 && <li><i className="swatch l10" />Team-drawn lot</li>}
                 {showUnscreened && <li><i className="swatch nearby" />Unscreened listing</li>}
                 {OVERLAYS.filter(item => overlaysOn.includes(item.id)).map(item => <li key={item.id}>{item.label}</li>)}
               </ul>

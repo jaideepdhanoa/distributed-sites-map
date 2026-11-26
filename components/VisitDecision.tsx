@@ -19,7 +19,8 @@ export default function VisitDecision({ option, plan, charging }: Props) {
     {plan && <details className="disclosure">
       <summary className="disclosure">Actions and offer conditions</summary>
       <h4>Run in parallel</h4>
-      <ul><li><b>Seller and economics.</b> {plan.commercial}</li><li><b>Utility.</b> {plan.power}</li></ul>
+      <p><b>Seller and economics.</b> {plan.commercial}</p>
+      <p><b>Utility.</b> {plan.power}</p>
       <h4>Visit</h4>
       <p><b>Before booking.</b> {plan.beforeVisit}</p><p><b>On site.</b> {plan.fieldwork}</p>
       <h4>Price and approval</h4>

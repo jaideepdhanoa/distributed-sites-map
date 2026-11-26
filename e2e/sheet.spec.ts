@@ -30,7 +30,11 @@ test("the sheet reorders, resizes, pins, hides, sorts, filters, and keeps the la
   await expect(stage).toHaveAttribute("aria-sort", "ascending");
 
   await page.getByRole("button", { name: "Columns", exact: true }).click();
-  await page.getByRole("group", { name: "Columns", exact: true }).getByText("Traffic", { exact: true }).click();
+  const columns = page.getByRole("group", { name: "Columns", exact: true });
+  await columns.getByText("Traffic", { exact: true }).click();
+  if (!(await page.locator('th[data-col="score"]').count())) {
+    await columns.getByText("Historical score", { exact: true }).click();
+  }
   await expect(page.locator('th[data-col="traffic"]')).toHaveCount(0);
   await page.getByRole("button", { name: "Columns", exact: true }).click();
 
@@ -44,7 +48,7 @@ test("the sheet reorders, resizes, pins, hides, sorts, filters, and keeps the la
     window.dispatchEvent(new PointerEvent("pointermove", { clientX: startX + 160, clientY: y, bubbles: true, pointerId: 1 }));
     window.dispatchEvent(new PointerEvent("pointerup", { clientX: startX + 160, clientY: y, bubbles: true, pointerId: 1 }));
   });
-  await expect(score).toHaveAttribute("style", /width:\s*2\d\dpx/);
+  await expect.poll(async () => (await score.boundingBox())?.width || 0).toBeGreaterThan((before?.width || 0) + 40);
   const after = await score.boundingBox();
   expect(after && before && after.width).toBeGreaterThan((before?.width || 0) + 40);
 
@@ -77,8 +81,8 @@ test("the sheet reorders, resizes, pins, hides, sorts, filters, and keeps the la
   }
   await expect(page.locator("[data-testid=sheet-grid] thead th[data-col]").nth(1)).toHaveAttribute("data-col", "openLand");
 
-  await score.getByRole("button", { name: "Filter Score" }).click();
-  await page.getByRole("group", { name: "Score column" }).getByRole("checkbox", { name: "Pin left" }).check();
+  await score.getByRole("button", { name: "Filter Historical score" }).click();
+  await page.getByRole("group", { name: "Historical score column" }).getByRole("checkbox", { name: "Pin left" }).check();
   await expect(score).toHaveAttribute("data-pinned", "true");
 
   await stage.getByRole("button", { name: "Filter Stage" }).press("Enter");

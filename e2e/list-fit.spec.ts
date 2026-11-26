@@ -39,7 +39,7 @@ async function openList(page: Page, path: string) {
 
 test("chip notes have no native title on an ancestor", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "desktop tooltips");
-  await page.goto("/?funnel=pipeline&view=list&cats=wash|lube|auto|land", { waitUntil: "domcontentloaded" });
+  await page.goto("/?funnel=pipeline&view=list&cols=site|stage|county|score&cats=wash|lube|auto|land", { waitUntil: "domcontentloaded" });
   await page.waitForSelector("[data-testid=list-score]");
   async function ancestorTitles(testId: string) {
     const chip = page.getByTestId(testId).first();

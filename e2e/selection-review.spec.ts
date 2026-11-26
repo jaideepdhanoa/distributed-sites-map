@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { marketSequence,meritVersion } from "../lib/charging/merit";
+import type { SelectionRow } from "../lib/selection/screen";
 import { test, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 
@@ -57,6 +60,17 @@ test("released selection review joins uniquely and serves active rows", async ({
     !/dropped|off[ -]?market/i.test(f.properties.stage));
   expect(mappedActive.every((f: {properties:{deal_id:string}})=>activeIds.has(f.properties.deal_id))).toBe(true);
   console.info("Selection parity",info.project.name,JSON.stringify({active:rows.length,stageDifferences:result.mismatches,workbookInputs:result.hasInputs}));
+  const financialRows=(result.rows as SelectionRow[]).filter(r=>r.charging);
+  expect(financialRows.length).toBeGreaterThan(0);
+  expect(financialRows.every(r=>r.charging?.merit.version===meritVersion)).toBe(true);
+  const ranks=marketSequence(financialRows.map(r=>({id:r.id,city:r.city,merit:r.charging!.merit})));
+  const digestRows=financialRows.map(row=>{
+    const c=row.charging!,m=c.merit,rank=ranks.get(row.id);
+    return [row.id,c.selected?.split(":").pop()??"",m.action,m.next,m.downsideGap,m.downsideCeiling,m.netValue,
+      rank?.rank,rank?.value,rank?.peak,m.version].map(v=>typeof v==="number" ? v.toPrecision(12) : v??"");
+  }).sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0);
+  const fingerprint=createHash("sha256").update(JSON.stringify(digestRows)).digest("hex");
+  console.info("Charging decision readback",JSON.stringify({rows:financialRows.length,ranked:ranks.size,version:meritVersion,fingerprint}));
   await page.goto("/selection-review");
   await expect(page.getByText(rows.length+" of "+rows.length+" active sites")).toBeVisible();
 });

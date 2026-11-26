@@ -149,7 +149,7 @@ export default function CompareTray({
     if (onInspect && column.deal?.kind==="pipeline" && purchaseLabels.some(p=>p===label)) {
       return <button type="button" className="text-link compare-evidence" onClick={event=>{
         inspectedCell.current=event.currentTarget;onInspect(column.id,label);
-      }}>{value===MISSING?"Inspect financial inputs":value}</button>;
+      }}>{value===MISSING?"Inspect financial inputs":value}{row?.basis && <small>{row.basis}</small>}</button>;
     }
     if (statement && value === "Unavailable") return <button type="button" className="text-link" onClick={statements.retry}>Retry statement</button>;
     if (statement && !["Not applicable","Checking…",MISSING].includes(value)) return <button type="button" className="text-link compare-evidence"

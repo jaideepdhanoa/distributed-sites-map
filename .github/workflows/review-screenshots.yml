@@ -11,6 +11,7 @@ on:
       - lib/mutedStyle.ts
       - e2e/map-journey.spec.ts
       - e2e/layout-options.spec.ts
+      - e2e/purchase-review.spec.ts
       - components/spaces/**
   workflow_dispatch:
 
@@ -60,7 +61,7 @@ jobs:
             sleep 2
           done
           export E2E_BASE_URL=http://localhost:3456
-          npx playwright test e2e/review-shots.spec.ts e2e/map-journey.spec.ts e2e/layout-options.spec.ts
+          npx playwright test e2e/review-shots.spec.ts e2e/map-journey.spec.ts e2e/layout-options.spec.ts e2e/purchase-review.spec.ts
       - if: steps.gate.outputs.run == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && env.HAS_PREVIEW_ACCESS == 'true'
         name: Find the Vercel preview for this commit
         id: preview
@@ -87,7 +88,7 @@ jobs:
           E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: npx playwright test e2e/map-journey.spec.ts e2e/layout-options.spec.ts
+        run: npx playwright test e2e/map-journey.spec.ts e2e/layout-options.spec.ts e2e/purchase-review.spec.ts
       - if: steps.gate.outputs.run == 'true' && github.event_name == 'push'
         name: Walk the released map on desktop and phone
         env:
@@ -103,6 +104,7 @@ jobs:
           done
           npx playwright test e2e/map-journey.spec.ts
           npx playwright test e2e/layout-options.spec.ts --grep "open a released outline"
+          npx playwright test e2e/purchase-review.spec.ts --grep "open released financials"
       - if: steps.gate.outputs.run == 'true' && github.event_name != 'push'
         uses: actions/upload-artifact@v4
         with:

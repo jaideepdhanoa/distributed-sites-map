@@ -13,3 +13,9 @@ Follow this plan on `feat/financial-purchase-review` in `jaideepdhanoa/distribut
 ## Resume
 
 Fetch the latest main and feature branch, inspect their diff and the PR checks. Work from the first incomplete acceptance item. The Git history and PR are the delivery log. A release is complete only after the implemented paths and deployment have been verified.
+
+## Implementation checkpoint
+
+[Pull request 207](https://github.com/jaideepdhanoa/distributed-sites-map/pull/207) implements the five surfaces and uses the private snapshot for the purchase model. The extractor and acquisition math have synthetic regression coverage. A desktop and phone walkthrough opens the record, compares the two earnings cases, changes lost contribution, and reloads the direct link. Review screenshots publishes a cropped synthetic example. The post-merge walk opens a real financial record read-only.
+
+To resume, check the latest commit and required checks on PR 207. After merge, confirm the main deployment and the next Workbook sync. The workbook sync makes the new private file available. Until it runs, the interface can show statement and package evidence with an unknown modeled balance. A new footprint carries a new revision, so a saved scenario that used the old geometry asks for review. One-time interruption affects first-year cash. Price ceilings use recurring annual cash with the workbook network configuration.

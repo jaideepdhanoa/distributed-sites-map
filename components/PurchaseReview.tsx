@@ -28,6 +28,12 @@ export default function PurchaseReview({deal,pnl}:{deal:DealProps;pnl:ReturnType
   const claim=w?.claim ?? deal.stated_cash_flow;
   const claimLabel=w?.claimLabel || deal.cash_flow_label || "Reported earnings";
   const annual=result?.cash;
+  const revenue = w?.revenue ?? deal.stated_revenue;
+  const ask = deal.asking_price ?? w?.ask;
+  const leadLabel = annual!=null ? "Retained annual cash" : claim!=null ? claimLabel : revenue!=null ? "Reported revenue" : ask!=null ? "Asking price" : "Operating cash";
+  const leadNote = annual!=null ? [scenario.basis==="normalized" ? "Normalized EBITDA" : "Workbook EBITDA", linePeriod, "modeled per year"] :
+    claim!=null ? [deal.earnings_period || "Period unconfirmed", deal.earnings_basis || w?.status || "Source basis unconfirmed"] :
+    revenue!=null ? [w?.periods?.revenue || deal.revenue_period || "Period unconfirmed", deal.revenue_basis || "Revenue only"] : ["Annual operating cash pending"];
   const layout=layoutName(deal,scenario);
   const changed=layout==="Footprint changed";
   const hasStatement=pnl.statement?.status==="ready";
@@ -43,16 +49,24 @@ export default function PurchaseReview({deal,pnl}:{deal:DealProps;pnl:ReturnType
   const withheld=evidence==="Withheld" || /refus|unavailable/i.test(w?.package || deal.package_status || "");
   const check=changed ? "Review the changed footprint" : purchaseCheck(deal);
   return <section className="purchase-review" aria-label="Purchase support" data-testid="purchase-review">
+    <div className="purchase-summary">
     <header><p className="eyebrow">Site financials</p><h3>Can the business carry the purchase?</h3>
       <p className="purchase-basis">{evidence}{w?.checked && " · Checked "+w.checked}</p></header>
     <article className="purchase-lead">
-      <span>{annual!=null ? "Retained annual cash" : claim!=null ? claimLabel : "Asking price"}</span>
-      <strong>{amount(annual ?? claim ?? deal.asking_price ?? w?.ask)}</strong>
-      <small>{annual!=null ? basisLabel+" · "+linePeriod+" · modeled per year" : claim!=null ? [deal.earnings_period || "Period unconfirmed",deal.earnings_basis || w?.status || "Source basis unconfirmed"].join(" · ") : "Annual operating cash pending"}</small>
+      <span>{leadLabel}</span>
+      <strong>{amount(annual ?? claim ?? revenue ?? ask)}</strong>
+      <small>{leadNote.join(" · ")}</small>
     </article>
+    {annual!=null && result?.charge!=null && <div className="purchase-funding" aria-label="Annual purchase coverage">
+      <div><span>Annual charge at ask</span><b>{amount(result.charge)}</b></div>
+      <div><span>{result.gap==null ? "Annual balance" : result.gap<0 ? "Annual shortfall" : "Annual surplus"}</span><b>{amount(result.gap==null?null:Math.abs(result.gap))}</b></div>
+      {result.charge>0 && <p><span className="purchase-meter" aria-hidden="true"><i style={{width:Math.max(0,Math.min(100,100*annual/result.charge))+"%"}}/></span>
+        {percent(annual/result.charge)} of the asking-price charge covered by operating cash</p>}
+    </div>}
     <div className="purchase-check"><b>{check}</b><p>{w?.normalized!=null && w.normalized!==w.ebitda ? "Compare the workbook input and the normalized recast. Check the period and lease obligations for the purchase." :
       withheld ? "View the existing request or refusal before another follow-up." : w?.fit===0 ? "The recorded layout fits zero stalls. Review an alternative footprint before using the network ceiling." :
       result?.cash==null ? "Open the available evidence and identify a full operating period." : "Confirm that the income, occupancy costs and available space belong to the same purchase setup."}</p></div>
+    </div>
     {data && w && a && result && <>
       <h4>Cash from operations</h4>
       {w.normalized!=null && <div className="segmented" role="group" aria-label="Earnings basis">{(["workbook","normalized"] as const).map(b=><button type="button" key={b} aria-pressed={b===scenario.basis} className={b===scenario.basis?"segmented on":"segmented"} onClick={()=>switchCase({basis:b})}>{b==="workbook"?"Workbook input":"Normalized recast"}</button>)}</div>}
@@ -62,7 +76,7 @@ export default function PurchaseReview({deal,pnl}:{deal:DealProps;pnl:ReturnType
       {!result.open && <p>Workbook setup closes the business. Its retained operating cash is zero.</p>}
       {w.textInputs.length>0 && <p className="layer-meta">Some worksheet amounts are stored as text. The workbook case preserves its published outputs.</p>}
       <h4>Purchase at the asking price</h4>
-      <Ledger rows={[["Asking price used in workbook",amount(w.ask)],["Annual capital charge",amount(w.charge)],["Modeled annual surplus or shortfall",amount(result.gap)],
+      <Ledger rows={[["Asking price used in workbook",amount(w.ask)],["Annual capital charge",amount(w.charge)],...(scenario.upgrade?[["Incremental upgrade charge",amount(result.extraAnnual)] as [string,string]]:[]),["Modeled annual surplus or shortfall",amount(result.gap)],
         ["EBITDA needed at ask for target saving",amount(w.required)]]}/>
       <p className="layer-meta">The capital charge uses {percent(a.closing)} closing costs and {percent(a.capital)} cost of capital. Operating and purchase scopes require review.</p>
       <details className="disclosure"><summary className="disclosure">Price support and network assumptions</summary>
@@ -73,13 +87,14 @@ export default function PurchaseReview({deal,pnl}:{deal:DealProps;pnl:ReturnType
         <p className="layer-meta">Screening estimates use the workbook’s network and staffing setup. A footprint change needs a fresh stall count and utility-cost check.</p>
       </details>
       <details className="disclosure"><summary className="disclosure">Test a layout or operating change</summary>
+        {data.layout && <a href={"/?spaces=1&spaceSite="+encodeURIComponent(deal.deal_id)} className="text-link">Inspect footprints on the main map</a>}
         <label>Assessed footprint<select className="secondary" value={scenario.layout} onChange={e=>switchCase({layout:e.target.value})}>
           <option value="">Workbook setup</option>{changed && <option value={scenario.layout}>Footprint changed</option>}
           {data.layout?.zones.map((z,i)=><option key={i} value={data.layout!.revision+"."+i}>{z}</option>)}</select></label>
         {([["lostCash","Annual contribution displaced ($)"],["upgrade","Additional one-time power upgrade ($)"],["downtime","Months of lost contribution in year one"]] as const).map(([key,label])=><label key={key}>{label}<input className="field" type="number" min="0" max={key==="downtime"?12:99999999999} step="0.01" value={scenario[key]} onChange={e=>changeAmount(key,e.target.value)}/></label>)}
         {invalid && <p role="alert">{invalid}</p>}
         <Ledger rows={[["Year-one retained cash",amount(result.firstYear)],["Incremental annual capital charge on upgrade",amount(result.extraAnnual)]]}/>
-        <p className="layer-meta">The upgrade is incremental to the workbook. Interruption removes a share of positive operating contribution in year one. Compare can save this scenario with a decision.</p>
+        <p className="layer-meta">The upgrade is incremental to the workbook. Interruption reduces year-one cash only. The price ceilings use recurring annual cash. Compare can save this scenario with a decision.</p>
       </details>
     </>}
     <h4>Statements and evidence</h4>
@@ -93,7 +108,7 @@ export default function PurchaseReview({deal,pnl}:{deal:DealProps;pnl:ReturnType
     </div>
     <details className="disclosure"><summary className="disclosure">Durability and site fit</summary>
       <Ledger rows={[["Car count · latest / prior",[w?.cars,w?.priorCars].map(v=>v?.toLocaleString()??"—").join(" / ")],["Prior annual revenue",amount(w?.priorRevenue)],["Membership share",percent(w?.memberShare)],
-        ["Nearby washes within 1 mile",deal.trade_washes_1mi??"Unknown"],["Stalls that fit",w?.fit??deal.bays_that_fit??"Unknown"],["Selected footprint",layout]]}/>
+        ["Nearby washes within 1 mile",deal.trade_washes_1mi??"Unknown"],["Road traffic · vehicles per day",deal.trade_aadt?.toLocaleString()??"Unknown"],["On-site electrical service",deal.cap_c_amps!=null?deal.cap_c_amps+" A":"Unconfirmed"],["Frontage hosting",deal.cap_b_frontage!=null?deal.cap_b_frontage+" MW":"Unconfirmed"],["Stalls that fit",w?.fit??deal.bays_that_fit??"Unknown"],["Selected footprint",layout]]}/>
       <p>Check peak demand, power upgrade timing and any loss of operating space for this footprint.</p>
     </details>
     {checklist && pnl.panel && createPortal(<FinancialsPanel dealId={deal.deal_id} initial={pnl.panel} onClose={closeChecklist}/>,document.body)}

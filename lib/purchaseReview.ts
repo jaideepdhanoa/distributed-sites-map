@@ -36,12 +36,12 @@ export function purchaseCase(data: PurchaseData, scenario: Sensitivity) {
   const rebuilt = !open ? 0 : ebitda != null && upkeep != null && a.oversight != null ? ebitda - upkeep - a.oversight : null;
   // Preserve the workbook output, including blanks when a cell was stored as text.
   const base = basis === "workbook" ? w.cash : rebuilt;
-  const cash = base == null ? null : base - scenario.lostCash;
+  const cash = base == null ? null : base - (open ? scenario.lostCash : 0);
   const factor = a.closing != null && a.capital != null && a.capital > 0 ? (1+a.closing)*a.capital : null;
   const charge = w.charge;
-  const gap = cash != null && charge != null ? cash - charge : null;
   const cashPrice = cash != null && factor && factor > 0 ? Math.max(0,cash) / factor : null;
   const extraAnnual = scenario.upgrade === 0 ? 0 : a.capital != null ? scenario.upgrade * a.capital : null;
+  const gap = cash != null && charge != null && extraAnnual != null ? cash - charge - extraAnnual : null;
   const layoutStalls = w.stalls ?? (/shared/i.test(w.archetype) ? a.sharedStalls : a.defaultStalls);
   const sites = layoutStalls && layoutStalls > 0 && a.demand ? Math.ceil(a.demand/layoutStalls) : null;
   function price(allowance: number | null) {
@@ -111,10 +111,14 @@ export function scenarioFigure(d:DealProps,s:PurchaseScenario) {
   const result=purchaseCase(d.purchase,s);
   const period=w.periods?.[s.basis==="normalized"?"normalized":"ebitda"] || "Annual input · period unconfirmed";
   const basis=(s.basis==="normalized"?"Normalized EBITDA":"Workbook EBITDA")+" · "+layoutName(d,s);
+  const a=d.purchase.assumptions;
   // All selected assumptions and outputs are compared when a saved decision is reopened.
   const value = result.cash==null ? "—" : [amount(result.cash)+"/yr retained",amount(result.gap)+"/yr at ask",
     amount(result.firstYear)+" first year",amount(result.ceiling)+" target ceiling",
-    purchaseCheck(d)].join(" · ");
+    purchaseCheck(d),
+    "Capital "+(a.capital==null?"unknown":(100*a.capital)+"%")+", closing "+(a.closing==null?"unknown":(100*a.closing)+"%"),
+    "Upkeep "+(a.upkeep==null?"unknown":(100*a.upkeep)+"%")+", oversight "+amount(a.oversight),
+    [w.status,w.checked,financialEvidence(d),w.ownership,w.archetype,w.fit==null?"Fit unconfirmed":w.fit+" fit"].filter(Boolean).join(" · ")].join(" · ");
   const source=["Pipeline workbook",w.checked,s.basis==="normalized"?"Normalized EBITDA":"EBITDA",w.periods?.revenue,
     "Lost contribution "+amount(s.lostCash)+"/yr","Additional upgrade "+amount(s.upgrade),"Interruption "+s.downtime+" mo"].filter(Boolean).join(" · ");
   return {value,period,basis,source,anchor:scenarioAnchor(s)};

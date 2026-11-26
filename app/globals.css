@@ -4540,3 +4540,12 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 @media(max-width:767px){
   .space-map-launch.tool { left:8px; top:calc(var(--bar-h, 138px) + 8px); bottom:auto; min-height:44px; }
 }
+
+.purchase-funding {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;border-block:1px solid #d6cebe;padding:12px 0;}
+.purchase-funding div {display:grid;gap:3px;}
+.purchase-funding span,.purchase-funding p {font-size:.78rem;}
+.purchase-funding b {font-size:1.2rem;font-variant-numeric:tabular-nums;}
+.purchase-funding p {grid-column:1/-1;margin:0;}
+.purchase-meter {display:block;border-radius:4px;height:6px;background:#ded9cf;overflow:hidden;margin-bottom:6px;}
+.purchase-meter i {display:block;height:100%;background:#356456;}
+.purchase-summary {display:grid;gap:12px;}

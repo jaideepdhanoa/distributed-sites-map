@@ -550,12 +550,14 @@ export default function PipelineList({
           sort={{ id: activeLayout.sort?.id || "site", desc: Boolean(activeLayout.sort?.desc) }}
           onChange={(id, desc) => commit({ ...activeLayout, sort: { id, desc }, touched: true })}
         />
+        {signedIn && <a className="paper-btn only-desktop" href="/selection-review">Selection review</a>}
         {signedIn && <a className="paper-btn only-desktop" href="/space-review">Space review</a>}
         <button type="button" className="paper-btn only-desktop" onClick={() => download(ordered)}>Export CSV</button>
         <div className="more-wrap only-mobile">
           <button type="button" className="paper-btn" aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More list actions" onClick={() => setMoreOpen((value) => !value)}>More</button>
           {moreOpen ? (
             <div className="menu" role="menu" aria-label="List actions">
+              {signedIn && <a className="menu-item" role="menuitem" href="/selection-review">Selection review</a>}
               {signedIn && <a className="menu-item" role="menuitem" href="/space-review">Space review</a>}
               {<button type="button" className="menu-item" role="menuitem" onClick={() => { toggleAll(); setMoreOpen(false); }}>{allOn ? "Clear selection" : "Select all shown"}</button>}
               <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); download(ordered); }}>Export CSV</button>

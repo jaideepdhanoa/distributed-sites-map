@@ -92,6 +92,7 @@ jobs:
           fi
           python scripts/sync_workbook.py
           python scripts/build_data.py
+          python -m scripts.selection_inputs
           if [ -f data/source/space-layouts.json ]; then
             cp data/source/space-layouts.json data/generated/space-layouts.json
           fi

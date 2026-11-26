@@ -30,3 +30,5 @@ playwright/.cache/
 
 # Private workbook inputs for the signed-in purchase review
 /data/generated/purchase-review.json
+# Signed-in selection screen, built from the private pipeline.
+data/generated/selection-inputs.json

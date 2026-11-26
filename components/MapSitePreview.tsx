@@ -1,3 +1,4 @@
+import {ChargingLink} from "@/components/ChargingLink";
 import { filedScreenLabel } from "@/lib/charging/summary";
 import MapPowerCard, { type GridCoverage } from "./MapPowerCard";
 import { useEffect, useRef, useState } from "react";
@@ -75,7 +76,7 @@ export default function MapSitePreview(props: PreviewProps) {
         <p>{powerDeal.charging.result.siteCost==null?"Site cost pending":"$"+powerDeal.charging.result.siteCost.toFixed(2)+" / charge"}
           {powerDeal.charging.result.depot!=null && " · $"+powerDeal.charging.result.depot.toFixed(2)+" depot"+(powerDeal.charging.comparator==="workbook"?" proxy":"")}</p>
         <small>{powerDeal.charging.name} · {powerDeal.charging.result.peakSessions??"Unknown"} peak charges · {powerDeal.charging.result.opening||"Opening unconfirmed"}</small>
-        <p>{powerDeal.charging.result.next}</p>{!powerDeal.charging.selected && <p className="layer-meta">{filedScreenLabel(powerDeal.charging.screen)}</p>}<a className="text-link" href={"/charging?site="+encodeURIComponent(powerDeal.deal_id)}>Edit charging assumptions</a>
+        <p>{powerDeal.charging.result.next}</p>{!powerDeal.charging.selected && <p className="layer-meta">{filedScreenLabel(powerDeal.charging.screen)}</p>}<ChargingLink site={powerDeal.deal_id} revision={powerDeal.charging.selected}/>
       </section>}
       {!props.grid.open && <div className="preview-actions">
       {!showingPower && power && <PowerFollowUp deal={props.powerDeal} site={props.powerSite} primary />}

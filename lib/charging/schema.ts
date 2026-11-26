@@ -2,14 +2,21 @@ import { z } from "zod";
 import { fields,keys,type Key,type Inputs } from "./model";
 const bounds=Object.fromEntries(keys.map(k=>[k,z.number().finite().min(fields[k].min).max(fields[k].max).nullable()])) as Record<Key,z.ZodNullable<z.ZodNumber>>;
 const date=z.union([z.literal(""),z.iso.date()]);
+const key=z.enum(keys as [Key,...Key[]]);
+const evidence=z.strictObject({status:z.enum(["assumed","quoted","verified"]),source:z.string().max(400),date,reviewer:z.string().max(160).optional()})
+  .refine(e=>e.status==="assumed" || Boolean(e.source.trim() && e.date),"Quoted or verified inputs need a dated source.");
 const inputs=z.strictObject({
-  values:z.strictObject(bounds), evidence:z.partialRecord(z.enum(keys as [Key,...Key[]]),z.strictObject({
-    status:z.enum(["assumed","quoted","verified"]),source:z.string().max(400),date
-  }).refine(e=>e.status==="assumed" || Boolean(e.source.trim() && e.date),"Quoted or verified inputs need a dated source.")),
+  values:z.strictObject(bounds),evidence:z.partialRecord(key,evidence),
+  sourceValues:z.partialRecord(key,z.strictObject({value:z.number().finite().nullable(),evidence})).optional(),
   layout:z.string().min(1).max(240),rights:z.enum(["unknown","controlled","unavailable"]),rightsSource:z.string().max(400),rightsDate:date,
   comparable:z.boolean(),sensitivityPct:z.number().finite().min(1).max(100),terms:z.enum(["purchase","lease"]),comparator:z.enum(["workbook","local"]),energyScope:z.enum(["included","excluded"]),
   openEarly:date,openLate:date,depotDate:date,allOptionsReviewed:z.boolean(),peakDay:z.enum(["weekday","weekend"]),temporaryEnd:date,temporarySource:z.string().max(400),
-}).refine(c=>!c.openEarly || !c.openLate || c.openEarly<=c.openLate,"Opening dates are reversed.")
+}).refine(c=>Object.entries(c.sourceValues??{}).every(([name,source])=>{
+  const k=name as Key;
+  return (source.value===null || (source.value>=fields[k].min && source.value<=fields[k].max && (k!=="stalls" || Number.isInteger(source.value)))) &&
+    (c.evidence[k]?.status??"assumed")==="assumed";
+}),"An override needs a valid source observation and an assumed case value.")
+.refine(c=>!c.openEarly || !c.openLate || c.openEarly<=c.openLate,"Opening dates are reversed.")
 .refine(c=>c.comparator!=="workbook" || c.energyScope==="excluded","The workbook proxy excludes electricity.")
 .refine(c=>c.rights==="unknown" || Boolean(c.rightsSource.trim() && c.rightsDate),"Add a dated source for the rights evidence.")
 .refine(c=>c.values.stalls===null || Number.isInteger(c.values.stalls),"Stalls must be a whole number.");

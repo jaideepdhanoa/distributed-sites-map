@@ -72,3 +72,43 @@ test("billed peak, temporary replacement and the upgrade threshold have distinct
   c.values.upgrade=calculate(c).upgradeLimit;assert.ok(Math.abs(calculate(c).difference!)<1e-8);
   c.temporarySource="";assert.equal(calculate(c).avoidedTemp,null);
 });
+
+import {changeValue,reviseSource,sourceValue} from "../../lib/charging/evidence";
+import type {CalculationTrace} from "../../lib/charging/model";
+test("the explanation reconciles each annual line and the binding hourly capacity",()=>{
+  const c=example();
+  for(const terms of ["purchase","lease"] as const)for(const energyScope of ["included","excluded"] as const){
+    c.terms=terms;c.energyScope=energyScope;
+    Object.assign(c.values,{rent:3000,build:75000,conversion:10000,interruption:3200,loss:4000,cash:12000,tax:1.2,
+      rate:7,energyRate:.17,billedPeak:110,demandRate:4,closing:3,fixed:8000});
+    const trace:CalculationTrace={annual:[],throughput:[],total:null,hours:null,perHour:null};
+    const result=calculate(c,trace);
+    const total=trace.annual.reduce((sum,line)=>sum+(line.value??0),0);
+    assert.ok(Math.abs(total-trace.total!)<1e-7);
+    assert.ok(Math.abs(total/result.sessions!-result.siteCost!)<1e-9);
+    assert.equal(trace.throughput.find(line=>line.value===trace.perHour)?.label,"Fleet demand");
+    assert.equal(trace.hours!*trace.perHour!,result.sessions);
+    assert.equal(trace.annual.find(line=>line.label.includes("Electricity"))?.excluded,energyScope==="excluded");
+    c.values.fixed=null;assert.equal(calculate(c,trace).siteCost,null);assert.equal(trace.total,null);
+    assert.equal(trace.annual.find(line=>line.label.startsWith("Upkeep"))?.value,null);
+    c.values.fixed=0;calculate(c,trace);assert.equal(trace.annual.find(line=>line.label.startsWith("Upkeep"))?.value,0);
+  }
+});
+test("a saved quote survives trials, edits to the underlying source, copies and review attribution",async()=>{
+  const c=example();delete c.sourceValues;
+  const quoted={status:"quoted" as const,source:"Synthetic contractor estimate",date:"2026-11-01",reviewer:"reviewer"};
+  c.evidence.conversion=quoted;c.values.conversion=18000;
+  const first=changeValue(c,"conversion",25000),second=changeValue(first,"conversion",30000);
+  assert.deepEqual(sourceValue(second,"conversion"),{value:18000,evidence:quoted});
+  assert.equal(second.evidence.conversion?.status,"assumed");assert.ok(validateInputs(second).success);
+  assert.deepEqual(changeValue(second,"conversion",18000).evidence.conversion,quoted);
+  const updated=reviseSource(second,"conversion",20000,{...quoted,date:"2026-11-10"});
+  assert.equal(updated.values.conversion,30000);assert.equal(updated.sourceValues?.conversion?.value,20000);
+  const invalid={...second,evidence:{...second.evidence,conversion:quoted}};assert.equal(validateInputs(invalid).success,false);
+  const sql=await memorySql();await migrate(sql);
+  const site="PIPE-PHX-9998",input={id:randomUUID(),requestId:randomUUID(),base:0,name:"Quote test",inputs:second,sourceRevision:"aaaaaaaaaaaaaaaaaaaaaaaa",select:false,expectedSelection:null};
+  await assert.rejects(saveCase(sql,site,"different",input),/reviewer/);
+  await saveCase(sql,site,"reviewer",input);
+  const rows=await saveCase(sql,site,"different",{...input,id:randomUUID(),requestId:randomUUID()});
+  assert.equal(rows[0].inputs.sourceValues?.conversion?.evidence.reviewer,"reviewer");assert.equal((await activeCases(sql)).length,0);
+});

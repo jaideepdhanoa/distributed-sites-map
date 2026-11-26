@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { GeoJSONSource, Map, Marker, NavigationControl, setWorkerUrl, type ExpressionSpecification, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { Pentagon, Ruler } from "lucide-react";
+import { Ruler } from "lucide-react";
 import { AREA_LABELS, AREA_PAINT, areaRole } from "@/lib/areas";
 import type { NearbyWash } from "@/lib/nearbyWashes";
 import { areaTip, dealTip, depotTip, ringTip, siteTip, tipHtml, washTip, type TipModel } from "@/lib/markerTip";
@@ -18,10 +18,13 @@ import type { DealFeature, GeoFeature, SiteFeature, UnscreenedFeature } from "@/
 import type { GroundBox } from "@/lib/spaces/measure";
 import type { MapOutline } from "./spaces/SpaceOptions";
 import { worldPoint } from "@/lib/spaces/options";
+import MainMapSpaces from "./spaces/MainMapSpaces";
 import SpaceTools, { spaceIdAt } from "./spaces/SpaceTools";
 import type { SpaceShape } from "./spaces/SpacePopover";
 
 type Props = {
+  signedIn?: boolean; spacesMarket?: string; spacesOpen?: boolean;
+  onDrawAt?: (site: string, center: [number,number]) => void;
   layoutOverlay?: MapOutline | null;
   sites: SiteFeature[];
   deals: DealFeature[];
@@ -341,12 +344,15 @@ export default function MapView(props: Props) {
           imagery: {
             type: "raster",
             tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+            // At parcel zoom, overzoom the available imagery instead of requesting no-data tiles.
+            maxzoom: 19,
             tileSize: 256,
             attribution: "Powered by Esri",
           },
           labels: {
             type: "raster",
             tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],
+            maxzoom: 19,
             tileSize: 256,
           },
           areas: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
@@ -1344,7 +1350,7 @@ export default function MapView(props: Props) {
     const observed = node.current;
     const preserveView = Boolean(kept);
     const recenter = () => {
-      if (propsRef.current.reviewFocus) return;
+      if (propsRef.current.reviewFocus || propsRef.current.spacesOpen) return;
       const id = propsRef.current.selectedId;
       if (!id) return;
       const deal = propsRef.current.deals.find((feature) => feature.properties.deal_id === id);
@@ -1647,6 +1653,7 @@ export default function MapView(props: Props) {
       if (map.getLayer("deal-halo")) map.setFilter("deal-halo", ["==", ["get", "deal_id"], props.selectedId || ""]);
       if (map.getLayer("deal-ring")) map.setFilter("deal-ring", ["==", ["get", "deal_id"], props.selectedId || ""]);
       if (map.getLayer("unscreened-selected")) map.setFilter("unscreened-selected", ["==", ["get", "listing_id"], props.selectedId || ""]);
+      if (propsRef.current.spacesOpen) return;
       const phone = window.matchMedia("(max-width: 767px)").matches;
       const reviewing = Boolean(props.reviewFocus) || (props.reviewMarkers || []).length > 0;
       const drawing = Boolean(propsRef.current.spaceDrawing);
@@ -1908,7 +1915,7 @@ export default function MapView(props: Props) {
     }
     let cancel = false;
     const go = () => {
-      if (cancel || reviewFocusRef.current) return;
+      if (cancel || reviewFocusRef.current || propsRef.current.spacesOpen) return;
       if (propsRef.current.spaceDrawing && propsRef.current.spaceFly) {
         const fly = propsRef.current.spaceFly;
         map.jumpTo({ center: [fly.lng, fly.lat], zoom: 18, padding: pointPadding(map) });
@@ -2124,7 +2131,7 @@ export default function MapView(props: Props) {
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const layer = props.layoutOverlay;
+    const layer = props.spacesOpen || props.showSpaces === false ? null : props.layoutOverlay;
     const paint = () => {
       const source = map.getSource("layout-options") as GeoJSONSource | undefined;
       if (!source && !layer?.frame) return;
@@ -2142,7 +2149,7 @@ export default function MapView(props: Props) {
     };
     if (map.isStyleLoaded() || map.getSource("layout-options")) paint(); else map.once("load", paint);
     return () => { map.off("load", paint); };
-  }, [mapGeneration, props.layoutOverlay]);
+  }, [mapGeneration, props.layoutOverlay, props.spacesOpen, props.showSpaces]);
 
   function undoMeasure() {
     points.current = points.current.slice(0, -1);
@@ -2187,6 +2194,9 @@ export default function MapView(props: Props) {
           requestDelete={deleteAsk}
         />
       ) : null}
+      {props.signedIn && <MainMapSpaces map={mapRef.current} failed={Boolean(mapFailed)} market={props.spacesMarket||"all"}
+        previewSite={props.layoutOverlay?.site} enabled={props.showSpaces!==false} blocked={Boolean(props.spaceDrawing||measure)}
+        selectedSite={props.selectedId||undefined} onDraw={props.canDrawLots?props.onDrawLots:undefined} onDrawAt={props.onDrawAt}/>}
       {mapFailed ? (
         <div className="map-empty" role="status" data-testid="map-error">
           <p>{mapFailed}</p>
@@ -2208,8 +2218,6 @@ export default function MapView(props: Props) {
               <button type="button" className="primary" data-testid="space-finish" onClick={() => sendDraw("finish")}>Finish</button>
               {props.selectedSpaceId ? <button type="button" className="paper-btn" data-testid="space-draw-delete" onClick={() => setDeleteAsk((value) => value + 1)}>Delete</button> : null}
             </div>
-          ) : props.canDrawLots && !measure ? (
-            <button type="button" className="tool draw-tool" aria-label="Draw available lots" data-testid="mark-space" title="Outline open land or parking a charger could use." onClick={() => props.onDrawLots?.()}><Pentagon size={16} aria-hidden="true" />Draw</button>
           ) : null}
           {measure ? (
             <div className="measure-bar">

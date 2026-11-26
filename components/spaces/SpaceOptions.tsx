@@ -6,6 +6,7 @@ import { Layers3 } from "lucide-react";
 import { firstOption, kinds, options, outlineDimensions, usableOutline, fitRange, edgeFitRange, threshold, optionZones, recordedFit, type Assessment, type Option, type Point } from "@/lib/spaces/options";
 import OptionAerial from "./OptionAerial";
 import { imageCandidates, isPanoUrl, type PhotoCard } from "@/lib/photos";
+import { spacesMapHref } from "@/lib/spaces/mapCatalog";
 import { outlineId, findOutline } from "@/lib/spaces/outlineAnchor";
 import { reviewBody } from "@/lib/spaces/optionReview";
 import { canWrite, useActionStatus } from "@/components/actions/panel";
@@ -43,19 +44,18 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
   const reviewed: string[] = [];
   const visible = zones.map(candidate => {
     if (candidate === zone && draft) return { ...candidate, points: draft };
-    const decision = history.reviews.find(entry => entry.review?.option === option && entry.review.area === candidate.label)?.review;
-    if (!decision || decision.frame !== row.image?.id || decision.disposition === "Dismiss option") return candidate;
-    if (!decision.points && decision.revision !== row.revision) return candidate;
+    const geometry = history.reviews.find(({review}) => review?.option === option && review.area === candidate.label && review.frame === row.image?.id && review.points)?.review?.points;
+    if (!geometry) return candidate;
     reviewed.push(candidate.label);
-    return decision.points ? { ...candidate, points: decision.points } : candidate;
+    return { ...candidate, points: geometry };
   });
   const clear = row.status === "reviewed" ? row.zones.filter(z => z.kind === "clear") : [];
   const painted = [...visible, ...clear];
   const overlayKey = JSON.stringify({ zones: painted, reviewed });
   useEffect(() => {
-    if (onOverlay && row.image?.bounds) onOverlay({ site, frame: row.image.bounds, ...JSON.parse(overlayKey) });
+    if (editing && onOverlay && row.image?.bounds) onOverlay({ site, frame: row.image.bounds, ...JSON.parse(overlayKey) });
     return () => onOverlay?.(null);
-  }, [site, row.image?.bounds, overlayKey, onOverlay]);
+  }, [site, row.image?.bounds, overlayKey, onOverlay, editing]);
   const reset = () => { setDraft(undefined); setEditing(false); setCorner(0); setEditError(""); };
   function changePoint(point: Point, index = corner) {
     const current = visible[which]?.points;
@@ -174,6 +174,7 @@ export default function SpaceOptions({ site, photos, compact, onOpen, onOverlay 
   }
   return <section ref={ref} aria-labelledby={titleId} className="space-options" data-testid="space-options">
     <div className="space-heading"><Layers3 size={19} aria-hidden="true"/><h3 id={titleId}>Space options</h3></div>
+    {row?.zones.some(z=>z.kind!=="clear") && <a className="paper-btn" href={spacesMapHref(site)}>Open spaces on main map</a>}
     {row && !open && <div className="space-top">
       {row.image && <div className="space-thumb"><OptionAerial image={row.image} zones={first ? [first] : []}/><button type="button" className="text-link" aria-label="Open annotated layout" onClick={() => setOpen(true)} /></div>}
       <div><strong>{first ? first.label : row.status === "hold" ? "Parcel or imagery check" : row.status === "needs-image" ? "Aerial needed" : "Layout needs measurement"}</strong>

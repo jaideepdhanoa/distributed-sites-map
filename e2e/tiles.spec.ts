@@ -12,12 +12,13 @@ for (const panel of panels) {
       await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
       const sheet = width < 500 ? "&sheet=full" : "";
       await page.goto(`/?${panel.city}funnel=pipeline&pstage=${panel.stage}&site=${panel.id}${sheet}`);
-      await page.getByTestId("panel-tab-numbers").click();
+      const overview = page.getByRole("region", { name: "Site at a glance" });
+      await expect(overview).toContainText(panel.exact);
+      await page.getByRole("tab", { name: "Site fit" }).click();
       await page.waitForSelector("[data-testid=key-strip] strong");
       const strip = page.getByTestId("key-strip");
-      await expect(strip).toContainText(panel.exact);
-      const overview = page.locator(".drawer .kv");
-      await expect(overview).toContainText(panel.exact);
+      await strip.getByText("Supporting market and financial figures", {exact:true}).click();
+      await expect(strip.getByText(panel.exact, {exact:true}).first()).toBeVisible();
       const offenders = await strip.locator("strong").evaluateAll((nodes) =>
         nodes.flatMap((node) => {
           const el = node as HTMLElement;

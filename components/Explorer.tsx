@@ -3379,7 +3379,6 @@ export default function Explorer() {
         ) : selectedDeal ? (
           <DealDetail
             power={{deal:pinPowerDeal,site:pinPowerSite}}
-            decisionFirst={listView || inReview}
             deal={selectedDeal}
             peers={dealRows.filter((deal) => deal.city === selectedDeal.city && deal.kind === selectedDeal.kind)}
             universeSite={selectedDeal.universe_id ? (detail?.site_id === selectedDeal.universe_id ? detail : siteById.get(selectedDeal.universe_id)) : null}
@@ -3424,7 +3423,6 @@ export default function Explorer() {
         ) : selectedSite ? (
           <Detail
             power={{deal:pinPowerDeal,site:pinPowerSite}}
-            decisionFirst={listView || inReview}
             site={selectedSite}
             lng={poolById.get(selectedSite.site_id)?.geometry?.coordinates?.[0]}
             lat={poolById.get(selectedSite.site_id)?.geometry?.coordinates?.[1]}

@@ -47,7 +47,7 @@ test("save review screenshots from the local build", async ({ page }, info) => {
     await page.waitForSelector("aside.drawer");
   }
   const record = page.locator("aside.drawer");
-  await record.locator("summary.disclosure", { hasText: "Record" }).click();
+  await record.getByText("Property, contacts and sources", { exact: true }).click();
   await expect(record).toContainText("PHX-U189");
   await page.goto("/?funnel=universe&stage=in_area", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");
@@ -160,11 +160,14 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   const stars = page.locator("aside.drawer");
   await expect(stars).toContainText("Stars & Stripes");
   await expect(stars).toContainText("Financial screen");
+  await page.getByRole("tab", {name:"Diligence",exact:true}).click();
   const step = stars.getByTestId("workbook-step");
   await expect(step).toBeVisible();
   const more = step.getByRole("button", { name: "Show full note" });
   if (await more.count()) await more.click();
   await expect(step).toContainText("POS/car counts");
+  await page.getByRole("tab", {name:"Overview",exact:true}).click();
+  await page.locator("aside.drawer").getByText("Property, contacts and sources",{exact:true}).click();
   await expect(stars).toContainText("Last contact Nov 6");
   await page.locator(".drawer-scroll").evaluate((node) => { node.scrollTop = 0; });
   await expect(stars.locator("h2")).toBeInViewport();
@@ -264,6 +267,7 @@ test("the record shows the action, owner and deadline together", async ({ page }
   }));
   await page.goto("/?funnel=pipeline&view=list&site=PIPE-MIA-0080&sheet=full", { waitUntil: "domcontentloaded" });
   const drawer = page.locator("aside.drawer");
+  await page.getByRole("tab", {name:"Diligence",exact:true}).click();
   const action = drawer.getByTestId("workbook-step");
   await expect(action).toContainText("Confirm available power");
   await expect(action).toContainText("Site team");
@@ -370,8 +374,6 @@ test("inspect five Phoenix map pins and return to the original view", async ({ p
       await expect(record.locator(".card-hero")).toBeAttached();
       if (index === 0) {
         await expect(brief.getByText("Parcel number", { exact: true })).toBeVisible();
-        const aerial = record.locator("img.hero-aerial");
-        if (await aerial.count()) await aerial.evaluate(async img => { await (img as HTMLImageElement).decode(); });
         await page.screenshot({ path: `review-shots/${info.project.name}-record-brief.png` });
       }
       if (info.project.name === "mobile") await expect(record).toHaveClass(/snap-full/);

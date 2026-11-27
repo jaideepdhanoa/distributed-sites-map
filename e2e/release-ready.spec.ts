@@ -120,6 +120,7 @@ for (const size of sizes) {
     await expect(page).toHaveURL(/funnel=universe/);
     await expect(page).toHaveURL(/city=LAS/);
     await expect(page.locator("aside.drawer")).toContainText("Sample site");
+    await page.locator("aside.drawer").getByText("Property, contacts and sources", { exact: true }).click();
     await page.getByTestId("copy-site-link").click();
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toMatch(/\/\?site=WB-LAS-9101$/);
   });

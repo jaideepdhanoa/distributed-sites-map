@@ -121,7 +121,7 @@ test("review holds are Possible", async ({ page }, info) => {
     await expect(drawer).toHaveAttribute("data-record", id);
     await expect(drawer).not.toContainText("Utility proximity");
     await expect(drawer).not.toContainText("Serving utility");
-    await expect(drawer.locator(".badge.pending, .badge.checked, .badge.gone")).toHaveText("Possible");
+    await expect(drawer.getByTestId("site-screening-status")).toHaveText("Possible");
   }
   if (info.project.name === "mobile") {
     await page.getByRole("button", { name: "Menu" }).click();

@@ -431,6 +431,7 @@ test("discussion stays a comment box, and a reviewer can accept a knock off", as
   await expect(page.getByTestId("proposed-next-step")).toContainText("Awaiting approval");
 
   await openAs(page, "reviewer", `/?funnel=pipeline&site=${target}`);
+  await page.getByRole("tab", { name: "Diligence", exact: true }).click();
   const card = page.getByTestId("proposed-next-step");
   await expect(card.getByRole("button", { name: "Send" })).toBeVisible();
   const storedStage = generatedDeal(target)?.stage;
@@ -768,6 +769,7 @@ for (const size of [
     });
     expect(found.nda).toMatch(/^NDA-/);
     await page.goto(`/?funnel=pipeline&site=${found.deal}`);
+    await page.getByRole("tab", {name:"Diligence",exact:true}).click();
     await page.getByTestId("nda-open").click();
     await expect(page.getByTestId("nda-detail")).toBeVisible();
     const text = `Sample note ${size.label} on the agreement.`;
@@ -859,7 +861,7 @@ test("an approved drop survives a warm browser cache and a reload without a new 
     await page.goto(`/?city=PHX&funnel=pipeline&pstage=desk&view=list&site=${target}`);
     const drawer = page.locator("aside.drawer");
     await expect(drawer).toHaveAttribute("data-record", target);
-    await expect(drawer.getByRole("heading", { name: "Desk screen", exact: true })).toBeVisible();
+    await expect(drawer.getByTestId("stage-chip")).toHaveText("Desk screen");
     await expect(page.getByTestId("scope-count").first()).toHaveText("2 sites");
 
     // These are ordinary browser fetches, including the all-city catalog. The
@@ -870,11 +872,12 @@ test("an approved drop survives a warm browser cache and a reload without a new 
         await Promise.all(urls.map(async (url) => { await (await fetch(url)).json(); }));
       }
     }, paths);
+    await drawer.getByRole("tab", {name:"Diligence"}).click();
     const card = page.getByTestId("proposed-next-step");
     await expect(card).toBeVisible();
     await card.getByLabel("Outcome").selectOption("accepted");
     await card.getByRole("button", { name: "Send", exact: true }).click();
-    await expect(drawer.getByRole("heading", { name: "Dropped", exact: true })).toBeVisible();
+    await expect(drawer.getByTestId("stage-chip")).toHaveText("Dropped");
     const saved = await withConnectionString(database, async (sql) => ({
       stage: (await sql.query<{ stage: string }>("SELECT stage FROM site_stages WHERE site_id = $1", [target])).rows[0]?.stage,
       snapshotId: (await selectLive(sql))?.id,
@@ -905,7 +908,7 @@ test("an approved drop survives a warm browser cache and a reload without a new 
     expect(fresh.map((row) => row.etag)).toEqual([null, null, null]);
 
     await page.reload();
-    await expect(drawer.getByRole("heading", { name: "Dropped", exact: true })).toBeVisible();
+    await expect(drawer.getByTestId("stage-chip")).toHaveText("Dropped");
     await expect(page).toHaveURL(/pstage=dropped/);
     await expect(page.getByTestId("scope-count").first()).toHaveText("1 site");
     await expect(page.getByTestId("pipeline-list")).toContainText(`Synthetic cache site ${siteNumber}`);

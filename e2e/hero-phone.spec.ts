@@ -74,6 +74,8 @@ test("phone hero overlays the view toggles on a 4:3 frame", async ({ page }, inf
   for (const width of widths) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto(`/?funnel=universe&site=${site}&sheet=full`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("tab", {name:"Site fit",exact:true}).click();
+    await page.locator("aside.drawer").getByText("View imagery",{exact:true}).click();
     const scroller = page.locator(".drawer-scroll");
     await scroller.evaluate((node) => { node.scrollTop = 0; });
     await expect(page.getByRole("tab", { name: "Street View" })).toBeVisible();

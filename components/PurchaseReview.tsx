@@ -2,6 +2,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { DealProps } from "@/lib/types";
+import { amounts } from "@/lib/charging/model";
 import { comparisonPower } from "@/lib/mapPower";
 import type { PowerRecords } from "@/lib/powerLinkIndex";
 import { useSearchParams } from "next/navigation";
@@ -58,7 +59,13 @@ export default function PurchaseReview({deal,pnl,power}:{deal:DealProps;pnl:Retu
   }
   function switchCase(next:Partial<PurchaseScenario>) {update({...scenario,...next});}
   function closeChecklist(){setChecklist(false);requestAnimationFrame(()=>trigger.current?.focus());}
-  if (evidence==="Not applicable") return <>{deal.charging && <ChargingSiteSection deal={deal}/>}<p>Operating financials are not applicable to this site.</p></>;
+  const chargingSection = deal.charging && <>
+    <ChargingSiteSection deal={deal}/>
+    {deal.charging.merit.netValue != null && <p className="layer-meta">
+      {amounts(deal.charging.merit.netValue)} downside network value · {deal.charging.merit.servedPeak} peak charges
+    </p>}
+  </>;
+  if (evidence==="Not applicable") return <>{chargingSection}<p>Operating financials are not applicable to this site.</p></>;
   const withheld=evidence==="Withheld" || /refus|unavailable/i.test(w?.package || deal.package_status || "");
   const constraints = purchaseConstraints(deal);
   const sources = (pnl.panel?.figures || []).filter(f=>{
@@ -72,7 +79,7 @@ export default function PurchaseReview({deal,pnl,power}:{deal:DealProps;pnl:Retu
   const source=sources.length===1?sources[0]:null;
   const check=changed ? "Review the changed footprint" : purchaseCheck(deal);
   return <section className="purchase-review" aria-label="Purchase support" data-testid="purchase-review">
-    {deal.charging && <ChargingSiteSection deal={deal}/>}
+    {chargingSection}
     <div className="purchase-summary">
     <header><p className="eyebrow">Site financials</p><h3>Can the business carry the purchase?</h3>
       <p className="purchase-basis">{evidence}{w?.checked && " · Checked "+w.checked}</p></header>

@@ -10,6 +10,10 @@ function text(value: string | undefined): string {
   return String(value || "").trim();
 }
 
+export function cityLabel(city?: string) {
+  return CITY_LABEL[text(city).toUpperCase()] || text(city);
+}
+
 function place(address: string, city: string): string {
   if (!address) return city;
   if (!city) return address;
@@ -26,8 +30,7 @@ export function siteResultDetail(input: {
   stageGroup?: string;
   universe?: boolean;
 }): string {
-  const code = text(input.city).toUpperCase();
-  const city = CITY_LABEL[code] || text(input.city);
+  const city = cityLabel(input.city);
   const where = place(text(input.address), city);
   let stage = "";
   if (input.universe) stage = "Universe";

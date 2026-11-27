@@ -188,7 +188,7 @@ test("desktop filters panel stays left of the drawer", async ({ page }, info) =>
     const filters = document.querySelector('.popover[aria-label="Filters"]')!.getBoundingClientRect();
     const drawer = document.querySelector("aside.drawer")!.getBoundingClientRect();
     const layers = document.querySelector("aside.layers")!.getBoundingClientRect();
-    const close = document.querySelector("aside.drawer .drawer-head .close")!.getBoundingClientRect();
+    const close = document.querySelector("aside.drawer .record-identity .close")!.getBoundingClientRect();
     const hit = (a: DOMRect, b: DOMRect) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
     return { drawer: hit(filters, drawer), layers: hit(filters, layers), close: hit(filters, close) };
   });

@@ -41,15 +41,10 @@ test("unknown or zero open land says it is not on file", async ({ page }, info) 
   await expect(missing).toBeVisible();
   await missing.click();
   await page.waitForSelector("[data-testid=card-numbers]");
-  const state = await page.evaluate(() => {
-    const block = document.querySelector("[data-testid=card-numbers]");
-    const row = [...(block?.querySelectorAll("div") || [])].find((el) => el.querySelector("span")?.textContent === "Open land");
-    const value = row?.querySelector("strong")?.textContent?.trim() || "";
-    if (value === "Not on file" || value === "—") return "missing";
-    if (/^0 sq ft/i.test(value)) return "zero";
-    return "other";
-  });
-  expect(state).toBe("missing");
+  await page.getByRole("tab", {name:"Site fit",exact:true}).click();
+  await page.getByText("Parcel and source readings", {exact:true}).click();
+  const land = page.locator("#panel-numbers [data-evidence=open-land] + div");
+  await expect(land).toHaveText(/Not on file|—/);
 });
 
 test("phone list is one toolbar row of cards and hides search this area", async ({ page }, info) => {

@@ -19,6 +19,7 @@ test("a site card opens its NDA and can come back", async ({ page }, info) => {
   await page.goto(`/?funnel=pipeline&site=${found.deal}`, { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("nda-site-thread")).toHaveCount(0);
   await expect(page.getByTestId("nda-view-all")).toHaveCount(0);
+  await page.getByRole("tab", { name: "Diligence", exact: true }).click();
   const card = page.getByTestId("nda-card-line");
   await expect(card).toBeVisible();
   if (info.project.name !== "mobile") await page.mouse.move(0, 0);
@@ -34,6 +35,9 @@ test("a site card opens its NDA and can come back", async ({ page }, info) => {
     await card.screenshot({ path: "review-shots/nda-card-hover.png" });
   }
   await card.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(card).toBeFocused();
   const ring = await card.evaluate((node) => getComputedStyle(node).outlineStyle);
   expect(ring).not.toBe("none");
   await card.click();
@@ -107,6 +111,7 @@ test("the phone NDA panel covers the site sheet", async ({ page }, info) => {
   });
   expect(found).toMatch(/^PIPE-|^LAND-/);
   await page.goto(`/?funnel=pipeline&site=${found}`, { waitUntil: "domcontentloaded" });
+  await page.getByRole("tab", {name:"Diligence",exact:true}).click();
   await page.getByTestId("nda-open").click();
   await expect(page.getByTestId("nda-detail")).toBeVisible();
   const covered = await page.evaluate(() => {

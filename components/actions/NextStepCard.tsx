@@ -1,6 +1,7 @@
 "use client";
 
 import { dropReasons } from "@/lib/selection/dropReasons";
+import { chooseRecordTab } from "../PanelSections";
 import GapThreadLink from "./GapThreadLink";
 
 import { useEffect, useRef, useState } from "react";
@@ -231,6 +232,7 @@ export function NextStepCard({
     function onOpen(event: Event) {
       const detail = (event as CustomEvent<NextStepTypeId>).detail;
       if (!detail) return;
+      chooseRecordTab("discussion");
       setType(detail);
       if (detail === "stage_move") setStage(forwardRef.current);
       setOpen(true);
@@ -238,6 +240,7 @@ export function NextStepCard({
     function onPrefill(event: Event) {
       const detail = (event as CustomEvent<{ title?: string; targetId?: string; reason?: string }>).detail;
       if (detail?.targetId && detail.targetId !== id) return;
+      chooseRecordTab("discussion");
       setEditing(null);
       setReason(detail?.reason || "");
       setOwnerId("");
@@ -265,7 +268,7 @@ export function NextStepCard({
     if ((!proposal && !(reviewing && phone)) || !status.enabled) return;
     const node = cardRef.current;
     const scroller = node?.closest(".drawer-scroll");
-    if (!node || !(scroller instanceof HTMLElement)) return;
+    if (!node || !node.getClientRects().length || !(scroller instanceof HTMLElement)) return;
     let frame = 0;
     const align = () => {
       const top = node.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;

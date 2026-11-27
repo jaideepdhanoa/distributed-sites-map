@@ -1,9 +1,9 @@
-import { sketchCase } from "./parcelLayout";
+import { areaCounts, assessedCases } from "./assessedMix";
 import { checkSpaceFit } from "./fitCheck";
 import type { MapSpaceSite } from "./mapCatalog";
 import { kinds, type Assessment } from "./options";
 
-export type ChargingFootprint = { stalls: number; condition: string; parcel?:boolean; conversionCost?:number; lostAnnualCash?:number };
+export type ChargingFootprint = { stalls: number; condition: string; parcel?:boolean; conversionCost?:number; lostAnnualCash?:number; system?:boolean; operatingConversion?:boolean; parts?:{area:string;stalls:number}[] };
 export type PipelineFit = { value: string; basis: string; count: number | null; layouts?: ChargingFootprint[] };
 
 function rangeText([low, high]: readonly number[]) {
@@ -18,17 +18,19 @@ export function pipelineFit(site: MapSpaceSite | undefined, assessment: Assessme
   if (assessment?.status === "hold") return pending("Confirm the parcel and image");
   if (site) {
     const options = site.zones.filter(zone => zone.kind !== "clear");
-    if (assessment?.parcelCases?.length) {
-      const checked: ChargingFootprint[] = [];
-      for (const proposal of assessment.parcelCases) {
-        const sketch = sketchCase(proposal,site.zones,site.frame);
-        if (sketch) checked.push({stalls:sketch.stalls.length,condition:proposal.name + ". " + proposal.condition,
-          parcel:true,conversionCost:proposal.conversionCost,lostAnnualCash:proposal.lostAnnualCash});
+    if (assessment?.status === "reviewed") {
+      const cases = assessedCases(site.zones,site.frame,assessment);
+      const assessed = cases.map(c => {
+        const parts=areaCounts(c.rows);
+        return {stalls:parts.reduce((total,p)=>total+p.stalls,0),condition:c.name+". "+c.condition,
+          system:!!c.system,parcel:true,parts,operatingConversion:!!c.system && parts.some(p=>site.zones.some(z=>z.label===p.area && ["bay","vacuum","apron","storage"].includes(z.kind))),conversionCost:c.conversionCost,lostAnnualCash:c.lostAnnualCash};
+      });
+      if (assessed.length) {
+        const first=assessed[0];
+        return {value:rangeText([first.stalls,first.stalls]),basis:"System estimate · "+cases[0].name,
+          count:first.stalls,layouts:assessed};
       }
-      if (!checked.length) return pending("Recheck the filed rows and their aisles against the latest outlines");
-      const counts=checked.map(c=>c.stalls);
-      return {value:rangeText([Math.min(...counts),Math.max(...counts)]),basis:"Conditional whole-parcel layouts · verify availability and access",
-        count:Math.min(...counts),layouts:checked};
+      if (assessment.parcelCases?.length) return pending("Recheck the filed rows and their aisles against the latest outlines");
     }
     const layouts = options.filter(zone=>zone.kind!=="ground").map(zone => ({ zone, fit: checkSpaceFit(zone, site.frame) }))
       .filter(layout => layout.fit.inside != null)

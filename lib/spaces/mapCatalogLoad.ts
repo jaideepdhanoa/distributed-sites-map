@@ -1,5 +1,6 @@
 import { actionsEnabled, withSql } from "@/lib/actions/db";
 import type { Point } from "./options";
+import { assessedCases } from "./assessedMix";
 import { assessedLayouts } from "./assessmentLoad";
 import { mapZones, type MapSpaceSite, type OutlineNote, type SpaceCatalog } from "./mapCatalog";
 
@@ -8,7 +9,7 @@ type Deal = {
   geometry?: { type?: string; coordinates?: unknown } | null;
 };
 
-export async function mapCatalog(deals: Deal[], rows = assessedLayouts()): Promise<SpaceCatalog> {
+export async function mapCatalog(deals: Deal[], rows = assessedLayouts(), withCounts=false): Promise<SpaceCatalog> {
   const ids = rows.map(([id]) => id);
   let reviewsAvailable = true;
   let notes: OutlineNote[] = [];
@@ -49,6 +50,9 @@ export async function mapCatalog(deals: Deal[], rows = assessedLayouts()): Promi
       Array.isArray(location) && location.length === 2 && location.every(Number.isFinite)
         ? [location[0], location[1]]
         : null;
+    const zones=mapZones(id,row,notes);
+    const layouts=withCounts && reviewsAvailable ? assessedCases(zones,row.image,row).filter(c=>c.system) : [];
+    const counts=layouts.map(c=>c.rows.reduce((n,r)=>n+r.count,0));
     sites.push({
       id,
       name: String(props?.name || props?.address || row.segment || id),
@@ -57,7 +61,7 @@ export async function mapCatalog(deals: Deal[], rows = assessedLayouts()): Promi
       revision: row.revision,
       frame: { id: frameId, bounds, date, source, kind, width, height, metersPerPixel },
       center: bounds ? [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2] : pin,
-      zones: mapZones(id, row, notes),
+      zones, ...(counts.length ? {assessed:{stalls:counts[0],maximum:Math.max(...counts),combinations:counts.length}} : {}),
     });
   }
   return { sites, reviewsAvailable };

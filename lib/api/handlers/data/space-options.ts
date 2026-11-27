@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   if (params.get("view") === "map") {
     const deals = await loadMapDeals(session.actionRole, false);
-    return json(await mapCatalog(deals.features));
+    return json(await mapCatalog(deals.features,undefined,true));
   }
   if (params.get("view") === "portfolio") {
     const deals = await loadMapDeals(session.actionRole, false);

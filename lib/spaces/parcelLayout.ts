@@ -5,12 +5,12 @@ import { usableOutline, type Aerial, type Point, type Zone } from "./options";
 
 type Frame = Pick<Aerial, "width" | "height" | "bounds" | "metersPerPixel">;
 export type Angle = 45 | 60 | 90;
-export type RowSpec = { area: string; edge: number; angle: Angle; count: number };
+export type RowSpec = { area: string; edge: number; angle: Angle; count: number; sharedAisle?: boolean; offset?:number };
 export type ParcelCase = {
   name: string; condition: string; rows: RowSpec[]; approach?: Point[];
-  conversionCost?: number; lostAnnualCash?: number;
+  conversionCost?: number; lostAnnualCash?: number; system?: boolean;
 };
-export type Sketch = { stalls: Point[][]; aisles: Point[][]; approach?:Point[] };
+export type Sketch = { stalls: Point[][]; aisles: Point[][]; firstSlot?:number; approach?:Point[] };
 export const inventoryLabels = { parking: "Existing parking", ground: "Undeveloped ground", operations: "Outdoor operations and access", bays: "Service or wash bays" };
 export type Inventory = Record<keyof typeof inventoryLabels, string>;
 
@@ -38,6 +38,11 @@ function surface(polygons: ReturnType<typeof clip.intersection>) {
 }
 const tolerance = 0.000001;
 function overlaps(a: Point[], b: Point[]) {
+  // Most rows are in disjoint courts. Skip the polygon operation for disjoint boxes.
+  for (const axis of [0,1]) {
+    const av=a.map(p=>p[axis]), bv=b.map(p=>p[axis]);
+    if (Math.max(...av)<=Math.min(...bv) || Math.max(...bv)<=Math.min(...av)) return false;
+  }
   return surface(clip.intersection([a],[b])) > tolerance;
 }
 function fits(outline: Point[], candidate: Point[], blocked: Point[][]) {
@@ -45,9 +50,9 @@ function fits(outline: Point[], candidate: Point[], blocked: Point[][]) {
 }
 
 /** A row starts at the chosen curb edge. Its drive aisle must also fit inside the traced area. */
-export function sketchRow(zone: Zone, frame: Frame | undefined, edge: number, angle: Angle, limit: number, excluded: Point[][]): Sketch | null {
+export function sketchRow(zone: Zone, frame: Frame | undefined, edge: number, angle: Angle, limit: number, excluded: Point[][], assumedShared = false, adjacentObstacles:Point[][] = [], offset=0): Sketch | null {
   const scale = feetPerPercent(frame);
-  if (!scale || zone.fitHold || ["clear","bay"].includes(zone.kind) || !usableOutline(zone.points) ||
+  if (!scale || zone.fitHold || (zone.kind==="clear" || zone.kind==="bay" && !assumedShared) || !usableOutline(zone.points) ||
       !Number.isInteger(edge) || !zone.points[edge] || ![45,60,90].includes(angle) || !(limit > 0)) return null;
   const start = zone.points[edge], end = zone.points[(edge+1)%zone.points.length];
   const dx = (end[0]-start[0])*scale[0], dy = (end[1]-start[1])*scale[1];
@@ -63,18 +68,32 @@ export function sketchRow(zone: Zone, frame: Frame | undefined, edge: number, an
   // A single uninterrupted group. Try again after an island or notch.
   let group: Point[][] = [];
   let first = 0;
-  for (let slot=0; slot<100 && slot*pitch+span<=length+1e-6; slot++) {
+  for (let slot=offset; slot<100 && slot*pitch+span<=length+1e-6; slot++) {
     const x = slot*pitch;
     const stall = [point(x,width*cos),point(x+width*sin,0),point(x+span,long*sin),point(x+long*cos,depth)];
     const candidateFirst = group.length ? first : x;
-    const lane = [point(candidateFirst,depth),point(x+span,depth),point(x+span,depth+aisle),point(candidateFirst,depth+aisle)];
-    if (!fits(zone.points,stall,excluded) || !fits(zone.points,lane,excluded)) { group=[]; continue; }
+    const near = assumedShared ? -aisle : depth, far = assumedShared ? 0 : depth+aisle;
+    const lane = [point(candidateFirst,near),point(x+span,near),point(x+span,far),point(candidateFirst,far)];
+    // A shared aisle is a conditional use of adjoining ground. It must still fit on
+    // the source image and avoid all mapped keep-clear areas.
+    const laneFits = assumedShared ? lane.every(p=>p.every(n=>n>=-1e-8 && n<=100+1e-8)) &&
+      ![...excluded,...adjacentObstacles].some(hole=>overlaps(lane,hole)) : fits(zone.points,lane,excluded);
+    if (!fits(zone.points,stall,excluded) || !laneFits) { group=[]; continue; }
     first=candidateFirst;
     group.push(stall);
-    if (group.length>sketch.stalls.length) { sketch.stalls=[...group]; sketch.aisles=[lane]; }
+    if (group.length>sketch.stalls.length) { sketch.stalls=[...group]; sketch.aisles=[lane]; sketch.firstSlot=slot-group.length+1; }
     if (group.length>=limit) break;
   }
   return sketch;
+}
+
+export function adjacentObstacles(zone: Zone, zones: Zone[]) {
+  return zones.filter(z=>z!==zone && (z.kind==="bay" || z.kind==="ground" || z.fitHold)).map(z=>z.points);
+}
+
+export function compatible(a:Sketch,b:Sketch) {
+  return !a.stalls.some(stall=>[...b.stalls,...b.aisles].some(shape=>overlaps(stall,shape)))
+    && !a.aisles.some(aisle=>b.stalls.some(stall=>overlaps(aisle,stall)));
 }
 
 export function sketchCase(proposal: ParcelCase, zones: Zone[], frame?: Frame): Sketch | null {
@@ -82,10 +101,9 @@ export function sketchCase(proposal: ParcelCase, zones: Zone[], frame?: Frame): 
   const blocked = zones.filter(z=>z.kind==="clear").map(z=>z.points);
   for (const row of proposal.rows) {
     const zone = zones.find(z=>z.label===row.area);
-    const drawn = zone && sketchRow(zone,frame,row.edge,row.angle,row.count,blocked);
+    const drawn = zone && sketchRow(zone,frame,row.edge,row.angle,row.count,blocked,!!proposal.system && row.sharedAisle,adjacentObstacles(zone,zones),row.offset);
     if (!drawn || drawn.stalls.length !== row.count ||
-        drawn.stalls.some(stall => [...result.stalls,...result.aisles].some(shape => overlaps(stall,shape))) ||
-        drawn.aisles.some(aisle => result.stalls.some(stall => overlaps(aisle,stall)))) return null;
+        !compatible(drawn,result)) return null;
     result.stalls.push(...drawn.stalls);
     result.aisles.push(...drawn.aisles);
   }

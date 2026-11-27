@@ -11,6 +11,7 @@ export type MapSpaceSite = {
   revision: string;
   frame: Pick<Aerial, "id" | "bounds" | "kind" | "source" | "date" | "width" | "height" | "metersPerPixel">;
   center: Point | null;
+  assessed?: {stalls:number; maximum:number; combinations:number};
   zones: MapZone[];
 };
 export type SpaceCatalog = { sites: MapSpaceSite[]; reviewsAvailable: boolean };

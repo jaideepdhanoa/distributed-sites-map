@@ -28,6 +28,7 @@ import { checkSpaceFit, fitChecks, type FitCheck } from "@/lib/spaces/fitCheck";
 import MapSpaceFit from "./MapSpaceFit";
 import OptionAerial from "./OptionAerial";
 import { bestRow, sketchCase, sketchRow, type Angle } from "@/lib/spaces/parcelLayout";
+import { areaCounts, assessedCases } from "@/lib/spaces/assessedMix";
 import OutlineTools from "./OutlineTools";
 import ParcelInventory from "./ParcelInventory";
 import SpaceGeography from "./SpaceGeography";
@@ -112,17 +113,34 @@ export default function MainMapSpaces({
   const [study,setStudy] = useState("default");
   const [edge,setEdge] = useState(0);
   const [angle,setAngle] = useState<Angle>(90);
-  const cases = assessment?.parcelCases;
-  const caseIndex = study === "default" ? 0 : Number(study);
+  const cases = useMemo(() => site && assessment?.image?.id===site.frame.id && catalog?.reviewsAvailable
+    ? assessedCases(site.zones,site.frame,assessment) : [],[site,assessment,catalog?.reviewsAvailable]);
+  const namedCase=params.get("mix");
+  const exclusions=params.getAll("omit");
+  const writeMix=(name:string, omitted:string[])=>{
+    const url=new URL(window.location.href);
+    url.searchParams.set("mix",name);
+    url.searchParams.delete("omit");
+    for(const label of omitted) url.searchParams.append("omit",label);
+    window.history.replaceState(null,"",url);
+  };
+  const caseIndex = study === "default" ? Math.max(0,cases.findIndex(c=>c.name===namedCase)) : Number(study);
   const selectedCase = filter === "all" && !area && cases && Number.isInteger(caseIndex) ? cases[caseIndex] : undefined;
+  const parts=selectedCase ? areaCounts(selectedCase.rows) : [];
+  const omitted=selectedCase?.name===namedCase ? parts.filter(p=>exclusions.includes(p.area)).map(p=>p.area) : [];
+  const filtered=useMemo(()=>selectedCase && ({...selectedCase,
+    rows:selectedCase.rows.filter(r=>!(selectedCase.name===namedCase && params.getAll("omit").includes(r.area))),
+    approach:selectedCase.name===namedCase && params.has("omit") ? undefined : selectedCase.approach
+  }),[selectedCase,namedCase,params]);
+  const matchingCase=omitted.length && filtered ? cases.find(c=>JSON.stringify(c.rows)===JSON.stringify(filtered.rows)) : undefined;
   const canTestRow = active && !active.fitHold && active.kind !== "bay" && active.kind !== "clear";
   const rowTrial = study === "row" && canTestRow;
   const sketch = useMemo(() => {
     if (draft || !site) return null;
-    if (selectedCase) return sketchCase(selectedCase,site.zones,site.frame);
+    if (filtered) return sketchCase(filtered,site.zones,site.frame);
     if (rowTrial && active) return sketchRow(active,site.frame,edge,angle,100,site.zones.filter(z=>z.kind==="clear").map(z=>z.points));
     return null;
-  },[active,angle,draft,edge,rowTrial,selectedCase,site]);
+  },[active,angle,draft,edge,rowTrial,filtered,site]);
   const prior = history.reviews.find(
     (x) =>
       x.review?.option === layout &&
@@ -529,7 +547,7 @@ export default function MainMapSpaces({
                     <button className="menu-item" type="button" key={s.id} onClick={() => pick(s.id)}>
                       <strong>{s.name}</strong>
                       <small>
-                        {s.id} · {candidates(s).length} {candidates(s).length === 1 ? "space" : "spaces"} ·{" "}
+                        {s.assessed ? `${s.assessed.stalls} assessed stalls${s.assessed.maximum>s.assessed.stalls ? " · up to "+s.assessed.maximum+" with assumptions" : ""}` : "No system combination"} · {candidates(s).length} {candidates(s).length === 1 ? "space" : "spaces"} ·{" "}
                         {s.frame.bounds ? "Map aligned" : "Source image"}
                       </small>
                     </button>
@@ -537,6 +555,7 @@ export default function MainMapSpaces({
                 </div>
               </>
             )}
+            {site && filter==="all" && !area && !draft && assessment && !cases.length && <p className="layer-meta">{catalog?.reviewsAvailable ? "No system combination fits the currently usable, scaled outlines." : "Latest outline edits are unavailable."}</p>}
             {site && filter==="all" && !draft && <ParcelInventory inventory={assessment?.inventory} zones={site.zones}/>}
             {site && !draft && (filter==="all" && !area && cases?.length || rowTrial || canTestRow) ? <div className="parcel-sketch">
               <label>Charging layout<select aria-label="Charging layout" className="secondary" value={selectedCase ? String(caseIndex) : rowTrial ? "row" : "none"} onChange={event=>{
@@ -545,18 +564,29 @@ export default function MainMapSpaces({
                   const best=bestRow(active,site.frame,site.zones.filter(z=>z.kind==="clear").map(z=>z.points));
                   setEdge(best?.edge ?? 0);setAngle(best?.angle ?? 90);
                 }
-                setStudy(value);
+                if (cases[Number(value)]) {writeMix(cases[Number(value)].name,[]);setStudy("default");}
+                else setStudy(value);
               }}>
                 <option value="none">Area outlines</option>
-                {filter==="all" && !area && cases?.map((c,i)=><option value={i} key={c.name}>{c.name}</option>)}
+                {filter==="all" && !area && cases?.map((c,i)=><option value={i} key={c.name}>{c.system ? "System · " : "Filed · "}{c.name} ({c.rows.reduce((n,r)=>n+r.count,0)})</option>)}
                 {canTestRow && <option value="row">Test a row in this area</option>}
               </select></label>
               {rowTrial && active && <div className="space-map-filters"><label>Curb edge<select aria-label="Curb edge" className="secondary" value={edge} onChange={e=>setEdge(Number(e.target.value))}>
                 {active.points.map((_,i)=><option key={i} value={i}>Corners {i+1}–{(i+1)%active.points.length+1}</option>)}</select></label>
                 <label>Stall angle<select aria-label="Stall angle" className="secondary" value={angle} onChange={e=>setAngle(Number(e.target.value) as Angle)}>{[90,60,45].map(a=><option key={a} value={a}>{a}°</option>)}</select></label></div>}
-              {(selectedCase || rowTrial) && <p aria-live="polite"><strong>{sketch ? sketch.stalls.length+" stalls sketched" : "Layout needs measurement"}</strong>
+              {selectedCase && <div className="assessed-mix">
+                <strong>{omitted.length ? "Your combination" : selectedCase.system ? "System recommendation" : "Filed alternative"}</strong>
+                {selectedCase.system && <small>Highest stall count found under these operating assumptions.</small>}
+                {parts.map(p=><label key={p.area}><input className="check" type="checkbox" checked={!omitted.includes(p.area)}
+                  onChange={e=>writeMix(selectedCase.name,e.target.checked ? omitted.filter(x=>x!==p.area) : [...omitted,p.area])}/><span>{p.area}</span><b>{p.stalls}</b></label>)}
+                {omitted.length>0 && <button type="button" className="text-link" onClick={()=>writeMix(selectedCase.name,[])}>Restore full combination</button>}
+                <small>Every included stall uses the same utilization rate.</small>
+              </div>}
+              {(selectedCase || rowTrial) && <p aria-live="polite"><strong>{sketch ? sketch.stalls.length+" stalls sketched" : selectedCase && !filtered?.rows.length ? "0 stalls selected" : "Layout needs measurement"}</strong>
                 {sketch && " · Blue stalls and amber drive aisle."} {sketch?.approach && "Dashed line shows the proposed entry route."} {selectedCase?.condition || (rowTrial && (angle===90 ? "Verify the two-way approach and peak availability." : "Verify one-way entry, exit and peak availability."))} {rowTrial && active?.kind === "ground" && "Development scenario. Verify buildable limits, drainage and paving cost."}</p>}
-              {selectedCase && <a className="text-link" href={"/charging?"+new URLSearchParams({site:site.id,view:"explain",basis:"screen",layout:selectedCase.name,returnTo:"/?"+new URLSearchParams({spaces:"1",spaceSite:site.id})})}>See cost per charge</a>}
+              {selectedCase && sketch && <a className="text-link" href={"/charging?"+new URLSearchParams([
+                ["site",site.id],["view","explain"],["basis","screen"],["layout",matchingCase?.name || selectedCase.name],
+                ...(matchingCase ? [] : omitted).map(p=>["omit",p]),["returnTo","/?"+params.toString()]])}>See cost per charge</a>}
             </div> : null}
             {site && !active && (
               <>
@@ -579,7 +609,7 @@ export default function MainMapSpaces({
                   {site.name} · {markets[site.market] || site.market} · {site.id}
                 </small>
                 <h3 data-testid="map-space-title">{selectedCase ? "Areas on this parcel" : active.label}</h3>
-                {choices.length > 1 && (
+                {(choices.length > 1 || selectedCase) && (
                   <label>
                     Space
                     <select

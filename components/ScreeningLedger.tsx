@@ -12,10 +12,10 @@ const delta=(n:number)=>(n>0?"+":"")+amounts(n,2);
 type SaveContext={site:string;source:string;canWrite:boolean;listTrial?:ListAssumptions};
 type Line={key:keyof ReturnType<typeof screenLedger>["costs"];label:string;fact:string;fields:LedgerKey[];test:Changes;testLabel:string};
 
-export function ScreeningLedger({basis,saveContext,initial}:{
-  basis:LedgerBasis;saveContext?:SaveContext;initial?:SavedScreen;
+export function ScreeningLedger({basis,saveContext,initial,startingStalls}:{
+  basis:LedgerBasis;saveContext?:SaveContext;initial?:SavedScreen;startingStalls?:number;
 }){
-  const [changes,setChanges]=useState<Changes>(initial?.inputs.changes??{});
+  const [changes,setChanges]=useState<Changes>(initial?.inputs.changes??(startingStalls!=null ? {stalls:startingStalls} : {}));
   const [scenario,setScenario]=useState(initial?.inputs.scenario??0);
   const [editing,setEditing]=useState<string|null>(null);
   const [name,setName]=useState(""),[status,setStatus]=useState(""),[saving,setSaving]=useState(false);

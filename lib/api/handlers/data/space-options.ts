@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { roleAllows } from "@/lib/actions/roles";
+import { canReadFinancials } from "@/lib/agent/access";
 import { askReady } from "@/lib/ask/model";
 import { isSession, privateHeaders, requireUser } from "@/lib/guard";
 import { loadMapDeals } from "./deals";
@@ -10,9 +11,9 @@ import { isExcludedSite } from "@/lib/alerts/excluded";
 import { layoutAssessment, assessedSiteIds } from "@/lib/spaces/assessmentLoad";
 import { cachedDraft, generateOptions, liveSource } from "@/lib/spaces/generateOptions";
 
-function spatialOnly(data: ReturnType<typeof layoutAssessment>) {
-  if (!data?.row.parcelCases) return data;
-  return {...data,row:{...data.row,parcelCases:data.row.parcelCases.map(({name,condition,rows})=>({name,condition,rows}))}};
+function spatialOnly(data: ReturnType<typeof layoutAssessment>,role:string) {
+  if (canReadFinancials(role) || !data?.row.parcelCases) return data;
+  return {...data,row:{...data.row,parcelCases:data.row.parcelCases.map(({name,condition,rows,approach})=>({name,condition,rows,approach}))}};
 }
 
 function json(body: unknown, status = 200) {
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
   }
   const id = params.get("site") || "";
   const assessment = layoutAssessment(id);
-  if (assessment && assessment.row.status !== "needs-image") return json({ assessment:spatialOnly(assessment) });
+  if (assessment && assessment.row.status !== "needs-image") return json({ assessment:spatialOnly(assessment,session.actionRole) });
   const source = await liveSource(id);
   const draft = source ? await cachedDraft(source).catch(() => null) : null;
   return json({ assessment: draft || assessment, canDraft: Boolean(!draft && source && askReady() && roleAllows(session.actionRole,"contributor")) });
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
   if (!roleAllows(session.actionRole,"contributor")) return json({error:"Contributor access required."},403);
   const id = new URL(request.url).searchParams.get("site") || "";
   const existing = layoutAssessment(id);
-  if (existing && existing.row.status !== "needs-image") return json({assessment:spatialOnly(existing)});
+  if (existing && existing.row.status !== "needs-image") return json({assessment:spatialOnly(existing,session.actionRole)});
   const source = await liveSource(id);
   if (!source) return json({error:"A parcel-matched aerial is required."},422);
   try { return json({assessment:await generateOptions(source,session.u,request.signal)}); }

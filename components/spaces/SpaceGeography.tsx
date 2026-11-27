@@ -22,6 +22,7 @@ const layers = [
   "space-proposal-fill",
   "space-proposal-line",
   "space-team-line",
+  "space-approach-line",
 ];
 const palette: ExpressionSpecification = [
   "case",
@@ -54,7 +55,7 @@ export default function SpaceGeography(props: Props) {
   const collection = useMemo(() => {
     const features: {
       type: "Feature";
-      geometry: { type: "Point"; coordinates: Point } | { type: "Polygon"; coordinates: Point[][] };
+      geometry: { type: "Point"; coordinates: Point } | {type:"LineString"; coordinates:Point[]} | { type: "Polygon"; coordinates: Point[][] };
       properties: Record<string, string | boolean | number>;
     }[] = [];
     for (const item of sites) {
@@ -97,6 +98,9 @@ export default function SpaceGeography(props: Props) {
           properties:{kind,site:site.id,area:"",focused:false,solid:true}});
       }
     }
+    if (sketch?.approach && site?.frame.bounds && overlays) features.push({
+      type:"Feature",geometry:{type:"LineString",coordinates:sketch.approach.map(p=>worldPoint(p,site.frame.bounds!))},properties:{kind:"approach"}
+    });
     return { type: "FeatureCollection" as const, features };
   }, [sites, site, active, draft, workspace, layout, overlays, sketch]);
   const data = useRef(collection);
@@ -170,6 +174,8 @@ export default function SpaceGeography(props: Props) {
             ...(solid ? {} : { "line-dasharray": [3, 2] }),
           },
         });
+      map.addLayer({id:layers[5],type:"line",source:sourceId,minzoom:15,filter:["==",["geometry-type"],"LineString"],
+        paint:{"line-color":"#fff8df","line-width":3,"line-dasharray":[2,1]}});
     }
     if (map.isStyleLoaded() || map.getSource("sites") || map.getSource(sourceId)) install();
     else map.once("style.load", install);
@@ -287,6 +293,8 @@ export default function SpaceGeography(props: Props) {
         // The filed frame fills missing satellite tiles. Its printed markings belong in source inspection.
         map.getLayer("imagery") ? "imagery" : map.getLayer(layers[0]) ? layers[0] : undefined,
       );
+      map.addLayer({id:layers[5],type:"line",source:sourceId,minzoom:15,filter:["==",["geometry-type"],"LineString"],
+        paint:{"line-color":"#fff8df","line-width":3,"line-dasharray":[2,1]}});
     }
     if (map.isStyleLoaded() || map.getSource("sites") || map.getSource(sourceId)) install();
     else map.once("style.load", install);
@@ -298,7 +306,7 @@ export default function SpaceGeography(props: Props) {
     };
   }, [map, image, workspace, muted]);
   useEffect(() => {
-    if (!map || !site || !bounds || muted || !overlays || edit) return;
+    if (!map || !site || !bounds || muted || !overlays || edit || sketch) return;
     const names = site.zones
       .filter((z) => z.kind === "clear" || z === active)
       .map((z) => {
@@ -316,7 +324,7 @@ export default function SpaceGeography(props: Props) {
     return () => {
       for (const name of names) name.remove();
     };
-  }, [map, site, active, bounds, muted, overlays, edit]);
+  }, [map, site, active, bounds, muted, overlays, edit,sketch]);
   const markers = useRef<Marker[]>([]);
   const count = draft?.length || active?.points.length || 0;
   useEffect(() => {

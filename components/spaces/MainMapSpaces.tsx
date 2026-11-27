@@ -378,6 +378,7 @@ export default function MainMapSpaces({
                     image={image}
                     zones={overlays ? plotted : []}
                     sketch={overlays ? sketch : null}
+                    focus={site?.zones}
                     labels
                     active={active?.label}
                     reviewed={zones.filter((z) => z.edited).map((z) => z.label)}
@@ -553,7 +554,7 @@ export default function MainMapSpaces({
                 {active.points.map((_,i)=><option key={i} value={i}>Corners {i+1}–{(i+1)%active.points.length+1}</option>)}</select></label>
                 <label>Stall angle<select className="secondary" value={angle} onChange={e=>setAngle(Number(e.target.value) as Angle)}>{[90,60,45].map(a=><option key={a} value={a}>{a}°</option>)}</select></label></div>}
               {(selectedCase || rowTrial) && <p aria-live="polite"><strong>{sketch ? sketch.stalls.length+" stalls sketched" : "Layout needs measurement"}</strong>
-                {sketch && " · Blue stalls and amber drive aisle."} {selectedCase?.condition || (rowTrial && (angle===90 ? "Verify the two-way approach and peak availability." : "Verify one-way entry, exit and peak availability."))}</p>}
+                {sketch && " · Blue stalls and amber drive aisle."} {sketch?.approach && "Dashed line shows the proposed entry route."} {selectedCase?.condition || (rowTrial && (angle===90 ? "Verify the two-way approach and peak availability." : "Verify one-way entry, exit and peak availability."))}</p>}
               {selectedCase && <a className="text-link" href={"/charging?site="+site.id+"&view=explain"}>See cost per charge</a>}
             </div> : null}
             {site && !active && (
@@ -576,17 +577,18 @@ export default function MainMapSpaces({
                 <small>
                   {site.name} · {markets[site.market] || site.market} · {site.id}
                 </small>
-                <h3 data-testid="map-space-title">{active.label}</h3>
+                <h3 data-testid="map-space-title">{selectedCase ? "Areas on this parcel" : active.label}</h3>
                 {choices.length > 1 && (
                   <label>
                     Space
                     <select
                       className="secondary"
                       aria-label="Selected footprint"
-                      value={outlineId(active)}
+                      value={selectedCase ? "" : outlineId(active)}
                       disabled={saving}
                       onChange={(e) => pick(site.id, e.target.value)}
                     >
+                      {selectedCase && <option value="" disabled>Inspect an area</option>}
                       {choices.map((z) => (
                         <option key={outlineId(z)} value={outlineId(z)}>
                           {z.label}
@@ -595,14 +597,14 @@ export default function MainMapSpaces({
                     </select>
                   </label>
                 )}
-                <div className="space-map-status">
+                {!selectedCase && <div className="space-map-status">
                   <span>{active.edited ? "Team-edited outline" : "Analysis proposal"}</span>
                   {prior?.review && <span>{prior.review.disposition==="Dismiss option" ? "Dismissed" : "Kept for diligence"}</span>}
                   <span>{site.frame.bounds ? "Map aligned" : "Source image · alignment needed"}</span>
-                </div>
-                {!draft && !selectedCase && <MapSpaceFit zone={active} image={image} review={prior?.review} />}
+                </div>}
+                {!draft && !selectedCase && !rowTrial && <MapSpaceFit zone={active} image={image} review={prior?.review} />}
                 <div className="space-actions">
-                  {!draft && assessment && (
+                  {!draft && !selectedCase && assessment && (
                     <button
                       type="button"
                       className="primary"
@@ -615,7 +617,7 @@ export default function MainMapSpaces({
                       {reviewOpen ? "Close review" : "Review area"}
                     </button>
                   )}
-                  {!draft && canWrite(status.actionRole) && status.enabled && catalog?.reviewsAvailable && (
+                  {!draft && !selectedCase && canWrite(status.actionRole) && status.enabled && catalog?.reviewsAvailable && (
                     <button
                       type="button"
                       className="paper-btn"
@@ -631,7 +633,7 @@ export default function MainMapSpaces({
                       <Pencil size={14} /> Edit outline
                     </button>
                   )}
-                  {!draft && (
+                  {!draft && !selectedCase && (
                     <button
                       type="button"
                       className="paper-btn"

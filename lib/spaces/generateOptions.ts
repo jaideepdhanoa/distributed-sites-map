@@ -18,7 +18,7 @@ export function generationSource(deal: DealProps | undefined): Source | null {
     /(?:county|parcel).*outline/i.test(p.caption || "") && !/approximate|unavailable|unconfirmed|mismatch|not the offered/i.test(p.caption || ""));
   if (photos.length !== 1) return null;
   const match = photos[0].view_url?.match(/^\/api\/data\/photos\/([a-f0-9]{20}\.(?:jpg|jpeg|webp|png))$/);
-  return match ? { key: isolatedKey("space-options:v1:" + deal.deal_id + ":" + match[1]), name: match[1], photo: photos[0], deal } : null;
+  return match ? { key: isolatedKey("space-options:v2:" + deal.deal_id + ":" + match[1]), name: match[1], photo: photos[0], deal } : null;
 }
 export async function liveSource(site: string) {
   if (!/^PIPE-(PHX|LAS|MIA|SNA)-\d{4,}$/.test(site) || isExcludedSite(site)) return null;

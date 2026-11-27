@@ -7,10 +7,10 @@ type Frame = Pick<Aerial, "width" | "height" | "bounds" | "metersPerPixel">;
 export type Angle = 45 | 60 | 90;
 export type RowSpec = { area: string; edge: number; angle: Angle; count: number };
 export type ParcelCase = {
-  name: string; condition: string; rows: RowSpec[];
+  name: string; condition: string; rows: RowSpec[]; approach?: Point[];
   conversionCost?: number; lostAnnualCash?: number;
 };
-export type Sketch = { stalls: Point[][]; aisles: Point[][] };
+export type Sketch = { stalls: Point[][]; aisles: Point[][]; approach?:Point[] };
 export const inventoryLabels = { parking: "Existing parking", ground: "Undeveloped ground", operations: "Outdoor operations and access", bays: "Service or wash bays" };
 export type Inventory = Record<keyof typeof inventoryLabels, string>;
 
@@ -89,7 +89,7 @@ export function sketchCase(proposal: ParcelCase, zones: Zone[], frame?: Frame): 
     result.stalls.push(...drawn.stalls);
     result.aisles.push(...drawn.aisles);
   }
-  return result.stalls.length ? result : null;
+  return result.stalls.length ? {...result,approach:proposal.approach} : null;
 }
 
 export function rotateOutline(points: Point[], degrees: number, frame?: Frame): Point[] | null {

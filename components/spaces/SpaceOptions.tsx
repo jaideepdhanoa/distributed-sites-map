@@ -184,8 +184,8 @@ export default function SpaceOptions({ site, photos, compact, onOpen, onOverlay 
     {row?.zones.some(z=>z.kind!=="clear") && <a className="paper-btn" href={spacesMapHref(site)}>Open spaces on main map</a>}
     {row && !open && <div className="space-top">
       {row.image && <div className="space-thumb"><OptionAerial image={row.image} zones={row.zones}/><button type="button" className="text-link" aria-label="Open annotated layout" onClick={() => setOpen(true)} /></div>}
-      <div><strong>{first ? first.label : row.status === "hold" ? "Parcel or imagery check" : row.status === "needs-image" ? "Aerial needed" : "Layout needs measurement"}</strong>
-      <p>{summary}</p>{first && <small>{options[opt]} · {fitLabel}{compactFit && " in outline test"}</small>}</div>
+      <div><strong>{row.inventory ? "Whole-parcel assessment" : first ? first.label : row.status === "hold" ? "Parcel or imagery check" : row.status === "needs-image" ? "Aerial needed" : "Layout needs measurement"}</strong>
+      <p>{row.inventory ? row.summary : summary}</p>{first && !row.inventory && <small>{options[opt]} · {fitLabel}{compactFit && " in outline test"}</small>}</div>
     </div>}
     {open && row && <p className="space-recorded">{summary}</p>}
     {!row && <p>{error ? "Space review could not be loaded." : loaded === undefined ? "Loading space review…" : "No aerial assessment on file. A parcel-matched aerial or dimensioned site plan is needed."}</p>}

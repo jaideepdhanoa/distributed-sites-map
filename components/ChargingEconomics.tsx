@@ -1,6 +1,6 @@
 "use client";
 import { PreliminaryChargingCost } from "./PreliminaryChargingCost";
-import { pipelineCost } from "@/lib/charging/pipelineCost";
+import { pipelineCost, screenBasis } from "@/lib/charging/pipelineCost";
 import { siteMerit } from "@/lib/charging/merit";
 import { MeritEditor } from "./SiteMerit";
 import { useEffect,useRef,useState } from "react";
@@ -28,7 +28,7 @@ export function ChargingSiteSection({deal}:{deal:DealProps}) {
   return <section className="charging-preview" aria-label="Charging economics"><strong>Charging economics</strong>
     <p>{c.merit.action} · {c.name}</p>
     <p>{cost.value}{cost.amount!=null && " per charge"} · {amounts(c.result.depot,2)} {c.comparator==="workbook"?"depot proxy":"depot"}</p>
-    <small>{cost.basis}</small><p>{c.merit.next}</p>{!c.selected && <p className="layer-meta">{filedScreenLabel(c.screen)}</p>}<ChargingLink site={deal.deal_id} revision={c.selected}/></section>;
+    <small>{cost.basis}</small><p>{c.merit.next}</p>{!c.selected && <p className="layer-meta">{filedScreenLabel(c.screen)}</p>}<ChargingLink site={deal.deal_id} basis={screenBasis(c)} revision={c.selected}/></section>;
 }
 export function ChargingEditor({site,revision,explain=false,screenId,basis}:{site:string;revision?:string|null;explain?:boolean;screenId?:string|null;basis?:string|null}) {
   const [payload,setPayload]=useState<Payload|null>(null),[failed,setFailed]=useState(false),[attempt,retry]=useState(0);
@@ -48,18 +48,21 @@ export function ChargingEditor({site,revision,explain=false,screenId,basis}:{sit
   const listTrial=basis==="list"?readListTrial(window.location.hash):undefined;
   if(listTrial===null)return <p role="status">These list assumptions are unavailable. <a className="text-link" href={explanationUrl(site)}>Open current estimate</a></p>;
   const estimate=listTrial?listScreen(payload.site,listTrial).estimate:c?.preliminary;
-  const showScreen=!!saved || (explain && basis!=="detail" && (basis==="screen" || basis==="list" || !revision) && c && !c.stale && c.result?.siteCost==null && estimate && "layouts" in estimate);
+  const screenRequested=basis==="screen" || basis==="list" || (!revision && !!screenBasis(c));
+  const showScreen=!!saved || (explain && basis!=="detail" && screenRequested && estimate && "layouts" in estimate);
+  const alternatives=!!payload.screens?.length && <section><h3>Saved screening alternatives</h3>{payload.screens.map(row=>{
+    const params=new URLSearchParams(window.location.search);params.delete("case");params.delete("basis");params.set("screen",row.id);
+    return <p key={row.id}><a className="text-link" href={"?"+params}>{row.name}</a> · {new Date(row.at).toLocaleDateString()}</p>;})}</section>;
   if(basis==="list" && !showScreen)return <p role="status">The pipeline inputs have changed. <a className="text-link" href={explanationUrl(site)}>Open the current calculation</a></p>;
   if(showScreen){
     const href=new URLSearchParams(window.location.search);href.delete("screen");href.set("basis","detail");if(!href.has("case") && c?.selected)href.set("case",c.selected);
     return <section className="charging-editor" aria-label="Charging economics editor"><p className="eyebrow">Charging economics</p><h2 className="charging-title">{payload.site.name??site}</h2>
       <PreliminaryChargingCost estimate={estimate??{reason:"Current site estimate unavailable"}} initial={saved}
         hypothetical={!!(estimate && "layouts" in estimate && estimate.layouts[0]?.ledger?.hypothetical)} saveContext={{site,source:payload.source,canWrite:payload.canWrite && !saved,listTrial}}/>
-      {!!payload.screens?.length && <section><h3>Saved screening alternatives</h3>{payload.screens.map(row=>{
-        const params=new URLSearchParams(window.location.search);params.set("screen",row.id);return <p key={row.id}><a className="text-link" href={"?"+params}>{row.name}</a> · {new Date(row.at).toLocaleDateString()}</p>;})}</section>}
+      {alternatives}
       <a className="text-link" href={"?"+href}>Open detailed operating case</a></section>;
   }
-  return <Editor key={site+":"+attempt} data={payload} revision={revision} explain={explain} updateHistory={history=>setPayload({...payload,history})} reload={()=>retry(attempt+1)}/>;
+  return <><Editor key={site+":"+attempt} data={payload} revision={revision} explain={explain} updateHistory={history=>setPayload({...payload,history})} reload={()=>retry(attempt+1)}/>{alternatives}</>;
 }
 
 const defaultEvidence=planning;

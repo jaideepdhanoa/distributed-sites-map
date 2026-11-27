@@ -1,5 +1,5 @@
 import { nextDecision, offeredTransaction, recommendation } from "@/lib/selection/opportunityDisplay";
-import { pipelineCost } from "@/lib/charging/pipelineCost";
+import { pipelineCost, screenBasis } from "@/lib/charging/pipelineCost";
 import {ChargingLink} from "@/components/ChargingLink";
 import { filedScreenLabel } from "@/lib/charging/summary";
 import MapPanelGrip from "./MapPanelGrip";
@@ -88,7 +88,7 @@ export default function MapSitePreview(props: PreviewProps) {
         {powerDeal.charging.merit.downsideGap!=null && <small>Downside gap ${powerDeal.charging.merit.downsideGap.toFixed(2)} per charge</small>}
         <small>{cost.basis}</small>
         <small>{powerDeal.charging.name} · {powerDeal.charging.result.peakSessions??"Unknown"} peak charges · {powerDeal.charging.result.opening||"Opening unconfirmed"}</small>
-        {!powerDeal.charging.selected && <p className="layer-meta">{filedScreenLabel(powerDeal.charging.screen)}</p>}<ChargingLink site={powerDeal.deal_id} revision={powerDeal.charging.selected}/>
+        {!powerDeal.charging.selected && <p className="layer-meta">{filedScreenLabel(powerDeal.charging.screen)}</p>}<ChargingLink site={powerDeal.deal_id} basis={screenBasis(powerDeal.charging)} revision={powerDeal.charging.selected}/>
       </section>}
       {!props.grid.open && <div className="preview-actions">
       {!showingPower && power && <PowerFollowUp deal={props.powerDeal} site={props.powerSite} primary />}

@@ -124,3 +124,19 @@ test("saved screening alternative is immutable, retries safely and stays out of 
   assert.equal(screenSaveSchema.safeParse({...request,changes:{perPost:0}}).success,false);
   assert.equal(screenSaveSchema.safeParse({...request,changes:{stalls:1.5}}).success,false);
 });
+
+test("a layout's conversion and displaced income reconcile when business credit is removed",()=>{
+  for(const lostAnnualCash of [1000,8000]){
+    const layout={stalls:4,condition:"Parking",parcel:true,conversionCost:10000,lostAnnualCash};
+    const site={...deal,chargingSpace:{count:4,value:"4 spaces",basis:"Conditional",layouts:[layout]}};
+    const result=preliminaryCost(site,assumptions,undefined,{hypothetical:false,assumptions:{...defaultListAssumptions,creditCash:false}});
+    assert.ok("layouts" in result);
+    const row=result.layouts[0];
+    assert.equal(row.layoutCash,Math.min(0,5000-lostAnnualCash));
+    const calc=screenLedger(row.ledger);
+    assert.equal(calc.costs.conversion,1000);
+    assert.equal(calc.costs.displaced+calc.costs.cash,Math.max(0,lostAnnualCash-5000));
+    assert.equal(calc.annualCost,row.base.annualCost);
+    assert.equal(row.base.annualCost,40600+5000+1100+Math.max(0,lostAnnualCash-5000));
+  }
+});

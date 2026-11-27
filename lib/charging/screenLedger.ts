@@ -19,7 +19,7 @@ export type LedgerBasis = {
   inputs:LedgerInputs; terms:"purchase"|"lease"; condition:string; space:string;
   priceBasis:string; cashBasis:string; source?:string|null; date?:string|null; proxy?:number|null;
   // The layout may be a conditional screen rather than a proven fit.
-  hypothetical?:boolean; workbookDefaults?:Changes;
+  hypothetical?:boolean; creditCash?:boolean; workbookDefaults?:Changes;
 };
 export type SavedScreen = {id:string; name:string; author:string; at:string;
   inputs:{basis:LedgerBasis; changes:Changes; scenario:number}};
@@ -32,12 +32,15 @@ export function screenLedger(basis:LedgerBasis, changes:Changes={}, scenario=0) 
   const sessions=stalls*perStall*v.volume/100*stress.volume;
   const construction=stalls*v.unitBuild, upgrade=v.upgrade*stress.upgrade;
   const build=construction+v.conversion;
+  const displaced=basis.terms==="lease"?0:v.displaced;
+  // A trial with income credit off still carries any loss after displacement.
+  const cash=basis.creditCash===false?Math.min(v.cash,displaced):v.cash;
   const costs={
     property:basis.terms==="lease"?v.price*12:v.price*(1+v.closing/100)*recovery,
     construction:construction*recovery, conversion:v.conversion*recovery,
     upgrade:upgrade*recovery, tax:(build+upgrade)*v.tax/100,
     staffing:posts*v.postCost, upkeep:v.fixed+v.insurance+chargers*v.perCharger,
-    displaced:basis.terms==="lease"?0:v.displaced, cash:-v.cash,
+    displaced, cash:-cash,
   };
   const annualCost=Object.values(costs).reduce((sum,n)=>sum+n,0);
   return {costs,sessions,annualCost,perCharge:sessions>0?annualCost/sessions:null,

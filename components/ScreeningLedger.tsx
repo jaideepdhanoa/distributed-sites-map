@@ -64,14 +64,14 @@ export function ScreeningLedger({basis,saveContext,initial}:{
   const recovery=num(r.recovery*100)+"% annual recovery ("+num(v.rate)+"% over "+num(v.years)+" years)";
   const tenPct=(n:number)=>n===0?10000:n*1.1;
   const lines:Line[]=[
-    {key:"property",label:lease?"Lease":"Purchase and closing",fact:lease?amounts(v.price)+"/month × 12":amounts(v.price)+" + "+num(v.closing)+"% closing × annual recovery",fields:lease?["price"]:["price","closing","years","rate"],test:{price:v.price*.9},testLabel:"10% lower terms"},
+    {key:"property",label:lease?"Lease":"Purchase and closing",fact:lease?amounts(v.price)+"/month × 12":"("+amounts(v.price)+" × "+(1+v.closing/100).toLocaleString("en-US",{maximumFractionDigits:5})+") × annual recovery · "+num(v.closing)+"% closing",fields:lease?["price"]:["price","closing","years","rate"],test:{price:v.price*.9},testLabel:"10% lower terms"},
     {key:"construction",label:"Stall construction",fact:v.stalls+" stalls × "+amounts(v.unitBuild)+" per stall × annual recovery",fields:["unitBuild","years","rate"],test:{unitBuild:tenPct(v.unitBuild)},testLabel:v.unitBuild?"10% higher build":"$10k more per stall"},
     {key:"upgrade",label:"Utility upgrade",fact:amounts(r.upgrade)+" × annual recovery",fields:["upgrade"],test:{upgrade:v.upgrade+100000},testLabel:"$100k more before stress"},
     {key:"tax",label:"Infrastructure tax",fact:num(v.tax)+"% × "+amounts(r.build+r.upgrade)+" infrastructure",fields:["tax"],test:{tax:v.tax+.5},testLabel:"0.5 points higher"},
     {key:"staffing",label:"Round-the-clock attendants",fact:r.posts+" staffed posts × "+amounts(v.postCost)+"/year · "+num(v.perPost)+" stalls per post",fields:["postCost","perPost"],test:{postCost:tenPct(v.postCost)},testLabel:v.postCost?"10% higher post cost":"$10k more per post"},
     {key:"upkeep",label:"Upkeep and insurance",fact:amounts(v.fixed)+" fixed + "+amounts(v.insurance)+" insurance + "+r.chargers+" chargers × "+amounts(v.perCharger)+" · "+v.ports+" stalls per charger",fields:["fixed","insurance","perCharger","ports"],test:{fixed:v.fixed+10000},testLabel:"$10k more per year"},
     {key:"conversion",label:"Additional conversion works",fact:amounts(v.conversion)+" × annual recovery",fields:["conversion"],test:{conversion:v.conversion+100000},testLabel:"$100k more in works"},
-    ...(!lease?[{key:"cash" as const,label:"Less retained operating cash",fact:basis.cashBasis,fields:["cash" as const],test:{cash:v.cash+100000},testLabel:"$100k more retained"},
+    ...(!lease?[{key:"cash" as const,label:"Less retained operating cash",fact:basis.creditCash===false?basis.cashBasis+" · income offsets displacement only":basis.cashBasis,fields:["cash" as const],test:{cash:v.cash+100000},testLabel:"$100k more retained"},
       {key:"displaced" as const,label:"Displaced operating cash",fact:amounts(v.displaced)+" per year",fields:["displaced" as const],test:{displaced:v.displaced+10000},testLabel:"$10k more displaced"}]:[]),
   ];
   function source(line:Line){
@@ -80,6 +80,11 @@ export function ScreeningLedger({basis,saveContext,initial}:{
     if(line.key==="conversion" || line.key==="displaced")return basis.inputs[line.key]?"Layout estimate":"No allowance in starting estimate";
     if(line.key==="cash")return "Income credit";
     return "Workbook assumption";
+  }
+  function savedLink(id:string){
+    const query=new URLSearchParams(window.location.search);
+    query.delete("case");query.delete("basis");query.set("site",saveContext!.site);query.set("view","explain");query.set("screen",id);
+    return "?"+query.toString();
   }
   const fewer=v.stalls>1?screenLedger(basis,{...changes,stalls:v.stalls-1},scenario):null;
   return <div className="screen-ledger">
@@ -91,8 +96,10 @@ export function ScreeningLedger({basis,saveContext,initial}:{
     <div className="screen-scenarios">{cases.map((c,i)=><button type="button" className="paper-btn screen-scenario" aria-pressed={scenario===i} key={i}
       onClick={()=>{setScenario(i);setSaved(null);setStatus("");}}><span>{scenarios[i].label}</span><b>{c.perCharge==null?"—":amounts(c.perCharge,2)}</b>
       <small>{i===0?"Per charge":c.perCharge!=null && cases[0].perCharge!=null?delta((Math.round(c.perCharge*100)-Math.round(cases[0].perCharge*100))/100)+" vs base":"No volume"}</small></button>)}</div>
+    {cases[0].perCharge!=null && cases[1].perCharge!=null && cases[2].perCharge!=null && Math.abs(Math.abs(cases[1].perCharge-cases[0].perCharge)-Math.abs(cases[2].perCharge-cases[0].perCharge))>=.005 &&
+      <p className="screen-insight"><b>{Math.abs(cases[1].perCharge-cases[0].perCharge)>=Math.abs(cases[2].perCharge-cases[0].perCharge)?"Volume has the larger effect in these tests.":"The utility upgrade has the larger effect in these tests."}</b> Verify the layout and access before relying on either case.</p>}
     <h3>Completed charges</h3>
-    <p><b>{v.stalls} operating stalls</b> · {basis.condition}{v.stalls!==basis.inputs.stalls?" · trial layout":""}. Footprint on its own · {basis.space}.</p>
+    <p><b>{v.stalls} operating stalls</b> · {basis.condition}{v.stalls!==basis.inputs.stalls?" · trial layout":""}. {basis.hypothetical?"Recorded layout":"Assessed footprint"} · {basis.space}.</p>
     <p>{v.stalls} × {num(r.perStall)} charges/stall/year × {num(v.volume*stress.volume)}% = <b>{count(r.sessions)} per year</b> · {count(r.sessions/365)} per day.</p>
     <small>Workbook benchmark · {count(v.benchmark)} completions over {v.referenceYears} years across {v.referenceStalls} stalls. Fleet demand and power need site confirmation.</small>
     <div className="screen-tools">{editButton("volume","Test layout and volume")}
@@ -117,6 +124,6 @@ export function ScreeningLedger({basis,saveContext,initial}:{
     {(custom || scenario!==0 || initial) && <div className="screen-tools"><button className="text-link" type="button" onClick={()=>{change({});setScenario(0);}}>Reset to starting estimate</button></div>}
     {saveContext?.canWrite && priced && (custom || scenario!==0) && <form className="screen-save" onSubmit={save}><label>Alternative name<input className="field" required maxLength={80} value={name} onChange={e=>{setName(e.target.value);setSaved(null);}}/></label>
       <button type="submit" className="paper-btn" disabled={saving||!!saved||!name.trim()}>{saving?"Saving…":"Save screening alternative"}</button></form>}
-    <p role="status">{status}{saved && <> <a className="text-link" href={"?"+new URLSearchParams({site:saveContext!.site,view:"explain",screen:saved.id})}>Reopen saved ledger</a></>}</p>
+    <p role="status">{status}{saved && <> <a className="text-link" href={savedLink(saved.id)}>Reopen saved ledger</a></>}</p>
   </div>;
 }

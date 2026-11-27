@@ -2,7 +2,7 @@ import { checkSpaceFit } from "./fitCheck";
 import type { MapSpaceSite } from "./mapCatalog";
 import { kinds, type Assessment } from "./options";
 
-export type ChargingFootprint = { stalls: number; condition: string };
+export type ChargingFootprint = { stalls: number; condition: string; parcel?:boolean; conversionCost?:number; lostAnnualCash?:number };
 export type PipelineFit = { value: string; basis: string; count: number | null; layouts?: ChargingFootprint[] };
 
 function rangeText([low, high]: readonly number[]) {

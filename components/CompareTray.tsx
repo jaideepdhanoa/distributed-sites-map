@@ -1,3 +1,4 @@
+import {screenBasis} from "@/lib/charging/pipelineCost";
 import {ChargingLink} from "@/components/ChargingLink";
 import { catalogPowerRecords } from "@/lib/powerLinkIndex";
 import { usePurchaseScenarios } from "./PurchaseScenarios";
@@ -167,7 +168,7 @@ export default function CompareTray({
     const row = column.rows.find(row => row.label === label);
     const canFollowUp = column.followUps && column.deal?.kind !== "land" && column.deal?.stage_group !== "dropped";
     const statement = options.get(column.id+"|"+label);
-    if(column.deal?.charging && chargingLabels.includes(label))return <ChargingLink site={column.deal.deal_id} basis={label==="Site cost per charge" && column.deal.charging.result.siteCost==null && !column.deal.charging.stale && column.deal.charging.preliminary && "layouts" in column.deal.charging.preliminary?"screen":undefined} revision={column.deal.charging.selected}>{value}<small>{row?.basis} · Explain cost per charge</small></ChargingLink>;
+    if(column.deal?.charging && chargingLabels.includes(label))return <ChargingLink site={column.deal.deal_id} basis={label==="Site cost per charge"?screenBasis(column.deal.charging):undefined} revision={column.deal.charging.selected}>{value}<small>{row?.basis} · Explain cost per charge</small></ChargingLink>;
     if (onInspect && column.deal?.kind==="pipeline" && purchaseLabels.some(p=>p===label)) {
       return <button type="button" className="text-link compare-evidence" onClick={event=>{
         inspectedCell.current=event.currentTarget;onInspect(column.id,label,baseline ? new URLSearchParams({caseView:"baseline"}) : undefined);

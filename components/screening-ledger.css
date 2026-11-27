@@ -28,3 +28,5 @@
   .screen-line { grid-template-columns:minmax(0,1fr) auto auto; column-gap:.55rem; font-size:.88rem; }
   .screen-tools .text-link,.screen-ledger .paper-btn { min-height:44px; }
 }
+
+.screen-ledger p.screen-insight { margin-top:.65rem; }

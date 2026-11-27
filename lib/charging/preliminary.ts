@@ -6,7 +6,7 @@ import { type Inputs } from "./model";
 
 export type RangeCase = { sessions: number; upgrade: number; annualCost: number; perCharge: number };
 export type LayoutCost = ChargingFootprint & {
-  ledger: LedgerBasis; base: RangeCase; downside: RangeCase; build: number; staffing: number; upkeep: number;
+  ledger: LedgerBasis; base: RangeCase; downside: RangeCase; build: number; layoutCash?:number; staffing: number; upkeep: number;
 };
 export type PreliminaryCost = { reason: string } | {
   layouts: LayoutCost[]; space: string; price: number; terms: "purchase" | "lease"; priceBasis: string;
@@ -50,7 +50,7 @@ export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?
     ? "Confirm monthly rent and rights to use the spaces for charging" : "Confirm a current purchase price that includes the property" };
 
   const fit = d.chargingSpace;
-  const layouts = trial?.hypothetical ? [{stalls:trial.assumptions.stalls, condition:"Assumed footprint · verify space, access and displacement"}] : fit?.layouts ?? (fit?.count && fit.count > 0 ? [{stalls:fit.count, condition:fit.basis}] : []);
+  const layouts:ChargingFootprint[] = trial?.hypothetical ? [{stalls:trial.assumptions.stalls, condition:"Assumed footprint · verify space, access and displacement"}] : fit?.layouts ?? (fit?.count && fit.count > 0 ? [{stalls:fit.count, condition:fit.basis}] : []);
   if (!layouts.length) return { reason: fit?.count === 0 ? "No charging spaces fit the assessed layout" : fit?.basis || "Measure a charging layout and its aisle" };
   const c = a?.charging;
   if (!a || !c || !(a.horizon && a.horizon > 0 && a.demand && a.demand > 0 && c.charges && c.charges > 0 &&
@@ -71,19 +71,19 @@ export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?
   const costed: LayoutCost[] = [];
   for (const layout of layouts) {
     const ledger:LedgerBasis = {
-      terms, condition:layout.condition, space, priceBasis, cashBasis, hypothetical:trial?.hypothetical??false,
+      terms, creditCash:trial?.assumptions.creditCash, condition:layout.condition, space, priceBasis, cashBasis, hypothetical:trial?.hypothetical??false,
       workbookDefaults:trial ? {volume:100,unitBuild:c.unitBuild,postCost:c.attendant,upgrade:c.upgrade,cash:credited??0} : undefined,
       source:lease || filed ? null : research?.source, date:lease || filed ? null : research?.reviewedOn,
       proxy:a.hub!=null ? a.hub/c.charges : null,
       inputs:{stalls:layout.stalls, volume:trial?.assumptions.volume??100, benchmark:c.charges, referenceYears:a.horizon, referenceStalls:a.demand,
         price, years:a.horizon, rate:a.capital*100, closing:a.closing*100, unitBuild:trial?.assumptions.unitBuild??c.unitBuild, upgrade,
         tax:c.tax*100, postCost:trial?.assumptions.attendant??c.attendant, perPost:c.perPost, fixed:c.fixed, insurance:c.insurance,
-        ports:c.ports, perCharger:c.perCharger, cash, conversion:0, displaced:0},
+        ports:c.ports, perCharger:c.perCharger, cash:credited??0, conversion:layout.conversionCost??0, displaced:lease?0:layout.lostAnnualCash??0},
     };
     const base=screenLedger(ledger), downside=screenLedger(ledger,{},3);
     if(base.perCharge==null || downside.perCharge==null) continue;
     const range=(r:typeof base):RangeCase=>({sessions:r.sessions,upgrade:r.upgrade,annualCost:r.annualCost,perCharge:r.perCharge!});
-    costed.push({...layout, ledger, build:base.build, staffing:base.costs.staffing, upkeep:base.costs.upkeep,
+    costed.push({...layout, ...(layout.parcel?{layoutCash:-base.costs.cash-base.costs.displaced}:{}), ledger, build:base.build, staffing:base.costs.staffing, upkeep:base.costs.upkeep,
       base:range(base), downside:range(downside)});
   }
   if (!costed.length) return {reason:"No completed charges in this layout"};

@@ -16,7 +16,7 @@ test("compare operating layouts and model a four-stall boundary", async ({ page 
   await page.route("**/api/data/space-options?view=portfolio",r=>r.fulfill({json:{rows:[record]}}));
   await page.goto("/space-review?" + new URLSearchParams({site:id,panel:"space-options"}));
   const panel = page.getByRole("main").getByTestId("space-options");
-  await expect(panel.getByRole("button",{name:"Convert outdoor space",exact:true})).toHaveAttribute("aria-pressed","true");
+  await expect(panel.getByRole("button",{name:"All areas",exact:true})).toHaveAttribute("aria-pressed","true");
   await expect(panel).toContainText("0 stalls in the earlier screen");
   await panel.getByRole("button",{name:"Convert bays",exact:true}).click();
   await expect(panel).toContainText("No bay footprint established");
@@ -183,6 +183,10 @@ test("open a released outline in the main map on both source types", async ({pag
     if(aligned){
       await page.waitForFunction(()=>Boolean((window as unknown as {__sitesMap?:import("maplibre-gl").Map}).__sitesMap?.getSource("space-evidence-image")));
     }else await expect(work.locator("svg[role=img] image")).toBeVisible();
+    const inspectedArea = work.getByLabel("Selected footprint", { exact: true });
+    if (await inspectedArea.isVisible() && await inspectedArea.inputValue() === "") {
+      await inspectedArea.selectOption({ index: 1 });
+    }
     if(status.enabled && ["contributor","reviewer"].includes(status.actionRole)){
       await work.getByRole("button",{name:"Edit outline"}).click();
       await expect(work.getByRole("button",{name:"Save outline"})).toBeDisabled();

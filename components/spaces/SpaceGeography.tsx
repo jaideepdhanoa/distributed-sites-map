@@ -10,6 +10,7 @@ import {
   type FilterSpecification,
 } from "maplibre-gl";
 
+import { clearPanelPadding } from "@/lib/mapPanelPadding";
 import { outlineId } from "@/lib/spaces/outlineAnchor";
 import { kinds, worldPoint, type Option, type Aerial, type Point } from "@/lib/spaces/options";
 import type { MapSpaceSite, MapZone } from "@/lib/spaces/mapCatalog";
@@ -223,7 +224,12 @@ export default function SpaceGeography(props: Props) {
     function focus() {
       if (!map) return;
       map.resize();
-      const phone = map.getContainer().clientWidth < 760;
+      const canvas = map.getContainer();
+      const phone = canvas.clientWidth < 760;
+      const inspector = canvas.closest(".stage-map")?.querySelector(".space-map-inspector[data-placed]");
+      const desktopPadding = inspector
+        ? clearPanelPadding(canvas.getBoundingClientRect(), inspector.getBoundingClientRect(), { top: 86, bottom: 45, left: 45, right: 45 })
+        : { top: 86, bottom: 45, left: 45, right: 340 };
       map.fitBounds(
         [
           [w, s],
@@ -238,7 +244,7 @@ export default function SpaceGeography(props: Props) {
                 left: 20,
                 right: 20,
               }
-            : { top: 86, bottom: 45, left: 45, right: 340 },
+            : desktopPadding,
           duration: 0,
         },
       );

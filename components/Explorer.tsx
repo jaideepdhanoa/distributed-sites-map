@@ -68,7 +68,7 @@ import type { GroundBox } from "@/lib/spaces/measure";
 import type { SpaceLayout, SpaceType } from "@/lib/spaces/vocab";
 import { patchLiveStage, preservePendingStage, STAGE_REFRESH_EVENT, type StageRefresh } from "@/lib/stageOverlay";
 import { linkedPnlIds, linksFromRecords } from "@/lib/pnl/ids";
-import { placeReadableTip } from "@/lib/tipPlace";
+import { mapChromeBoxes, placeReadableTip } from "@/lib/tipPlace";
 import { droppedDealsShown, parsePipeView } from "@/lib/pipeStage";
 import AlertSettings from "./alerts/AlertSettings";
 import CommandSearch from "./CommandSearch";
@@ -261,17 +261,10 @@ export default function Explorer() {
     const bounds = map
       ? { left: map.left, top: map.top, right: map.right, bottom: map.bottom }
       : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
-    const obstacles = ["aside.drawer", "aside.layers.open", ".map-float"].flatMap((selector) => {
-      const node = document.querySelector(selector);
-      if (!node) return [];
-      const rect = node.getBoundingClientRect();
-      if (rect.width < 8 || rect.height < 8) return [];
-      return [{ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }];
-    });
     const placed = placeReadableTip({
       cursor: ringCursor,
       bounds,
-      obstacles,
+      obstacles: mapChromeBoxes(),
       widths: [248, 200],
       measure: (width) => {
         note.style.width = `${width}px`;

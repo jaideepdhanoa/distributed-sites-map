@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
-import {amounts,fields,groups,keys,type CalculationLine,type CalculationTrace,type Evidence,type Inputs,type Key,type Result} from "@/lib/charging/model";
+import {amounts,diligenceDrivers,fields,groups,keys,type CalculationLine,type CalculationTrace,type Evidence,type Inputs,type Key,type Result} from "@/lib/charging/model";
 import {planning,sourceValue} from "@/lib/charging/evidence";
 import type {networkReference} from "@/lib/charging/reference";
 
@@ -22,6 +22,7 @@ export function ChargingExplanation({draft,seed,result:r,trace,reference,referen
   function chip(key:Key){
     return <button type="button" className="text-link" key={key} onClick={()=>{choose(key);setFocusInput(n=>n+1);}}>{fields[key].label}</button>;
   }
+  const sensitivities=diligenceDrivers(draft,r);
   const maxAnnual=Math.max(0,...trace.annual.map(row=>Math.abs(row.value??0)));
   const material=new Set<Key>(["days","hostWeek","ownWeek","hostEnd","ownEnd","weekdayHours","weekendHours","depot",...trace.annual.filter(row=>!row.excluded).flatMap(row=>row.keys),...trace.throughput.flatMap(row=>row.keys)]);
   const counts:Record<string,number>={Verified:0,Quoted:0,Assumed:0,Missing:0};
@@ -35,7 +36,7 @@ export function ChargingExplanation({draft,seed,result:r,trace,reference,referen
     const limiting=hourly && trace.perHour!=null && row.value===trace.perHour;
     return <details className="disclosure calc-item" key={row.label}><summary className="disclosure"><span>{row.label}{limiting && <small>Limits throughput</small>}</span>
       {!hourly && maxAnnual>0 && row.value!=null && <span aria-hidden="true" className="calc-bar"><i className={row.value<0?"offset":""} style={{width:Math.abs(row.value)/maxAnnual*100+"%"}}/></span>}
-      <b>{row.excluded?"Excluded":hourly?number(row.value,2):money(row.value,0)}</b></summary>
+      <b>{row.excluded?"Excluded":hourly?number(row.value,2):money(row.value,0)}{!hourly && !row.excluded && row.value!=null && !!r.sessions && <small>{money(row.value/r.sessions)} / charge</small>}</b></summary>
       <div className="calc-inputs">{row.keys.map(chip)}</div></details>;
   }
   const missing=keys.filter(k=>r.missing.includes(fields[k].label));
@@ -68,14 +69,18 @@ export function ChargingExplanation({draft,seed,result:r,trace,reference,referen
     <div className="cost-sections">
       <details className="disclosure cost-section" open><summary className="disclosure">How this site is calculated</summary>
         <div className="calc-equation"><div><span>Annual net cost</span><b>{money(trace.total,0)}</b></div><i>÷</i><div><span>Annual completed charges</span><b>{number(r.sessions,0)}</b></div><i>=</i><div><span>Cost per charge</span><b>{money(r.siteCost)}</b></div></div>
-        <details className="disclosure calc-group"><summary className="disclosure">Annual costs and retained cash</summary>
+        <details className="disclosure calc-group" open><summary className="disclosure">Annual costs and retained cash</summary>
           <p className="layer-meta">Annual dollars. Purchase and construction use capital recovery over the case horizon. Retained cash reduces cost.</p>{trace.annual.map(row=>line(row))}</details>
-        <details className="disclosure calc-group"><summary className="disclosure">What limits completed charges?</summary>
+        <details className="disclosure calc-group" open><summary className="disclosure">What limits completed charges?</summary>
           <p>{number(trace.hours,0)} covered hours/year × {number(trace.perHour,2)} completed charges/hour</p>
           <p className="layer-meta">The lowest of these hourly rates sets throughput. Stall turnover and deliverable power include availability.</p>{trace.throughput.map(row=>line(row,true))}
           <div className="calc-inputs">{(["days","weekdayHours","weekendHours","hostWeek","hostEnd","ownWeek","ownEnd"] as Key[]).map(chip)}</div></details>
         <p className="layer-meta">Peak shift · {number(r.peakSessions,0)} charges. Additional charges before the depot opens · {earlier}.</p>
       </details>
+      {sensitivities.length>0 && <section className="cost-section"><h3>What moves depot parity?</h3>
+        <p>Change one input by ±{draft.sensitivityPct}%. The figures show site cost minus depot cost per charge.</p>
+        {sensitivities.slice(0,5).map(d=><button key={d.key} type="button" className="action calc-evidence-row" onClick={()=>{choose(d.key);setFocusInput(n=>n+1);}}>
+          <span>{fields[d.key].label}<small>{number(d.low)} to {number(d.high)} · {sourceValue(draft,d.key).evidence.status}</small></span><b>{signed(d.best)} to {signed(d.worst)}</b></button>)}</section>}
       <details className="disclosure cost-section" open={r.siteCost==null && !!reference}><summary className="disclosure">Workbook network reference <b>{money(reference?.cost??null)}</b></summary>
         {reference?<><p>{reference.sites} similar sites · dollars per completed charge · electricity excluded<br/><small>{referenceBasis}</small></p>
           {reference.lines.map((l,i)=><div className="calc-row" key={l.label}><span>{l.label}{i===0?" · "+reference.hostHours+" host hours/day":""}</span><b>{i?signed(l.value):money(l.value)}</b></div>)}

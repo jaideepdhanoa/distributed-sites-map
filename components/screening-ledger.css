@@ -1,0 +1,32 @@
+.screen-ledger { min-width:0; font-variant-numeric:tabular-nums; }
+.screen-ledger h3 { margin:1.5rem 0 .45rem; font-size:1.1rem; }
+.screen-ledger small,.screen-tools span,.screen-head { color:var(--ink-3); font-size:.84rem; }
+.screen-result { background:var(--paper); border-left:4px solid var(--green); padding:.9rem 1.1rem; margin-top:.6rem; }
+.screen-result strong { display:block; font:500 clamp(2rem,5vw,3rem)/1.15 var(--font-serif),serif; }
+.screen-scenarios { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.4rem; }
+.screen-scenario.paper-btn { display:grid; align-content:start; gap:.22rem; text-align:left; border-radius:.65rem; padding:.6rem; white-space:normal; }
+.screen-scenario[aria-pressed=true] { background:#e7eee6; border-color:var(--green); }
+.screen-scenario b { font-size:1.15rem; }
+.screen-line { display:grid; grid-template-columns:minmax(0,1fr) minmax(5rem,auto) 5rem; gap:.5rem; align-items:baseline; }
+.screen-line> :nth-child(n+2) { text-align:right; }
+.screen-line small { display:block; }
+.screen-item { border-top:1px solid var(--line); padding:.65rem 0; }
+.screen-item p { font-size:.9rem; margin:.25rem 0; }
+.screen-tools,.screen-save { display:flex; flex-wrap:wrap; align-items:center; gap:.3rem .9rem; }
+.screen-tools .text-link { text-align:left; }
+.screen-total { border-block:1px solid var(--line); padding:.6rem 0; }
+.screen-checks { padding-left:1.2rem; }
+.screen-checks li { margin:.45rem 0; }
+.screen-edit { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr)); gap:.6rem; background:var(--paper); padding:.7rem; margin:.4rem 0; }
+.screen-edit label,.screen-save label { display:grid; min-width:0; gap:.25rem; }
+.screen-edit input,.screen-save input { min-width:0; max-width:100%; }
+.screen-edit>div { grid-column:1/-1; }
+.screen-save { margin-top:.75rem; align-items:flex-end; }
+.screen-layouts { margin:.5rem 0; max-width:100%; }
+@media(max-width:650px) {
+  .screen-scenarios { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .screen-line { grid-template-columns:minmax(0,1fr) auto auto; column-gap:.55rem; font-size:.88rem; }
+  .screen-tools .text-link,.screen-ledger .paper-btn { min-height:44px; }
+}
+
+.screen-ledger p.screen-insight { margin-top:.65rem; }

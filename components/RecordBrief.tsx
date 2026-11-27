@@ -3,7 +3,7 @@ import type { PowerRecords } from "@/lib/powerLinkIndex";
 import { PowerFollowUp } from "./PowerEvidence";
 import { useRouter } from "next/navigation";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
-import { pipelineCost } from "@/lib/charging/pipelineCost";
+import { pipelineCost, screenBasis } from "@/lib/charging/pipelineCost";
 import { chooseRecordTab } from "./PanelSections";
 import { ChargingLink } from "./ChargingLink";
 import { RecordRecommendation, RecommendationSources } from "./OpportunityReview";
@@ -55,7 +55,7 @@ export default function RecordBrief({ target, pnl, power, snapshot, ...input }: 
     <dl>
       <div><dt>Charging spaces</dt><dd>{space?.value ?? "No layout estimate"}{space?.basis && space.basis !== cost.basis && <small>{space.basis}</small>}</dd></div>
       <div><dt>Cost per charge</dt><dd>{input.deal.charging
-        ? <ChargingLink site={input.deal.deal_id} revision={input.deal.charging.selected}>{cost.value}</ChargingLink> : cost.value}
+        ? <ChargingLink site={input.deal.deal_id} basis={screenBasis(input.deal.charging)} revision={input.deal.charging.selected}>{cost.value}</ChargingLink> : cost.value}
         {cost.basis && cost.basis !== space?.basis && <small>{cost.basis}</small>}</dd></div>
     </dl>
     {space?.basis && space.basis === cost.basis && <small className="shared-basis">{space.basis}</small>}

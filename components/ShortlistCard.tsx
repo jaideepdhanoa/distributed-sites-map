@@ -3,7 +3,7 @@ import type { SelectionRow } from "@/lib/selection/screen";
 import type { Opportunity, OpportunitySite } from "@/lib/selection/opportunity";
 import { offeredTransaction } from "@/lib/selection/opportunityDisplay";
 import { reviewLink } from "@/lib/reviewNavigation";
-import { pipelineCost } from "@/lib/charging/pipelineCost";
+import { pipelineCost, screenBasis } from "@/lib/charging/pipelineCost";
 import { amounts } from "@/lib/charging/model";
 import { filedScreenLabel } from "@/lib/charging/summary";
 import { ChargingLink } from "./ChargingLink";
@@ -38,7 +38,7 @@ export default function ShortlistCard({ row, review, option, origin }:Props) {
         <div><dt>Asking price</dt><dd>{row.asking || "Price needs confirmation"}</dd></div>
         <div><dt>Charging spaces</dt><dd>{row.chargingSpace?.value || row.option || "Needs measurement"}{row.chargingSpace?.basis && <small>{row.chargingSpace.basis}</small>}</dd></div>
         <div><dt>Site cost per charge</dt><dd>{charging
-          ? <ChargingLink site={row.id} revision={charging.selected} returnTo={origin}>{cost.value}</ChargingLink>
+          ? <ChargingLink site={row.id} basis={screenBasis(charging)} revision={charging.selected} returnTo={origin}>{cost.value}</ChargingLink>
           : cost.value}<small>{cost.basis}</small></dd></div>
       </dl>}
       <p className="shortlist-next"><b>Next check</b> {option.next}</p>

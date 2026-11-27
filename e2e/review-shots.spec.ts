@@ -47,7 +47,7 @@ test("save review screenshots from the local build", async ({ page }, info) => {
     await page.waitForSelector("aside.drawer");
   }
   const record = page.locator("aside.drawer");
-  await record.locator("summary.disclosure", { hasText: "Record" }).click();
+  await record.getByText("Property, contacts and sources", { exact: true }).click();
   await expect(record).toContainText("PHX-U189");
   await page.goto("/?funnel=universe&stage=in_area", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".shell");

@@ -620,7 +620,7 @@ for (const width of [1440, 390]) {
     const tray = page.getByTestId("compare-tray");
     const figure = tray.getByRole("button", { name: "Inspect Open land for Canyon Wash" });
     await expect(figure).toBeVisible();
-    const gapCounts = tray.locator('[data-compare-row="Open evidence gaps"] td');
+    const gapCounts = tray.locator('[data-compare-row="Open follow-up tasks"] td');
     await expect(gapCounts.first()).toHaveText("1");
     await expect(gapCounts.nth(1)).toHaveText("0");
     const price = tray.locator('[data-compare-row="Asking"]');

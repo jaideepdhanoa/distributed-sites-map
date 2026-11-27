@@ -9,11 +9,11 @@ export function pipelineCost(charging?: ChargingSummary) {
     const scope = charging.energyScope === "excluded" ? " · excludes electricity" : "";
     return { value: amounts(amount, 2), basis: (charging.selected ? "Selected case" : "Planning estimate") + scope, amount };
   }
+  const missing = charging.result.missing?.[0];
   const example = charging.screen?.find(scenario => scenario.stalls === 4);
   if (example && charging.screenDepot != null) {
     const estimate = amounts(charging.screenDepot * (1 - example.base), 2);
-    return { value: "Site cost pending", basis: "Network example: " + estimate + "/charge at 4 assumed spaces, excluding electricity", amount: null };
+    return { value: "Site cost pending", basis: (missing ? "Needed: " + missing + ". " : "") + "Network example: " + estimate + "/charge at 4 assumed spaces, excluding electricity", amount: null };
   }
-  const missing = charging.result.missing?.[0];
   return { value: "Not calculated", basis: missing ? "Needed: " + missing : "Check site inputs and completed charges", amount: null };
 }

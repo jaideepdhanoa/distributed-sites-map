@@ -28,3 +28,8 @@
 .shortlist-intro h1 { line-height:1.12; }
 .shortlist-filter-toggle { min-height:44px; margin-bottom:7px; }
 .shortlist-guide { margin:22px 0; padding:14px 0; border-top:1px solid #cec9bb; }
+
+.shortlist-figures { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%, 10rem),1fr)); gap:.6rem 1rem; margin:.75rem 0; }
+.shortlist-figures dt,.shortlist-figures small { color:var(--ink-3); font-size:.78rem; }
+.shortlist-figures dd { margin:0; font-weight:600; }
+.shortlist-figures small { display:block; font-weight:400; }

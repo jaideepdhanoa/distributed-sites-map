@@ -31,6 +31,14 @@ When a transaction ends, record its reason, dated evidence and reopening conditi
 
 For future workflow changes, update the affected shared manual, rule and playbook passages at the point an agent uses them. Update this guide and relevant in-app instructions when their behavior changes. Include the source revision and next decision-changing check in handoffs. Give unresolved discrepancies an owner or record that ownership is open.
 
+### Intake and repeat reviews
+
+At intake, match the permanent site ID, address and offered parcel. Keep one primary opportunity per site and a separate row for each alternative offer. Capture the reason, the decision-changing check or reopening trigger, and the source and date. Record who owns the decision or leave ownership visibly open.
+
+On a new seller reply, layout, financial case or approved stage, revisit the affected offer. Keep conditional layout capacity and displaced operations tied to their specific footprint. A cost screen at an assumed number of stalls belongs with its assumptions. Put older estimates in the supporting information. Check the proposal queue before treating a drop as pending. Preserve any actual approval and its history.
+
+For each batch, compare unique active sites, primary and alternative offers, unresolved parcel/space checks, and modeled versus threshold-only footprints. Reuse the existing evidence and open task. After publication, the Workbook sync's signed-in opportunity check compares every register row with Selection Review and the map and checks current fit, selected case, site cost and pending drop status. Its logs contain counts. Record the source revision, eligible IDs, exceptions and next batch in the private review register or handoff. Repeating the same batch should create no new proposals or changes.
+
 ## Architecture
 
 ```

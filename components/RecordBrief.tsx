@@ -81,6 +81,7 @@ export default function RecordBrief({ target, pnl, power, ...input }: BriefProps
   return (
     <section className="record-brief" aria-label="Screening decision">
       {opportunity && input.deal ? <>
+        {input.deal.pendingDrop && <p><b>Drop proposal awaiting approval.</b> Review the proposal before taking the next step.</p>}
         <OpportunityReview record review={opportunity} charging={input.deal.charging}
           active={Boolean(input.deal.stage) && !/dropped|off[ -]?market/i.test(input.deal.stage || "") && input.deal.stage_group !== "dropped"}/>
         <p><b>Deal stage</b> <span className={`stage-pill tone-${stageTone(input.deal)}`}>{status === "Desk screen" ? "Initial review" : status}</span></p>

@@ -1,4 +1,4 @@
-import type { Opportunity } from "./opportunity";
+import type { Opportunity, OpportunitySite } from "./opportunity";
 
 const labels: Record<Opportunity["disposition"], string> = {
   Shortlist: "Acquisition shortlist",
@@ -21,11 +21,14 @@ export function recommendation(option: Opportunity) {
   return labels[option.disposition];
 }
 
-export function recommendationNote(option: Opportunity) {
-  switch (option.disposition) {
-    case "Watch availability": return "Before pursuing this site, confirm it is still available, what the price includes and when the buyer could take possession.";
-    case "Hold": return "Further work is paused. See the review notes for what would change that decision.";
-    case "Reserve": return "Keep this option available if a higher-priority site falls through.";
-    default: return option.next;
+export function offeredTransaction(option: Opportunity, scope?: string) {
+  return scope && option.route.toLowerCase().includes("acquisition") && scope !== option.route
+    ? option.route + " · " + scope : option.route;
+}
+
+export function nextDecision(review: OpportunitySite, option = review.primary) {
+  if (option.route === review.primary.route && option.disposition === "Shortlist" && review.visitPlan) {
+    return review.visitPlan.decision;
   }
+  return option.next;
 }

@@ -15,6 +15,9 @@ export function chargingHold(input:Inputs|undefined) {
 export type SelectionRow = {
   id: string; name: string; city: string; mapped: boolean; hasRecord?: boolean; stage: string; mirrorStage: string;
   priority: string; instruction: string; geometry: string; section: string; amount: number | null;
+  asking?: string;
+  chargingSpace?: import("../spaces/pipelineFit").PipelineFit;
+  pendingDrop?: boolean;
   charging?: import("../charging/summary").ChargingSummary;
   review?: import("./opportunity").OpportunitySite;
   research?: import("./research").SelectionResearch;

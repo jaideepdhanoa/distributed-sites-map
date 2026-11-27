@@ -145,7 +145,9 @@ test("shortlisted visit shows the charging decision and its parallel diligence w
     layoutSource:"/space-review",financeStatus:"Price or rights needed",finance:"The sale scope is open.",next:"Confirm the demised area.",
     source:"https://example.org/record",cases:[{stalls:4,kind:"Illustrative threshold only",price:null,cash:0,base:null,downside:null,ceiling:-1,replicas:10}]};
   const row = {id:"PIPE-LAS-9001",city:"LAS",name:"Example service yard",stage:"Desk screen",mapped:false,
-    priority:"Check space",section:"Operating",financeVisible:true,review:{name:"Example service yard",primary,alternatives:[],visitPlan,coverage},
+    priority:"Check space",section:"Operating",financeVisible:true,asking:"$120,000 · Example offer",pendingDrop:true,
+    chargingSpace:{value:"0 spaces",basis:"Up to three with the shared aisle",count:0},
+    review:{name:"Example service yard",primary,alternatives:[],visitPlan,coverage},
     charging:{merit:{action:"Review for closure",next:"Review the original outdoor layout.",netValue:null},
       name:"Screen",result:{siteCost:null},screen:[],selected:null}};
   await page.route("**/api/data/selection-review",route=>route.fulfill({json:{rows:[row],hasInputs:true,mismatches:0}}));
@@ -153,6 +155,17 @@ test("shortlisted visit shows the charging decision and its parallel diligence w
   await expect(page.getByRole("heading",{name:"Acquisition shortlist"})).toBeVisible();
   await expect(page.getByRole("link",{name:/needing my approval/})).toHaveAttribute("href",/qapprove=1/);
   await expect(page.getByText("Site evidence and economics")).toBeVisible();
+  const overview = page.locator(".shortlist-figures");
+  await expect(overview).toContainText("$120,000");
+  await expect(overview).toContainText("Up to three with the shared aisle");
+  await expect(page.getByText("Drop proposal awaiting approval.")).toBeVisible();
+  const costLink = overview.getByRole("link");
+  const dest = new URL(await costLink.getAttribute("href") || "", page.url());
+  expect(dest.searchParams.get("returnTo")).toBe("/selection-review?disposition=Shortlist#PIPE-LAS-9001");
+  await costLink.click();
+  await page.getByRole("link",{name:"← Selection review"}).click();
+  await expect(page).toHaveURL(/disposition=Shortlist#PIPE-LAS-9001$/);
+  await expect(page.locator(".shortlist-figures")).toBeVisible();
   await mkdir("review-shots",{recursive:true});
   await page.screenshot({path:"review-shots/"+info.project.name+"-acquisition-shortlist.png",animations:"disabled"});
   await page.getByRole("button",{name:"Filter shortlist"}).click();

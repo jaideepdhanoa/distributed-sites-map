@@ -26,9 +26,10 @@ export function changeValue(input:Inputs,key:Key,value:number|null){
   }
   return next;
 }
-export function explanationUrl(site:string,revision?:string|null){
+export function explanationUrl(site:string,revision?:string|null,returnTo?:string){
   const params=new URLSearchParams({site,view:"explain"});
   if(revision)params.set("case",revision);
+  if(returnTo)params.set("returnTo",returnTo);
   return "/charging?"+params.toString();
 }
 

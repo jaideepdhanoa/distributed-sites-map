@@ -23,7 +23,21 @@ if (!existsSync(path)) throw Error("The generated opportunity register is missin
       if (!portfolio.ok || !map.ok) continue;
       const {rows, filed, registerUrl} = await portfolio.json();
       const {features} = await map.json();
+      const mapDeals = new Map(features.filter(f => f.properties?.kind === "pipeline").map(f => [f.properties.deal_id, f.properties]));
+      const projectionsMatch = rows.every(row => {
+        const deal = mapDeals.get(row.id);
+        if (!deal) return !row.hasRecord;
+        return isDeepStrictEqual(row.chargingSpace, deal.chargingSpace)
+          && row.charging?.sourceRevision === deal.charging?.sourceRevision
+          && row.charging?.selected === deal.charging?.selected
+          && row.charging?.result?.siteCost === deal.charging?.result?.siteCost
+          && row.pendingDrop === deal.pendingDrop;
+      });
       coverage = {
+        activeWithEvidence: rows.filter(r => r.review?.coverage).length,
+        footprintScenarios: rows.reduce((n, r) => n + (r.review?.coverage?.cases?.length || 0), 0),
+        activeWithoutReview: rows.filter(r => !r.review).length,
+        activeWithNextDecision: rows.filter(r => r.review?.primary.next?.trim()).length,
         activeSites: rows.length,
         activeShortlist: rows.filter(r => r.review?.primary.disposition === "Shortlist").length,
         shortlistVisitPlans: rows.filter(r => r.review?.primary.disposition === "Shortlist" && r.review.visitPlan).length,
@@ -32,7 +46,8 @@ if (!existsSync(path)) throw Error("The generated opportunity register is missin
         filedOutsideActive: filed?.length,
       };
       const actual = new Map([...rows, ...(filed || [])].filter(r => r.review).map(r => [r.id, r]));
-      verified = registerUrl === expected.register && actual.size === count &&
+      verified = projectionsMatch && new Set(rows.map(r => r.id)).size === rows.length &&
+        actual.size === count && registerUrl === expected.register &&
         Object.entries(expected.sites).every(([id, site]) => isDeepStrictEqual(opportunity.reviewAtStage(site, actual.get(id)?.stage || "", actual.get(id)?.decisionReason),actual.get(id)?.review)) &&
         features.every(({properties:p}) => p.kind !== "pipeline" || isDeepStrictEqual(opportunity.reviewAtStage(expected.sites[p.deal_id], p.stage, p.decision_reason || p.chips?.find(c => c.family === "drop_reason")?.label),p.opportunityReview));
     }

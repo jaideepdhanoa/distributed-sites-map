@@ -18,7 +18,7 @@ import type { DealProps, SiteProps } from "@/lib/types";
 import { displayAddress } from "@/lib/format";
 import { marketSequence,incompatibleMarkets } from "@/lib/charging/merit";
 import { amounts } from "@/lib/charging/model";
-import { acquisitionCriteria, compareSections, comparisonMeasures, dealRows, siteRows, MISSING } from "@/lib/comparison";
+import { acquisitionCriteria, compareSections, overviewLabels, comparisonMeasures, dealRows, siteRows, MISSING } from "@/lib/comparison";
 
 export default function CompareTray({
   deals,
@@ -145,11 +145,11 @@ export default function CompareTray({
   if (gapQuery) for (const column of columns) {
     const count = coverage?.query === gapQuery ? coverage.counts?.[column.id] : undefined;
     const value = count != null ? String(count) : coverage?.query === gapQuery ? "Unavailable" : "Checking…";
-    column.rows.push({label:"Open evidence gaps",key:count,value});
+    column.rows.push({label:"Open follow-up tasks",key:count,value});
   }
   const measures = comparisonMeasures(columns);
   const decisionMeasures = measures.filter(row => row.label !== "Power" || !signedIn);
-  const visible = showAll ? measures : decisionMeasures.filter(row => acquisitionCriteria.includes(row.label) || row.label.startsWith("Statement ") || ["different", "gap", "basis"].includes(row.kind));
+  const visible = showAll ? measures : decisionMeasures.filter(row => acquisitionCriteria.includes(row.label) || row.label.startsWith("Statement ") || (row.label !== "Earlier workbook stalls" && ["different", "gap", "basis"].includes(row.kind)));
 
   const sections = compareSections.filter(section => visible.some(row => row.section === section));
   const attention = visible.filter(row => row.values.some(v=>v.startsWith("Sources disagree")) || row.kind === "basis" || row.partial)
@@ -178,7 +178,7 @@ export default function CompareTray({
       onClick={()=>openStatement(statement)}>{statement.value}<small>{[statement.period,statement.basis,statement.source].join(" · ")}</small></button>;
     if (value === MISSING) {
       const target = evidenceEnabled && canFollowUp && (statement || evidenceTarget(column.targetKind, column.id, label, column.deal));
-      if (!target) return label === "Suggested drop" ? "None recorded" : "Not on file";
+      if (!target) return label === "Suggested drop" ? "None recorded" : label === "Drop proposal" ? "See site record" : "Not on file";
       return <>{label === "On-site service" && <strong className="comparison-unconfirmed">Unconfirmed</strong>}<button className="text-link compare-evidence" type="button"
         aria-label={label === "On-site service" ? `Check on-site service for ${column.title}` : `Not on file · Check missing ${label} for ${column.title}`}
         onClick={event => {
@@ -286,7 +286,7 @@ export default function CompareTray({
               <thead><tr><th scope="col">Measure</th>{columns.map(column => <th scope="col" key={column.id}>{column.title}</th>)}</tr></thead>
               {sections.filter(section => !selectedSection || selectedSection === section).map(section => {
                 const group = visible.filter(row => row.section === section);
-                const order = section === "Acquisition economics" ? ["Asking","Land estimate","Implied business price","Asking / earnings","Business-only multiple","Savings versus hub"] : section === "Financials" ? ["Revenue","Statement revenue","Cash flow","Statement SDE","EBITDA","Statement EBITDA"] : [];
+                const order = section === "Decision overview" ? overviewLabels : section === "Acquisition economics" ? ["Asking","Land estimate","Implied business price","Asking / earnings","Business-only multiple","Savings versus hub"] : section === "Financials" ? ["Revenue","Statement revenue","Cash flow","Statement SDE","EBITDA","Statement EBITDA"] : [];
                 const rank = (label:string) => order.includes(label) ? order.indexOf(label) : order.length;
                 group.sort((a,b) => rank(a.label) - rank(b.label));
                 if (!group.length) return null;
@@ -295,7 +295,7 @@ export default function CompareTray({
                     <tr className="comparison-section"><th scope="rowgroup" colSpan={columns.length + 1}>{section}</th></tr>
                     {group.map(({ label, values, kind, available, partial, allMissing }) => (
                       <tr key={label} tabIndex={-1} data-compare-row={label} data-state={kind}>
-                        <th scope="row">{label}{label === "Bays that fit" && <small>Earlier workbook screen</small>}{label === "Street-frontage hosting" && <small>Utility map at the street</small>}{label === "Implied business price" && <small>Asking less estimated land value</small>}{label === "Business-only multiple" && <small>Implied business price ÷ earnings</small>}{label === "Savings versus hub" && <small>At screening price</small>}{["Revenue","EBITDA","Cash flow"].includes(label) && <small>Deal record</small>}{kind === "basis" && <small>{purchaseLabels.some(measure=>measure===label) ? "Different case assumptions" : "Different measures, periods or sources"}</small>}{allMissing && label !== "Suggested drop" && <small>Missing for every applicable site</small>}{partial && !(section === "Power evidence" && columns.length === 2) && <small>Available for {available} of {values.filter(value => value !== "Not applicable").length} sites</small>}</th>
+                        <th scope="row">{label}{label === "Street-frontage hosting" && <small>Utility map at the street</small>}{label === "Implied business price" && <small>Asking less estimated land value</small>}{label === "Business-only multiple" && <small>Implied business price ÷ earnings</small>}{label === "Savings versus hub" && <small>At screening price</small>}{["Revenue","EBITDA","Cash flow"].includes(label) && <small>Deal record</small>}{kind === "basis" && <small>{purchaseLabels.some(measure=>measure===label) ? "Different case assumptions" : "Different measures, periods or sources"}</small>}{allMissing && label !== "Suggested drop" && <small>Missing for every applicable site</small>}{partial && !(section === "Power evidence" && columns.length === 2) && <small>Available for {available} of {values.filter(value => value !== "Not applicable").length} sites</small>}</th>
                         {values.map((value, i) => (
                           <td key={columns[i].id} className={value === MISSING ? "comparison-missing" : undefined}>
                             {renderCell(columns[i], label, kind, value)}{label === "Next check" && <small>{columns[i].rows.find(row=>row.label===label)?.source}</small>}

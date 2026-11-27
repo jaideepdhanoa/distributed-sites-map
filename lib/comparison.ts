@@ -1,3 +1,4 @@
+import { nextDecision, offeredTransaction, recommendation } from "./selection/opportunityDisplay";
 import { currentScreen } from "./selection/screen";
 import { comparisonPower } from "./mapPower";
 import { chargingLabels,chargingRows } from "./charging/summary";
@@ -16,10 +17,12 @@ export const MISSING = "—";
 type CompareRow = { label: string; value: string; key?: string | number | null; basis?: string; source?: string };
 export type ComparisonColumn = { id: string; title: string; rows: CompareRow[] };
 
-export const compareSections = ["Power evidence", "Market context", "Acquisition economics", "Financials", "Site fit", "Evidence quality", "Diligence", "Record details"] as const;
-export const acquisitionCriteria = [...chargingLabels,...purchaseLabels, "Assessed layout", "Traffic", "Washes within 1 mile", "Open land", "Bays that fit", "On-site service", "Street-frontage hosting", "Implied business price", "Business-only multiple", "Savings versus hub", "Service area", "Zoning", "Asking", "Revenue", "EBITDA", "Cash flow", "Asking / earnings", "Land estimate", "Reporting period", "Figure basis", "Financial source", "NDA", "Open evidence gaps", "Blocker", "Next check"];
+export const overviewLabels = ["Offered transaction", "Asking", "Charging spaces", "Site cost per charge", "Review priority", "Next check", "Drop proposal"];
+export const compareSections = ["Decision overview", "Power evidence", "Market context", "Acquisition economics", "Financials", "Site fit", "Evidence quality", "Diligence", "Record details"] as const;
+export const acquisitionCriteria = [...overviewLabels,...chargingLabels,...purchaseLabels, "Assessed layout", "Traffic", "Washes within 1 mile", "Open land", "On-site service", "Street-frontage hosting", "Implied business price", "Business-only multiple", "Savings versus hub", "Service area", "Zoning", "Asking", "Revenue", "EBITDA", "Cash flow", "Asking / earnings", "Land estimate", "Reporting period", "Figure basis", "Financial source", "NDA", "Open follow-up tasks", "Blocker", "Next check"];
 
 function sectionFor(label: string): typeof compareSections[number] {
+  if (overviewLabels.includes(label)) return "Decision overview";
   if(chargingLabels.includes(label)) return "Acquisition economics";
   if (marketLabels.some(item=>item===label)) return "Market context";
   if (["On-site service", "Street-frontage hosting"].includes(label)) return "Power evidence";
@@ -27,8 +30,8 @@ function sectionFor(label: string): typeof compareSections[number] {
   if (["Address", "Property owner"].includes(label)) return "Record details";
   if (["Financial package", "Cash flow coverage", "Figure basis", "Reporting period", "Financial source", "Land measurement"].includes(label)) return "Evidence quality";
 
-  if (["Assessed layout", "Bays that fit", "Service area", "Traffic", "Land", "Open land", "Power", "3-mile population", "Washes", "Depot", "Zoning"].includes(label)) return "Site fit";
-  if (["Stage", "Open evidence gaps", "NDA", "Suggested drop", "Next check", "Blocker"].includes(label)) return "Diligence";
+  if (["Assessed layout", "Earlier workbook stalls", "Service area", "Traffic", "Land", "Open land", "Power", "3-mile population", "Washes", "Depot", "Zoning"].includes(label)) return "Site fit";
+  if (["Stage", "Open follow-up tasks", "NDA", "Suggested drop", "Next check", "Blocker"].includes(label)) return "Diligence";
   return "Financials";
 }
 
@@ -66,7 +69,7 @@ export function dealRows(deal: DealProps, sites: SiteProps[], signedIn: boolean,
     ...(signedIn ? [{ label: "NDA", key: deal.nda_status || (deal.nda_id ? "Unknown" : "Not required"), value: ndaChip(deal) }] : []),
     ...(deal.suggested_drop && deal.stage_group !== "dropped" ? [{ label: "Suggested drop", key: "Proposed", value: deal.suggested_drop }] : []),
     { label: "Asking", key: signedIn ? deal.asking_price ?? deal.asking_price_display : null, value: signedIn ? withEvidence(sheetMoney(deal.asking_price, deal.asking_price_display), shownPriceSource(deal)) : MISSING },
-    { label: "Bays that fit", value: deal.bays_that_fit != null ? String(Math.round(deal.bays_that_fit)) : MISSING },
+    { label: "Earlier workbook stalls", value: deal.bays_that_fit != null ? String(Math.round(deal.bays_that_fit)) : MISSING },
     ...marketComparisonRows(marketEvidence(deal,linked)),
     { label: "Land", key: deal.land_acres, value: shown(acresText(deal.land_acres)) },
     { label: "Open land", value: spare.value },
@@ -131,7 +134,7 @@ export function siteRows(site: SiteProps, deals: DealProps[], signedIn: boolean,
     { label: "Stage", value: shown(site.pipeline_stage || "Universe") },
     ...(signedIn && linked ? [{ label: "NDA", key: linked.nda_status || (linked.nda_id ? "Unknown" : "Not required"), value: ndaChip(linked) }] : []),
     { label: "Asking", key: signedIn ? site.asking_price ?? site.asking_price_display : null, value: signedIn ? withEvidence(sheetMoney(site.asking_price, site.asking_price_display), site.asking_price_source) : MISSING },
-    { label: "Bays that fit", value: linked?.bays_that_fit != null ? String(Math.round(linked.bays_that_fit)) : MISSING },
+    { label: "Earlier workbook stalls", value: linked?.bays_that_fit != null ? String(Math.round(linked.bays_that_fit)) : MISSING },
     ...marketComparisonRows(marketEvidence(linked,site)),
     { label: "Land", key: site.parcel_acres ?? site.lot_ac, value: shown(acres) },
     { label: "Open land", value: spare.value },
@@ -168,15 +171,23 @@ function earningsBasis(deal?: DealProps) {
 function decisionRows(deal: DealProps | undefined, signedIn: boolean): CompareRow[] {
   if (!deal || !signedIn) return [];
   const screen = deal.screening && currentScreen(deal.screening, deal);
+  const review = deal.opportunityReview;
+  const fit = deal.chargingSpace;
   const applicable = deal.kind !== "land" && deal.financials_open !== false && deal.figures_status !== "vacant";
   return [
+    ...(deal.pendingDrop ? [{label:"Drop proposal", value:"Awaiting approval"}] : []),
+    ...(review ? [
+      {label:"Offered transaction", value:offeredTransaction(review.primary, deal.selectionResearch?.scope)},
+      {label:"Review priority", value:recommendation(review.primary)},
+    ] : []),
+    ...(fit ? [{label:"Charging spaces", value:withEvidence(fit.value,fit.basis), key:fit.count, basis:fit.basis}] : []),
     { label: "Financial source", value: applicable ? shown(deal.figures_source) : "Not applicable" },
     { label: "Financial package", value: applicable ? shown(packageLine(deal) || deal.package_status) : "Not applicable" },
     { label: "Cash flow coverage", value: !applicable ? "Not applicable" : deal.stated_cash_flow != null || deal.stated_cash_flow_display ? "Reported" : cashTile(deal).value },
     { label: "Figure basis", value: applicable ? shown(deal.earnings_basis || deal.figures_basis) : "Not applicable" },
     { label: "Reporting period", value: applicable ? shown(deal.earnings_period || deal.revenue_period) : "Not applicable" },
     { label: "Blocker", key: deal.stage_blocker === MISSING ? "clear" : deal.stage_blocker?.trim() ? "blocked" : null, value: deal.stage_blocker === MISSING ? "No blocker recorded" : shown(deal.stage_blocker) },
-    { label: "Next check", value: deal.stage_group === "dropped" ? "No further review scheduled." : shown(screen?.instruction || deal.stage_blocker && deal.stage_blocker !== MISSING && deal.stage_blocker || deal.next_step), source:screen?.origin },
+    { label: "Next check", value: review ? nextDecision(review) : deal.stage_group === "dropped" ? "No further review scheduled." : shown(screen?.instruction || deal.stage_blocker && deal.stage_blocker !== MISSING && deal.stage_blocker || deal.next_step), source:review ? [review.primary.owner,review.primary.revisitOn].filter(Boolean).join(" · ") : screen?.origin },
     ...(deal.screening?.fit ? [{label:"Assessed layout",value:deal.screening.fit,source:"Space assessment"}] : []),
   ];
 }
@@ -196,7 +207,8 @@ export function comparisonMeasures(columns: ComparisonColumn[]) {
     const recorded = cells.filter(cell => cell && ![MISSING, "Not applicable", "Checking…", "Unavailable"].includes(cell.value) && comparisonKey(cell));
     const available = recorded.length;
     const keys = recorded.map(comparisonKey);
-    const missing = values.filter(value => value === MISSING).length;
+    const missing = cells.filter((cell, index) => values[index] === MISSING ||
+      (["Site cost per charge","Charging spaces"].includes(label) && cell?.key === null)).length;
     const section = sectionFor(label);
     const differentBasis = new Set(recorded.map(cell => cell?.basis?.trim().toLowerCase() || "")).size > 1;
     const kind = section === "Record details" || label === "Next check" ? "detail"
@@ -204,7 +216,7 @@ export function comparisonMeasures(columns: ComparisonColumn[]) {
       : available && missing ? "gap"
       : !available ? "empty"
       : new Set(keys).size > 1 ? "different" : "shared";
-    return { label, values, section, kind, available, missing, allMissing: missing > 0 && values.every(value => value === MISSING || value === "Not applicable"), partial: available > 0 && missing > 0 };
+    return { label, values, section, kind, available, missing, allMissing: missing > 0 && missing === values.filter(value => value !== "Not applicable").length, partial: available > 0 && missing > 0 };
   });
 }
 

@@ -19,13 +19,16 @@ export function Evidence({option}:{option:Opportunity}) {
 export default function OpportunityReview({review, matched, active, charging, record}:{record?:boolean; review:OpportunitySite; matched?:Opportunity; active?:boolean; charging?:ChargingSummary}) {
   const primary = matched ?? review.primary;
   const others = [review.primary, ...review.alternatives].filter(o => o.route !== primary.route);
-  if (record) return <section className="opportunity-review" aria-label="Team recommendation">
-    <small>Team recommendation</small><h3>{recommendation(primary)}</h3>
-    <p>{recommendationNote(primary)}</p>
-    {primary.rank != null && <small>Ranked across all markets on the {primary.disposition === "Shortlist" ? "acquisition" : "fleet service"} list.</small>}
+  const visit = active && primary.disposition === "Shortlist" ? review.visitPlan : undefined;
+  if (record) return <section className="acquisition-brief" aria-label="Team recommendation">
+    <small>Team recommendation{primary.rank != null && " · All markets"}</small>
+    <h3>{recommendation(primary)}</h3>
+    {visit && <p>{visit.reason}</p>}
     {primary.dropReason && <p><b>Reason</b> · {primary.dropReason}</p>}
-    {active && primary.disposition === "Shortlist" && <VisitDecision option={primary} plan={review.visitPlan} charging={charging}/>}
+    <p><b>{visit ? "Before a visit" : ["Dropped","Archive listing","Outside mandate","Watch availability","Off-market prospect"].includes(primary.disposition) ? "Reconsider when" : "Next step"}</b> {visit?.beforeVisit || recommendationNote(primary)}</p>
+    <small>{primary.owner ? "Owner · " + primary.owner : "Decision owner unassigned"}{primary.revisitOn && <> · Review <time dateTime={primary.revisitOn}>{primary.revisitOn}</time></>}</small>
     <details className="disclosure"><summary className="disclosure">Review notes and sources</summary>
+      {active && primary.disposition === "Shortlist" && <VisitDecision option={primary} plan={review.visitPlan} charging={charging}/>}
       {primary.route !== "Site lead" && <p>{primary.route}</p>}
       {recommendationNote(primary) !== primary.next && <p>{primary.next}</p>}
       <Evidence option={primary}/>

@@ -17,7 +17,7 @@ import type { MapOutline } from "./spaces/SpaceOptions";
 import FinancialPortfolio from "./FinancialPortfolio";
 import { PurchaseScenarios } from "./PurchaseScenarios";
 import { purchaseLabels, financialEvidence } from "@/lib/purchaseReview";
-import { reviewLabel, reviewReturn } from "@/lib/reviewNavigation";
+import { acquisitionShortlist, reviewLabel, reviewReturn } from "@/lib/reviewNavigation";
 import MapSitePreview from "./MapSitePreview";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import { PanelBoundary } from "./PanelBoundary";
@@ -59,6 +59,7 @@ import { inCountedMarket, labeledCount, reviewBadge, shownMarketCounts } from "@
 import { actionColors } from "@/lib/charging/merit";
 import { scoreIssue } from "@/lib/scoreDisplay";
 import type { SpaceShape } from "./spaces/SpacePopover";
+import { navigateSpaces } from "@/lib/spaces/navigation";
 import { siteSpaceChange } from "@/lib/spaces/change";
 import CommentGridHost from "./comments/CommentGridHost";
 import { COMMENT_CHANGED, COMMENT_OPEN, readCommentAnchor } from "@/lib/comments/nav";
@@ -1442,6 +1443,7 @@ export default function Explorer() {
       ?? catalog?.find((feature) => feature.properties.site_id === selected)?.properties
       ?? null;
   const selectedDeal = dealRows.find((deal) => deal.deal_id === selected) ?? null;
+  const spaceSelectedId = selectedDeal?.deal_id || (selectedSite && dealForSite(selectedSite)?.deal_id) || selected || undefined;
   const showingPreview = Boolean(selected && previewId === selected && !listView && !reviewing && !ndaVisible && !loopsVisible);
   const pinPowerDeal = selectedDeal || (selectedSite ? powerDealForSite(selectedSite) : null);
   const linkedPowerSite = selectedDeal ? powerSiteForDeal(selectedDeal) : null;
@@ -2280,7 +2282,7 @@ export default function Explorer() {
   const shownCount = marketView.shown;
   const resultCount = listView && !ndaVisible && !loopsVisible ? listCount ?? shownCount : locationRows.length;
   const scopeLabel = <><span>{shortlistTitle}</span><small data-testid="scope-count">{resultCount.toLocaleString("en-US")} {resultCount === 1 ? "site" : "sites"}</small></>;
-  const mapCoverage = <div className="shortlist-map-coverage" aria-label="Mapped shortlist">
+  const mapCoverage = <div className="shortlist-map-coverage" aria-label="Mapped sites">
     <span>{mappedCount.toLocaleString("en-US")} mapped</span>
     {unplacedInView.length > 0 && <button type="button" className="text-link" onClick={() => {
       closeMenus(); setUnplacedOpen(true);
@@ -2389,7 +2391,7 @@ export default function Explorer() {
         <AskPanel open canPropose={me.actionRole === "contributor" || me.actionRole === "reviewer"} onSource={inspectAskSource} shortlist={askList} site={askSite} onClearSite={() => setAskSite(null)} onClose={() => setAskOpen(false)} />
       ) : null}
       <CommandSearch
-        open={commandOpen}
+        open={commandOpen} signedIn={Boolean(me?.u)}
         onClose={() => setCommandOpen(false)}
         fallback={(needle) => paletteGroups(needle, dealRows, (catalog ?? features).map((feature) => feature.properties), {
           cStores: categories.store,
@@ -2399,7 +2401,8 @@ export default function Explorer() {
         })}
       />
       <header className="bar">
-        {recoveringMap && <div className="map-retry" role="status"><span>Map unavailable. Showing your shortlist.</span>
+        {recoveringMap && <div className="map-retry" role="status"><span>Map unavailable. Showing your site list.</span>
+          {me && <button type="button" className="paper-btn" data-testid="open-map-spaces" onClick={()=>navigateSpaces(true,spaceSelectedId)}>Spaces</button>}
           <button className="text-link" type="button" onClick={retryMap}>Retry map</button>
         </div>}
         <ActionsQuietNotice />
@@ -2460,11 +2463,12 @@ export default function Explorer() {
             ) : null}
           </div>
         </div>
-        <nav className="workspace-jobs" aria-label="Acquisition workspace" aria-description="Discover sites in Explore, screen sites in Pipeline, open assignments in My work, or review the site queue.">
+        <nav className="workspace-jobs" aria-label="Acquisition workspace" aria-description="Explore sites, browse the pipeline, open the ranked acquisition shortlist, or review work and approvals.">
           {(["universe","pipeline"] as const).map(job => {
             const active = funnel === job && !inReview && !loopsVisible && !ndaVisible;
             return <button type="button" key={job} className={active ? "chip on" : "chip"} aria-current={active ? "page" : undefined} onClick={()=>{if (!active) {setSelected(null); chooseFunnel(job,true);}}}>{job === "universe" ? "Explore" : "Pipeline"}</button>;
           })}
+          {me?.u && <a className="chip workspace-shortlist" href={acquisitionShortlist} aria-label="Acquisition shortlist"><span className="only-desktop">Acquisition </span>Shortlist</a>}
           {me?.actionsEnabled && loopsAllowed && <button type="button" className={loopsVisible || ndaVisible ? "chip on" : "chip"} aria-current={myWork ? "page" : undefined} onClick={()=>{if (!myWork) {workPosition.current=null;setSelected(null);write({fromWork:null,loops:"work",nda:null,view:null,table:null,review:null,i:null,site:null,measure:null,compare:null});}}}>My work</button>}
           {me?.actionsEnabled ? (
             <button className={`review-launch ${inReview ? "on" : ""}`} aria-current={inReview ? "page" : undefined} type="button" onClick={() => inReview && restoreOrigin() ? undefined : write({ review: inReview ? null : "1", i: inReview ? null : "1", rsite: null, view: null, table: null, q: null, qmarket: inReview ? null : "all", qstage: inReview ? null : "any", nda: null, loops: null })}>
@@ -2949,7 +2953,10 @@ export default function Explorer() {
           <ReviewFeedSheet sites={reviewList.map((site) => ({ ...site, score: listScoreText(dealRows.find((deal) => deal.deal_id === site.siteId || deal.universe_id === site.siteId)?.score) }))} currentId={reviewCurrent?.siteId || ""} onPick={goReview} onClose={() => setFeedSheet(false)} links={reviewLinks} />
         ) : null}
         {(needsMap || mapVisited) && <PanelBoundary name="Map">
-        <MapView key={mapAttempt} signedIn={Boolean(me)} spacesMarket={allCities?"all":city} spacesOpen={params.get("spaces")==="1"}
+        <MapView key={mapAttempt} signedIn={Boolean(me)} spacesMarket={allCities?"all":city} spacesOpen={params.get("spaces")==="1"} spaceSiteIds={new Set(locationRows.map(row => {
+            const mapped = siteById.get(row.id);
+            return (mapped && dealForSite(mapped)?.deal_id) || row.id;
+          }))} spaceSelectedId={spaceSelectedId}
           onDrawAt={me ? (siteId, center) => {
             setShowSpaces(true); setPickedSpace(""); setMarking({siteId,lng:center[0],lat:center[1],nonce:Date.now()});
             if (dealRows.some(deal=>deal.deal_id===siteId)) { setSelected(siteId); setPreviewId(siteId); setSheetSnap("peek"); }
@@ -3196,7 +3203,7 @@ export default function Explorer() {
                 </div>
                 {!listView && !inReview && !marking && <div className="map-analysis-links"><p className="eyebrow">Map analysis</p>
                   <button className="text-link" type="button" onClick={()=>chooseMarketMetric(activeMetric || "traffic")}>Market context</button>
-                  {me?.u && <button className="text-link" type="button" onClick={()=>{chooseLayers(false);write({spaces:"1"});}}>Browse spaces</button>}</div>}
+                  {me?.u && <button className="text-link" type="button" onClick={()=>{chooseLayers(false);write({spaces:"1", spaceScope:"map"});}}>Browse spaces</button>}</div>}
                 <p className="eyebrow">Pin labels</p>
                 <div className="segmented pin-modes" role="group" aria-label="Pin labels">
                   {([["none", "Off", LAYER_TITLES.pinOff], ["asking", "Price", LAYER_TITLES.pinPrice], ["acres", "Acres", LAYER_TITLES.pinAcres], ["peracre", "$/ac", LAYER_TITLES.pinPerAcre]] as const).map(([id, label, title]) => (
@@ -3268,7 +3275,7 @@ export default function Explorer() {
           )}
         </aside>
         {!listView ? (
-          <div className="map-corner">
+          <div className={'map-corner' + (!activeMetric && !selected && !inReview && !ringsOutside ? ' map-summary' : '')}>
             {activeMetric && !selected && !stepsOpen && !filtersOpen && !unplacedOpen && !layersOpen && !ndaVisible && !loopsVisible && compareIds.length < 2 &&
               <MarketMapPanel metric={activeMetric} choose={chooseMarketMetric} clustered={mapZoom < PIN_SPLIT_ZOOM} missingLocations={unplacedInView.length}
                 showMissing={()=>{closeMenus();setUnplacedOpen(true);}} rows={marketRows} area={liveArea} spot={highlightNearby} pick={id=>nearbyPicker.current?.(id)} />}

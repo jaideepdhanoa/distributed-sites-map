@@ -10,7 +10,13 @@ export default function NearbySites({ locations, area, onPick, onSpot, fact }: {
 }) {
   const [open, setOpen] = useState(false);
   const [limit, setLimit] = useState(8);
-  useEffect(() => { setOpen(window.matchMedia("(min-width: 768px)").matches); }, []);
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 768px)");
+    const sync = () => setOpen(desktop.matches);
+    sync();
+    desktop.addEventListener("change", sync);
+    return () => desktop.removeEventListener("change", sync);
+  }, []);
   const [hover, setHover] = useState<string | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
   const spot = open ? locations.find(row => row.id === (hover || focus))?.point : null;

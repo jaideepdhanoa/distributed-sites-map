@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { Map } from "maplibre-gl";
-import { ChevronLeft, Layers3, Pencil, MessageSquare, Minus, Plus } from "lucide-react";
+import { ChevronLeft, Pencil, MessageSquare, Minus, Plus } from "lucide-react";
 import { canWrite, useActionStatus } from "@/components/actions/panel";
 import CommentThread from "@/components/comments/CommentThread";
 import {
@@ -17,6 +17,7 @@ import {
   type Assessment,
   type Point,
 } from "@/lib/spaces/options";
+import { navigateSpaces } from "@/lib/spaces/navigation";
 import { reviewLabel, reviewReturn } from "@/lib/reviewNavigation";
 import { outlineId } from "@/lib/spaces/outlineAnchor";
 import { reviewBody } from "@/lib/spaces/optionReview";
@@ -40,19 +41,6 @@ async function readCatalog(signal?: AbortSignal): Promise<SpaceCatalog> {
   if (!Array.isArray(catalog.sites)) throw Error("The space inventory is unavailable.");
   return catalog;
 }
-function navigate(open: boolean, site?: string, area?: string, layout?: Option) {
-  const url = new URL(window.location.href);
-  for (const key of ["spaces", "spaceSite", "spaceArea", "spaceLayout", "discussion", "note"])
-    url.searchParams.delete(key);
-  if (open) {
-    url.searchParams.set("spaces", "1");
-    url.searchParams.delete("view");
-  }
-  if (site) url.searchParams.set("spaceSite", site);
-  if (area) url.searchParams.set("spaceArea", area);
-  if (layout) url.searchParams.set("spaceLayout", layout);
-  window.history.pushState(null, "", url);
-}
 function candidates(site: MapSpaceSite) {
   return site.zones.filter((zone) => zone.kind !== "clear");
 }
@@ -64,6 +52,7 @@ export default function MainMapSpaces({
   market,
   selectedSite,
   previewSite,
+  mapSiteIds,
   onDraw,
   onDrawAt,
 }: {
@@ -74,6 +63,7 @@ export default function MainMapSpaces({
   market: string;
   selectedSite?: string;
   previewSite?: string;
+  mapSiteIds: ReadonlySet<string>;
   onDraw?: () => void;
   onDrawAt?: (site: string, center: Point) => void;
 }) {
@@ -193,12 +183,13 @@ export default function MainMapSpaces({
     window.addEventListener("beforeunload", leave);
     return () => window.removeEventListener("beforeunload", leave);
   }, [dirty]);
+  const fromMap = params.get("spaceScope") === "map";
   const scoped = useMemo(
     () =>
       (catalog?.sites || []).filter(
-        (s) => s.cohort === (site?.cohort || cohort) && (!region || s.market === region),
+        (s) => fromMap ? mapSiteIds.has(s.id) : s.cohort === (site?.cohort || cohort) && (!region || s.market === region),
       ),
-    [catalog, cohort, region, site],
+    [catalog, cohort, region, site, fromMap, mapSiteIds],
   );
   const needle=search.trim().toLowerCase();
   const list=useMemo(()=>scoped.flatMap(s=>{
@@ -221,7 +212,7 @@ export default function MainMapSpaces({
   function pick(s: string, a?: string) {
     const match = !a && (needle || fitCheck) ? list.find((item) => item.id === s) : undefined;
     const first = match && candidates(match)[0];
-    leave(() => navigate(true, s, a ?? (first && outlineId(first))));
+    leave(() => navigateSpaces(true, s, a ?? (first && outlineId(first))));
   }
   function move(p: Point, i = corner) {
     setCorner(i);
@@ -305,22 +296,10 @@ export default function MainMapSpaces({
         onPick={pick}
         onPoint={move}
       />
-      {!open ? (
-        !blocked && (
-          <button
-            type="button"
-            className="tool space-map-launch"
-            data-testid="open-map-spaces"
-            onClick={() => pick(catalog?.sites.some((s) => s.id === selectedSite) ? selectedSite! : "")}
-          >
-            <Layers3 size={16} />
-            Spaces
-          </button>
-        )
-      ) : (
+      {open && (
         <div className="space-map-open" data-testid="map-spaces-workspace">
           <div className="space-map-header"><header className="space-map-bar">
-            <button type="button" className="paper-btn" onClick={() => leave(() => back ? window.location.assign(back) : navigate(false))}>
+            <button type="button" className="paper-btn" onClick={() => leave(() => back ? window.location.assign(back) : navigateSpaces(false))}>
               <ChevronLeft size={16} />
               {back ? reviewLabel(back) : "Main map"}
             </button>
@@ -332,7 +311,7 @@ export default function MainMapSpaces({
                 onClick={() =>
                   leave(() => {
                     setCohort(site.cohort);
-                    navigate(true);
+                    navigateSpaces(true);
                   })
                 }
               >
@@ -350,7 +329,7 @@ export default function MainMapSpaces({
                   key={key}
                   disabled={saving}
                   onClick={() => {
-                    if (key !== layout) leave(() => navigate(true, site.id, undefined, key));
+                    if (key !== layout) leave(() => navigateSpaces(true, site.id, undefined, key));
                   }}
                 >
                   {options[key]}
@@ -455,14 +434,21 @@ export default function MainMapSpaces({
                     className="paper-btn"
                     data-testid="mark-space"
                     onClick={() => {
-                      navigate(false);
+                      navigateSpaces(false);
                       onDraw();
                     }}
                   >
                     Draw a lot at the selected site
                   </button>
                 )}
-                <div className="space-map-filters">
+                {fromMap && <p>Showing sites from your filtered map. <button type="button" className="text-link" onClick={() => {
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete("spaceScope");
+                  url.searchParams.delete("spaceSite");
+                  setRegion(""); setCohort("active"); setSearch(""); setFitCheck("");
+                  window.history.pushState(null, "", url);
+                }}>Browse all analyzed sites</button></p>}
+                {!fromMap && <div className="space-map-filters">
                   <label>
                     Pipeline
                     <select
@@ -492,7 +478,7 @@ export default function MainMapSpaces({
                       ))}
                     </select>
                   </label>
-                </div>
+                </div>}
                 <label>Physical fit
                   <select className="secondary" aria-label="Physical fit filter" value={fitCheck} onChange={e=>setFitCheck(e.target.value as FitCheck|"")}>
                     <option value="">All fit checks</option>{Object.entries(fitChecks).map(([key,label])=><option value={key} key={key}>{label}</option>)}
@@ -508,6 +494,7 @@ export default function MainMapSpaces({
                 <p>
                   {footprintCount} {footprintCount === 1 ? "space" : "spaces"} across {list.length} {list.length === 1 ? "site" : "sites"}
                 </p>
+                {list.length === 0 && <p>No analyzed spaces match this view.</p>}
                 <div className="space-map-list">
                   {list.map((s) => (
                     <button className="menu-item" type="button" key={s.id} onClick={() => pick(s.id,outlineId(candidates(s)[0]))}>
@@ -741,7 +728,7 @@ export default function MainMapSpaces({
                 className="text-link"
                 data-testid="mark-space"
                 onClick={() => {
-                  navigate(false);
+                  navigateSpaces(false);
                   onDrawAt(site.id, site.center!);
                 }}
               >

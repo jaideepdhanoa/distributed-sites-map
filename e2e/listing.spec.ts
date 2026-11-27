@@ -28,7 +28,7 @@ test("a deal with a site folder shows it next to the map and listing links", asy
   await expect(page.getByTestId("listing-link")).toHaveAttribute("aria-label", "Open the listing");
   await expect(page.getByTestId("overview-cash")).toBeVisible();
   await expect(page.getByTestId("card-numbers")).toContainText("Open land");
-  await expect(page.getByTestId("card-numbers")).toContainText("Bays that fit");
+  await expect(page.getByTestId("card-numbers")).toContainText("Earlier stall estimate");
   await expect(page.getByTestId("card-numbers")).toContainText("Traffic");
   const step = page.getByTestId("workbook-step");
   await expect(step).toBeVisible();

@@ -211,7 +211,7 @@ export default function KeyStrip({
       <div className="metrics">
         <Metric icon={LandPlot} label="Land" value={acres} basis={basisLabel(deal.land_acres_basis)} />
         <Metric icon={Trees} label="Open land" value={spare.value} note={spare.note} title={isOpenLandBlank(spare.value) ? "Not on file" : undefined} />
-        <Metric icon={Ruler} label="Bays that fit" value={bays ? bays.replace("Bays that fit ", "") : "—"} title={bays ? undefined : "Not on file"} />
+        <Metric icon={Ruler} label="Earlier stall estimate" value={bays ? bays.replace("Bays that fit ", "") : "—"} title={bays ? undefined : "Not on file"} />
       </div>
       <PowerEvidence {...(power || {deal,site:universeSite})} signedIn={signedIn} />
       <h3 className="job">Attractiveness</h3>

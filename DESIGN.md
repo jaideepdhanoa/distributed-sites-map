@@ -136,7 +136,7 @@ Existing component classes: `review-launch`, `avatar`, `phone-step`, `backdrop`,
 
 ## Acquisition workspace
 
-The pine navigation bar groups work by Explore, Pipeline, My work and Review. Map and List switch the representation of a shortlist. My work reads assignments, unresolved evidence threads and NDA deadlines from their existing systems. Team gaps include unassigned findings. The record separates site fit, economics, diligence and activity, with source links returning to the originating comparison.
+The pine navigation bar links directly to the all-market acquisition shortlist alongside Explore, Pipeline, My work and Review. Keyboard search reaches the same ranked list. Map and List switch how the current pipeline filters are displayed. My work reads assignments, unresolved evidence threads and NDA deadlines from their existing systems. Team gaps include unassigned findings. The record separates site fit, economics, diligence and activity, with source links returning to the originating comparison.
 
 ### Market map and parcel preview
 
@@ -144,7 +144,9 @@ Start a new browser on Streets. Restore the last explicit basemap. At national s
 
 A selected pin's preview leads with a sourced spatial fact where available, the next check, and its evidence action. Keep the site record, comparison and satellite view reachable. Parcel tools groups Draw and Measure on a phone. A rendering failure opens the same shortlist with Retry map. Keep URL filters and the selected record across retry.
 
-At city zoom, Nearby sites follows the visible map and orders matching records by distance from its center. Its phone sheet starts collapsed. A row and its pin open the same parcel preview and preserve the same return camera.
+At city zoom, Nearby sites follows the visible map and orders matching records by distance from its center. Its phone sheet starts collapsed in one map summary with coverage and the map key. A row and its pin open the same parcel preview and preserve the same return camera. Spaces is in Map tools. Opening it starts with the filtered pipeline sites. Browse all analyzed sites expands the catalog. Main map restores the market, filters, selection and camera from entry.
+
+On a site record, put section tabs before the review. Lead with one recommendation and the immediate action or condition for reconsideration. Show the owner, review date and deal stage separately. Keep charging spaces and cost per charge visible. Put dated workbook next steps in Activity when a current acquisition review exists.
 
 Saved comparisons place the decision beside its source figures. Keep the original value, basis and reporting period legible when a current figure changes. Link each citation to the underlying record and any matching evidence follow-up.
 

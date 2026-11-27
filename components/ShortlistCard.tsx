@@ -27,8 +27,8 @@ export default function ShortlistCard({ row, review, option, origin }:Props) {
     <div className="visit-decision shortlist-visit" aria-label="Visit decision">
       <div className="shortlist-judgment"><div><small>Visit decision</small><h3>{plan?.decision ?? "Review the next check"}</h3>
         <p><b>Why visit?</b> {plan?.reason ?? option.rationale}</p></div>
-        <div className="shortlist-owner"><small>Decision owner</small><span>{option.owner ?? "Unassigned"}{option.revisitOn && <> · <time dateTime={option.revisitOn}>{option.revisitOn}</time></>}</span>
-          <small>Charging screen</small><span>{charging?.merit.action ?? "Case pending"}</span></div></div>
+        <div className="shortlist-owner"><small>Decision owner</small><span>{option.owner ?? "Unassigned"}{option.revisitOn && <> · Review <time dateTime={option.revisitOn}>{option.revisitOn}</time></>}</span>
+        </div></div>
       <p className="shortlist-next"><b>Next check</b> {option.next}</p>
       {plan && <VisitActions plan={plan} charging={charging}/>}
     </div>
@@ -42,7 +42,7 @@ export default function ShortlistCard({ row, review, option, origin }:Props) {
       {row.quickLube && row.priority !== "Screen fleet service" && <p>Check retained lifts and fleet-service rights separately.</p>}
       {row.mirrorStage && row.stage !== row.mirrorStage && <p>Workbook stage · {row.mirrorStage}</p>}
       {row.financeVisible && <p>{row.readiness} · Workbook base savings {row.amount == null ? "unmodeled" : (100*row.amount).toFixed(1)+"%"}</p>}
-      {charging && <><h4>{charging.name}</h4><p>{charging.merit.next}</p>
+      {charging && <><h4>Charging case · {charging.name}</h4><p><b>{charging.merit.action === "Suggest drop" ? "Set this charging case aside" : charging.merit.action}</b></p><p>{charging.merit.next}</p>
         <p>{charging.result.siteCost == null ? "Cost pending" : "$"+charging.result.siteCost.toFixed(2)+"/charge"} · {charging.merit.netValue == null ? "Investment rank pending" : "Standalone downside network value "+amounts(charging.merit.netValue)}</p>
         {!charging.selected && <p>{filedScreenLabel(charging.screen)}</p>}<ChargingLink site={row.id} revision={charging.selected}/></>}
       {row.research && <SelectionResearch row={row.research}/>}

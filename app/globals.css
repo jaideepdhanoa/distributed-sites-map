@@ -4009,6 +4009,17 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .brief-decision span, .record-brief dt { color: var(--ink-3); font-size: var(--type-cap); }
 .brief-decision strong { color: var(--green); text-align: right; }
 .drawer .record-brief p { margin: 4px 0 8px; font-size: 14px; }
+.drawer .acquisition-brief h3 {
+  margin: .2rem 0 .4rem;
+  color: var(--ink);
+  font: 600 1.15rem/1.25 var(--font-sans, sans-serif);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.acquisition-brief > p > b { display: block; }
+.acquisition-brief > small { line-height: 1.45; }
+.acquisition-brief > details { margin-top: .6rem; }
+
 .record-brief dl { display: grid; gap: 5px; margin: 0; border-top: 1px solid var(--line); padding-top: 7px; }
 .record-brief dl > div { display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 8px; align-items: baseline; }
 .record-brief dd { margin: 0; font-size: 14px; line-height: 1.4; }
@@ -4124,6 +4135,8 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .bar .workspace-jobs { display:flex; align-items:stretch; width:100%; gap:18px; padding:0 16px; background:#173e33; color:#fffdf7; }
 .workspace-jobs .chip, .workspace-jobs .review-launch { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:38px; height:auto; margin:0; border:0; border-radius:0; padding:0 5px; background:transparent; color:#e7ece7; box-shadow:none; font-weight:550; }
 .workspace-jobs .chip.on, .workspace-jobs .review-launch.on, .workspace-jobs button:hover { color:white; background:transparent; box-shadow:inset 0 -3px #dfb986; }
+.workspace-shortlist { text-decoration:none; white-space:pre; }
+.workspace-shortlist:hover { box-shadow:inset 0 -3px #dfb986; }
 .workspace-jobs .split { display:none; }
 .workspace-jobs button:focus-visible { outline:2px solid white; outline-offset:-3px; }
 .empty-filter { overflow-wrap:anywhere; }
@@ -4197,6 +4210,13 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   position:sticky; top:0; z-index:3; align-items:center;
   padding-block:5px; margin-block:0 8px; background:var(--cream-0);
   border-bottom:1px solid var(--line);
+}
+
+@media (max-width: 767px) {
+  .drawer.snap-peek .drawer-scroll > .panel-tabs {
+    flex-wrap: nowrap; overflow-x: auto; scroll-padding-inline: 4px; scrollbar-width: thin;
+  }
+  .drawer.snap-peek .panel-tabs > button { flex: 0 0 auto; white-space: nowrap; }
 }
 
 .compare-evidence-sheet { position:fixed; inset:0 0 0 auto; margin:auto 0; width:min(26rem,100%); max-height:calc(100dvh - 2rem); overflow:auto; padding:1.25rem; background:var(--paper,#fffdf8); color:var(--ink,#1c1914); border:1px solid #d6cebe; border-radius:12px; }
@@ -4288,6 +4308,17 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   .nearby-sites { width: auto; }
   .nearby-sites:has([aria-expanded=true]) { width: min(320px, calc(100vw - 24px)); }
   #nearby-results { max-height: min(26vh, 200px); }
+  .map-corner.map-summary {
+    flex-flow: row wrap; align-items: center; gap: 0;
+    max-width: calc(100% - 16px); max-height: 44dvh; overflow: auto;
+    background: var(--paper-card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-1);
+  }
+  .map-summary .nearby-sites, .map-summary .map-key, .map-summary .key-toggle {
+    border: 0; box-shadow: none; background: transparent;
+  }
+  .map-summary .nearby-sites:has([aria-expanded=true]), .map-summary .key-expanded { flex-basis: 100%; }
+  .map-summary .shortlist-map-coverage { padding-inline: 8px; background: transparent; }
+
 }
 
 .nearby-map-ring { pointer-events: none; width: 29px; height: 29px; border-radius: 50%; border: 3px solid var(--green); box-shadow: 0 0 0 3px #fffdf8; }
@@ -4335,7 +4366,7 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .space-top small, .space-date, .option-aerial figcaption { color:#565c50; }
 .space-thumb .text-link { position:absolute; inset:0; width:100%; height:100%; border-radius:5px; }
 .space-thumb { position:relative; width:78px; height:64px; flex:none; }
-.space-thumb .option-aerial, .space-thumb svg { width:100%; height:100%; }
+.space-thumb .option-aerial, .space-thumb .option-aerial svg { width:100%; height:100%; border-radius:5px; overflow:hidden; }
 .space-thumb figcaption { display:none; }
 .space-workspace { border-top:1px solid #d7d9c9; padding-top:12px; margin-top:8px; }
 .space-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:3px; padding:3px; background:#e4e5d9; border-radius:9px; }
@@ -4429,7 +4460,6 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .finance-filters { display:flex; gap:.5rem; flex-wrap:wrap; align-items:end; }
 .finance-filters label { display:grid; gap:2px; font-size:.8rem; }
 /* A selected space owns the map canvas. The inspector leaves the footprint in view. */
-.space-map-launch.tool { position:absolute; left:14px; bottom:48px; z-index:4; display:inline-flex; align-items:center; gap:7px; background:#fffdf5; }
 .shell:has(.space-map-open) > :not(.map-stage) { display:none; }
 .shell:has(.space-map-open) .map-stage { display:block; position:fixed; inset:0; z-index:22; }
 .shell:has(.space-map-open) .map-stage > :not(:has(.space-map-open)):not(.stage-map) { display:none; }
@@ -4510,7 +4540,6 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   .stage-map:has(.space-map-open) .maplibregl-ctrl-top-right { top:158px; }
 }
 @media(max-width:767px){
-  .space-map-launch.tool { left:8px; top:calc(var(--bar-h, 138px) + 8px); bottom:auto; min-height:44px; }
 }
 
 .purchase-funding {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;border-block:1px solid #d6cebe;padding:12px 0;}
@@ -4570,7 +4599,6 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 }
 
 @media (min-width: 768px) {
-  .map-stage:has(.market-panel) .space-map-launch.tool { left: auto; right: 14px; }
 }
 
 .power-scope-chips, .map-analysis-links { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; }

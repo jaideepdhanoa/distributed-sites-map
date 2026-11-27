@@ -4,11 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { withoutGmail } from "@/lib/displayText";
+import { acquisitionShortlist } from "@/lib/reviewNavigation";
 import { rememberSearch } from "@/lib/navSearch";
 import { filledSections, type PaletteGroups, type PaletteHit } from "@/lib/search/palette";
 import { commandSheetBox } from "@/lib/search/sheet";
 
 type Groups = PaletteGroups;
+
+const shortlistHit: PaletteHit = { id: "acquisition-shortlist", title: "Acquisition shortlist", detail: "Ranked acquisition sites across all markets", path: acquisitionShortlist, url: acquisitionShortlist };
 
 const EMPTY: Groups = { sites: [], brokers: [], conversations: [] };
 
@@ -59,7 +62,9 @@ export default function CommandSearch({
   open,
   onClose,
   fallback,
+  signedIn,
 }: {
+  signedIn?: boolean;
   open: boolean;
   onClose: () => void;
   fallback?: (query: string) => Groups;
@@ -87,7 +92,7 @@ export default function CommandSearch({
   if (!open) opened.current = false;
 
   function choose(hit: PaletteHit) {
-    const href = openPath(hit);
+    const href = hit === shortlistHit ? acquisitionShortlist : openPath(hit);
     rememberSearch(href);
     onClose();
     router.push(href);
@@ -180,6 +185,10 @@ export default function CommandSearch({
   }, [open, onClose]);
 
   const sections = filledSections(groups);
+  const term = query.trim().toLowerCase();
+  if (signedIn && term.length >= 2 && ["acquisition shortlist", "short list", "selection review"].some(label => label.includes(term))) {
+    sections.unshift({ label: "Workspace", hits: [shortlistHit] });
+  }
   const flat = sections.flatMap((section) => section.hits);
   const index = flat.length ? Math.min(active, flat.length - 1) : 0;
   const current = flat[index];
@@ -190,7 +199,7 @@ export default function CommandSearch({
   }, [open, index, groups]);
 
   if (!open || typeof document === "undefined") return null;
-  const any = count(groups);
+  const any = flat.length;
   return createPortal(
     <>
     <button type="button" className="backdrop command-backdrop" aria-label="Close search" onClick={onClose} />
@@ -203,7 +212,7 @@ export default function CommandSearch({
         ref={input}
         className="search"
         aria-label="Search everything"
-        placeholder="Sites, brokers, conversations"
+        placeholder="Sites, brokers, conversations and workspaces"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         onKeyDown={(event) => {

@@ -72,7 +72,8 @@ export function ChargingExplanation({draft,seed,result:r,trace,reference,referen
         <div className="calc-equation"><div><span>Annual net cost</span><b>{money(trace.total,0)}</b></div><i>÷</i><div><span>Annual completed charges</span><b>{number(r.sessions,0)}</b></div><i>=</i><div><span>Cost per charge</span><b>{money(r.siteCost)}</b></div></div>
         <section className="detailed-site-trials"><h3>Site assumptions</h3><p className="layer-meta">{draft.layout || "Detailed layout"} · Changes update this working case.</p>
           <div className="ledger-controls">{(["stalls",draft.terms==="lease"?"rent":"ask","upgrade","build","conversion",...(draft.terms==="purchase"?["cash","loss"]:[])] as Key[]).map(k=><div key={k}>
-            <LedgerNumber label={fields[k].label+" · trial"} value={draft.values[k]} valid={n=>Number.isFinite(n) && n>=fields[k].min && n<=fields[k].max && (k!=="stalls" || Number.isInteger(n))} onValue={n=>onTrial(k,n)}/>
+            <LedgerNumber label={fields[k].label+" · trial"} caption={fields[k].label} value={draft.values[k]}
+              unit={k==="stalls"?"count":"money"} scale={{base:sourceValue(draft,k).value,fallback:k==="stalls"?12:250000,limit:fields[k].max,negative:k==="cash"}} valid={n=>Number.isFinite(n) && n>=fields[k].min && n<=fields[k].max && (k!=="stalls" || Number.isInteger(n))} onValue={n=>onTrial(k,n)}/>
             <small>{status(sourceValue(draft,k).value,sourceValue(draft,k).evidence)}</small></div>)}</div></section>
         <details className="disclosure calc-group" open><summary className="disclosure">Annual costs and retained cash</summary>
           <p className="layer-meta">Annual dollars. Purchase and construction use capital recovery over the case horizon. Retained cash reduces cost.</p>{trace.annual.map(row=>line(row))}</details>

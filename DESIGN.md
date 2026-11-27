@@ -18,6 +18,8 @@ Use one primary action per view. The other actions are pills or links.
 
 `tool` and `icon-btn` are the same secondary pill, used for map chrome and icon-only actions. `icon-btn` is 44px.
 
+The charging ledger uses a native range input with the `ledger-slider` class. Show both ends of its trial range and an adjacent editable amount. Keep the slider and value keyboard-accessible and give touch controls a 44px target.
+
 ## Segmented control
 
 An either/or pair, such as Streets / Satellite, is a segmented control. Not two separate pills, and not a `<select>`.

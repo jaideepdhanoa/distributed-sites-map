@@ -45,3 +45,10 @@
 .calc-bar+b { min-width:6.5rem; margin-left:0 !important; text-align:right; }
 .cost-evidence-link.text-link { display:block; max-width:100%; text-align:left; font-size:.84rem; min-height:36px; }
 @media(max-width:700px){ .cost-evidence-link.text-link { min-height:44px; } }
+
+.preliminary-cost { padding: 1rem; margin: 1rem 0; background: var(--paper-card); border: 1px solid var(--line); border-top: 3px solid var(--green); border-radius: 12px; }
+.preliminary-cost h3 { margin: 0 0 .6rem; }
+.preliminary-cost > div > strong { font-size: 1.4rem; }
+.preliminary-cost p { margin: .4rem 0; }
+.preliminary-cost dt { font-weight: 650; margin-top: .65rem; }
+.preliminary-cost dd { margin: .2rem 0; }

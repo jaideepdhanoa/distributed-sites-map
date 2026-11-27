@@ -94,7 +94,7 @@ export async function loadMapDeals(role: ActionRole, includePurchase = true) {
     if (active && !/^dropped/i.test(d.stage || "") && record.opportunityReview?.primary.disposition === "Suggest drop") {
       record.suggested_drop = record.opportunityReview.primary.rationale;
     }
-    if(active && ["MIA","PHX","LAS"].includes(d.city) && !selection?.[d.deal_id]?.land) record.charging=summarize(record,sourceRevision(record),saved?.get(d.deal_id));
+    if(active && ["MIA","PHX","LAS"].includes(d.city) && !selection?.[d.deal_id]?.land) record.charging=summarize(record,sourceRevision(record),saved?.get(d.deal_id),purchase?.assumptions);
     return {...feature,properties:record};
   });
   // Live decisions can change while the published workbook snapshot stays the same.

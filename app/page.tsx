@@ -1,3 +1,4 @@
+import "@/components/pipeline-charging.css";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import AppLoading from "@/components/AppLoading";

@@ -4,7 +4,6 @@ import { compareAttention, matchingOption } from "@/lib/selection/opportunity";
 import { recommendation, nextDecision } from "@/lib/selection/opportunityDisplay";
 import { listScreen, listSpace, hasListChanges, proxyReading } from "@/lib/charging/listScreen";
 import { defaultListAssumptions, type ListAssumptions } from "@/lib/charging/preliminary";
-import "./pipeline-charging.css";
 import { PipelineChargingDialog } from "./PipelineChargingDialog";
 import { ChargingLink } from "./ChargingLink";
 import { dropReasons } from "@/lib/selection/dropReasons";

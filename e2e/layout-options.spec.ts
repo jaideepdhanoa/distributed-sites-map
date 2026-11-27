@@ -122,6 +122,7 @@ test("open an analyzed space on the main map and adjust a source-plan corner", a
   await work.getByRole("button",{name:"Convert bays",exact:true}).click();
   await expect(work).toContainText("No bay footprint established");
   await work.getByRole("button",{name:"Convert outdoor space",exact:true}).click();
+  await expect(work.getByTestId("map-space-title")).toHaveText("East parking row");
   await work.getByRole("button",{name:"Hide overlays"}).click();
   await expect(work.locator("svg polygon")).toHaveCount(0);
   await work.getByRole("button",{name:"Show overlays"}).click();

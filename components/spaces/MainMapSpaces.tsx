@@ -115,7 +115,8 @@ export default function MainMapSpaces({
   const cases = assessment?.parcelCases;
   const caseIndex = study === "default" ? 0 : Number(study);
   const selectedCase = filter === "all" && !area && cases && Number.isInteger(caseIndex) ? cases[caseIndex] : undefined;
-  const rowTrial = study === "row" && active && !["clear","bay","ground"].includes(active.kind);
+  const canTestRow = active && !active.fitHold && active.kind !== "bay" && active.kind !== "clear";
+  const rowTrial = study === "row" && canTestRow;
   const sketch = useMemo(() => {
     if (draft || !site) return null;
     if (selectedCase) return sketchCase(selectedCase,site.zones,site.frame);
@@ -537,7 +538,7 @@ export default function MainMapSpaces({
               </>
             )}
             {site && filter==="all" && !draft && <ParcelInventory inventory={assessment?.inventory} zones={site.zones}/>}
-            {site && !draft && (filter==="all" && !area && cases?.length || rowTrial || active && !["bay","clear","ground"].includes(active.kind) && !active.fitHold) ? <div className="parcel-sketch">
+            {site && !draft && (filter==="all" && !area && cases?.length || rowTrial || canTestRow) ? <div className="parcel-sketch">
               <label>Charging layout<select aria-label="Charging layout" className="secondary" value={selectedCase ? String(caseIndex) : rowTrial ? "row" : "none"} onChange={event=>{
                 const value=event.target.value;
                 if(value==="row" && active) {
@@ -548,13 +549,13 @@ export default function MainMapSpaces({
               }}>
                 <option value="none">Area outlines</option>
                 {filter==="all" && !area && cases?.map((c,i)=><option value={i} key={c.name}>{c.name}</option>)}
-                {active && !["bay","clear","ground"].includes(active.kind) && !active.fitHold && <option value="row">Test a row in this area</option>}
+                {canTestRow && <option value="row">Test a row in this area</option>}
               </select></label>
               {rowTrial && active && <div className="space-map-filters"><label>Curb edge<select aria-label="Curb edge" className="secondary" value={edge} onChange={e=>setEdge(Number(e.target.value))}>
                 {active.points.map((_,i)=><option key={i} value={i}>Corners {i+1}–{(i+1)%active.points.length+1}</option>)}</select></label>
                 <label>Stall angle<select aria-label="Stall angle" className="secondary" value={angle} onChange={e=>setAngle(Number(e.target.value) as Angle)}>{[90,60,45].map(a=><option key={a} value={a}>{a}°</option>)}</select></label></div>}
               {(selectedCase || rowTrial) && <p aria-live="polite"><strong>{sketch ? sketch.stalls.length+" stalls sketched" : "Layout needs measurement"}</strong>
-                {sketch && " · Blue stalls and amber drive aisle."} {sketch?.approach && "Dashed line shows the proposed entry route."} {selectedCase?.condition || (rowTrial && (angle===90 ? "Verify the two-way approach and peak availability." : "Verify one-way entry, exit and peak availability."))}</p>}
+                {sketch && " · Blue stalls and amber drive aisle."} {sketch?.approach && "Dashed line shows the proposed entry route."} {selectedCase?.condition || (rowTrial && (angle===90 ? "Verify the two-way approach and peak availability." : "Verify one-way entry, exit and peak availability."))} {rowTrial && active?.kind === "ground" && "Development scenario. Verify buildable limits, drainage and paving cost."}</p>}
               {selectedCase && <a className="text-link" href={"/charging?site="+site.id+"&view=explain"}>See cost per charge</a>}
             </div> : null}
             {site && !active && (

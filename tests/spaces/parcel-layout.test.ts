@@ -39,3 +39,9 @@ test("a trial on another edge does not displace an assessed adjacent-aisle optio
   assert.match(result.layouts!.at(-1)!.condition,/shared aisle/);
   assert.equal(result.layouts!.at(-1)!.stalls,5);
 });
+
+test("a traced development area supports a conditional case after its footprint hold clears", () => {
+  const ground: Zone = { ...lot, kind: "ground" };
+  assert.equal(sketchCase(proposal, [ground], frame)?.stalls.length, 8);
+  assert.equal(sketchCase(proposal, [{ ...ground, fitHold: "footprint" }], frame), null);
+});

@@ -47,7 +47,7 @@ function fits(outline: Point[], candidate: Point[], blocked: Point[][]) {
 /** A row starts at the chosen curb edge. Its drive aisle must also fit inside the traced area. */
 export function sketchRow(zone: Zone, frame: Frame | undefined, edge: number, angle: Angle, limit: number, excluded: Point[][]): Sketch | null {
   const scale = feetPerPercent(frame);
-  if (!scale || zone.fitHold || ["clear","bay","ground"].includes(zone.kind) || !usableOutline(zone.points) ||
+  if (!scale || zone.fitHold || ["clear","bay"].includes(zone.kind) || !usableOutline(zone.points) ||
       !Number.isInteger(edge) || !zone.points[edge] || ![45,60,90].includes(angle) || !(limit > 0)) return null;
   const start = zone.points[edge], end = zone.points[(edge+1)%zone.points.length];
   const dx = (end[0]-start[0])*scale[0], dy = (end[1]-start[1])*scale[1];

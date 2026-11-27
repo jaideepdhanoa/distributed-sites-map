@@ -3,6 +3,7 @@ import { checkSpaceFit, fitChecks } from "@/lib/spaces/fitCheck";
 import type { Review } from "@/lib/spaces/optionReview";
 
 const availability: Record<Zone["kind"], string> = {
+  ground: "Verify buildable ground, drainage and paving costs.",
   parking: "Confirm peak parking demand and rights to the row.",
   vacuum: "Confirm peak vacuum use and how many positions the wash needs to retain.",
   bay: "Confirm which service bays can be released and during which hours.",

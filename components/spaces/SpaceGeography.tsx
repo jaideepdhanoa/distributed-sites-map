@@ -25,6 +25,8 @@ const layers = [
 ];
 const palette: ExpressionSpecification = [
   "case",
+  ["==",["get","kind"],"stalls"],"#1576b2",
+  ["==",["get","kind"],"aisles"],"#ebaa38",
   ["get", "focused"],
   "#ffc34c",
   ["match", ["get", "kind"], "clear", "#f3eee3", "bay", "#fac477", "#53d9af"],
@@ -39,14 +41,14 @@ type Props = {
   workspace: boolean;
   muted: boolean;
   edit: boolean;
-  layout: Option;
+  layout: Option|"all"; sketch?: import("@/lib/spaces/parcelLayout").Sketch|null; whole?:boolean;
   overlays: boolean;
   onPick: (site: string, area?: string) => void;
   onPoint: (point: Point, index: number) => void;
 };
 
 export default function SpaceGeography(props: Props) {
-  const { map, sites, site, active, draft, image, edit, workspace, muted, layout, overlays } = props;
+  const { map, sites, site, active, draft, image, edit, workspace, muted, layout, overlays, sketch, whole } = props;
   const latest = useRef(props);
   latest.current = props;
   const collection = useMemo(() => {
@@ -70,7 +72,7 @@ export default function SpaceGeography(props: Props) {
       if (!item.frame.bounds || (workspace && !overlays)) continue;
       for (const zone of item.zones) {
         if (zone.kind === "clear" && !selected) continue;
-        if (selected && zone.kind !== "clear" && kinds[zone.kind].option !== layout) continue;
+        if (selected && layout !== "all" && zone.kind !== "clear" && kinds[zone.kind].option !== layout) continue;
         const id = outlineId(zone);
         const focused = selected && active && id === outlineId(active);
         const points = focused && draft ? draft : zone.points;
@@ -88,8 +90,15 @@ export default function SpaceGeography(props: Props) {
         });
       }
     }
+    if (sketch && site?.frame.bounds && overlays) for (const kind of ["aisles","stalls"] as const) {
+      for (const shape of sketch[kind]) {
+        const ring=shape.map(p=>worldPoint(p,site.frame.bounds!));
+        features.push({type:"Feature",geometry:{type:"Polygon",coordinates:[[...ring,ring[0]]]},
+          properties:{kind,site:site.id,area:"",focused:false,solid:true}});
+      }
+    }
     return { type: "FeatureCollection" as const, features };
-  }, [sites, site, active, draft, workspace, layout, overlays]);
+  }, [sites, site, active, draft, workspace, layout, overlays, sketch]);
   const data = useRef(collection);
   data.current = collection;
   useEffect(() => {
@@ -173,7 +182,7 @@ export default function SpaceGeography(props: Props) {
       });
       const hit = hits.find(
         (f) =>
-          f.properties.kind !== "clear" &&
+          !["clear","stalls","aisles"].includes(f.properties.kind) &&
           (f.geometry.type !== "Point" || !f.properties.aligned || map.getZoom() < 16),
       );
       if (!hit && !latest.current.workspace) return;
@@ -211,12 +220,12 @@ export default function SpaceGeography(props: Props) {
   const selectedBounds = useMemo(() => {
     if (!bounds || !active?.points.length) return bounds;
     const footprint = new LngLatBounds();
-    for (const point of active.points) footprint.extend(worldPoint(point, bounds));
+    for (const point of (whole && site ? site.zones.flatMap(z=>z.points) : active.points)) footprint.extend(worldPoint(point, bounds));
     // Keep the approach and the neighboring aisle visible around the selected footprint.
     const context = LngLatBounds.fromLngLat(footprint.getSouthWest(), 15);
     context.extend(LngLatBounds.fromLngLat(footprint.getNorthEast(), 15));
     return [context.getWest(), context.getNorth(), context.getEast(), context.getSouth()];
-  }, [bounds, active]);
+  }, [bounds, active,whole,site]);
   const cameraBounds = (selectedBounds || extent)?.join(",");
   useEffect(() => {
     if (!map || !cameraBounds || !workspace || muted) return;
@@ -309,11 +318,11 @@ export default function SpaceGeography(props: Props) {
     };
   }, [map, site, active, bounds, muted, overlays, edit]);
   const markers = useRef<Marker[]>([]);
-  const count = active?.points.length || 0;
+  const count = draft?.length || active?.points.length || 0;
   useEffect(() => {
     if (!map || !bounds || !edit || muted || !active) return;
     const [w, n, e, s] = bounds;
-    markers.current = active.points.map((point, index) => {
+    markers.current = (latest.current.draft || active.points).map((point, index) => {
       const element = document.createElement("span");
       element.className = "map-outline-corner";
       element.title = "Corner " + (index + 1);

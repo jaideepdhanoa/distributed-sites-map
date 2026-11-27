@@ -193,3 +193,26 @@ test("open a released outline in the main map on both source types", async ({pag
   }
   expect(writes).toBe(0);
 });
+
+test("review a whole parcel, switch parking geometry and inspect its aisles", async ({page},info)=>{
+  const id="PIPE-PHX-9999";
+  const frame={id:"abcd1234567890ef",source:"Illustrative parcel plan",kind:"site-plan",date:"",width:100,height:100,metersPerPixel:.3048};
+  const lot={kind:"parking",label:"North court",points:[[4,4],[76,4],[76,49],[4,49]],edited:false};
+  const site={id,name:"Example parcel",market:"PHX",cohort:"active",revision:"abcdef123456",frame,center:null,zones:[lot]};
+  const row={area:lot.label,edge:0,angle:90,count:6};
+  const parcelCases=[{name:"North row",condition:"Check the approach and peak use.",rows:[row]}];
+  const source='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="silver"/></svg>';
+  await page.route("**/api/data/space-options?view=map",r=>r.fulfill({json:{sites:[site],reviewsAvailable:true}}));
+  await page.route("**/api/data/space-options?site=*",r=>r.fulfill({json:{assessment:{row:{...site,image:{...frame,src:source},parcelCases}}}}));
+  await page.goto("/?spaces=1&spaceSite="+id);
+  const workspace=page.getByTestId("map-spaces-workspace");
+  await expect(workspace.getByRole("button",{name:"All areas",exact:true})).toHaveAttribute("aria-pressed","true");
+  await expect(workspace.getByText("6 stalls sketched")).toBeVisible();
+  await workspace.getByText("Whole-parcel review",{exact:true}).click();
+  await expect(workspace.getByText("Undeveloped ground",{exact:true})).toBeVisible();
+  await workspace.getByText("Whole-parcel review",{exact:true}).click();
+  await page.screenshot({path:"review-shots/"+info.project.name+"-whole-parcel.png",animations:"disabled"});
+  await workspace.getByLabel("Charging layout",{exact:true}).selectOption("row");
+  await workspace.getByLabel("Stall angle").selectOption("45");
+  await expect(workspace.getByText(/Verify one-way entry/)).toBeVisible();
+});

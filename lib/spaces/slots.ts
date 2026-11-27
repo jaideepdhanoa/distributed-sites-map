@@ -4,7 +4,7 @@ import type { SpaceLayout } from "./vocab";
 export const STALL_WIDTH_FT = 9;
 export const STALL_DEPTH_FT = 18;
 
-const AISLE_FT: Record<"stalls_90" | "stalls_60" | "stalls_45", number> = {
+export const AISLE_FT: Record<"stalls_90" | "stalls_60" | "stalls_45", number> = {
   stalls_90: 24,
   stalls_60: 18,
   stalls_45: 14,

@@ -1,8 +1,9 @@
+import { bestRow, sketchCase } from "./parcelLayout";
 import { checkSpaceFit } from "./fitCheck";
 import type { MapSpaceSite } from "./mapCatalog";
 import { kinds, type Assessment } from "./options";
 
-export type ChargingFootprint = { stalls: number; condition: string };
+export type ChargingFootprint = { stalls: number; condition: string; parcel?:boolean; conversionCost?:number; lostAnnualCash?:number };
 export type PipelineFit = { value: string; basis: string; count: number | null; layouts?: ChargingFootprint[] };
 
 function rangeText([low, high]: readonly number[]) {
@@ -17,13 +18,37 @@ export function pipelineFit(site: MapSpaceSite | undefined, assessment: Assessme
   if (assessment?.status === "hold") return pending("Confirm the parcel and image");
   if (site) {
     const options = site.zones.filter(zone => zone.kind !== "clear");
-    const layouts = options.map(zone => ({ zone, fit: checkSpaceFit(zone, site.frame) }))
+    if (assessment?.parcelCases?.length) {
+      const checked: ChargingFootprint[] = [];
+      for (const proposal of assessment.parcelCases) {
+        const sketch = sketchCase(proposal,site.zones,site.frame);
+        if (sketch) checked.push({stalls:sketch.stalls.length,condition:proposal.name + ". " + proposal.condition,
+          parcel:true,conversionCost:proposal.conversionCost,lostAnnualCash:proposal.lostAnnualCash});
+      }
+      if (!checked.length) return pending("Recheck the filed rows and their aisles against the latest outlines");
+      const counts=checked.map(c=>c.stalls);
+      return {value:rangeText([Math.min(...counts),Math.max(...counts)]),basis:"Conditional whole-parcel layouts · verify availability and access",
+        count:Math.min(...counts),layouts:checked};
+    }
+    if (assessment?.inventory) {
+      const blocked=site.zones.filter(z=>z.kind==="clear").map(z=>z.points);
+      const rowOptions = options.filter(z=>z.kind!=="ground" && !z.fitHold).flatMap(zone=>{
+        const best=bestRow(zone,site.frame,blocked);
+        return best?.stalls ? [{stalls:best.stalls,condition:zone.label+" · "+best.angle+"° row with an internal aisle. "+(zone.check || kinds[zone.kind].check),parcel:true}] : [];
+      }).sort((a,b)=>b.stalls-a.stalls);
+      if(rowOptions.length) return {value:rangeText([rowOptions[0].stalls,rowOptions[0].stalls]),count:rowOptions[0].stalls,
+        basis:"Sketched row · verify access and peak use",layouts:rowOptions};
+    }
+    const layouts = options.filter(zone=>zone.kind!=="ground").map(zone => ({ zone, fit: checkSpaceFit(zone, site.frame) }))
       .filter(layout => layout.fit.inside != null)
       .sort((a, b) => b.fit.inside![0] - a.fit.inside![0] || b.fit.inside![1] - a.fit.inside![1]
         || (b.fit.adjacent?.[1] ?? 0) - (a.fit.adjacent?.[1] ?? 0));
     const best = layouts[0];
     if (best?.fit.inside) {
       const { inside, adjacent, check } = best.fit;
+      if (inside[1]===0 && !(adjacent && adjacent[1]>0) && (options.some(z=>z.kind==="bay" || z.kind==="ground" || z.fitHold) || assessment?.inventory)) {
+        return pending("Zero on the tested outline. Review the remaining areas and access");
+      }
       const basis = [kinds[best.zone.kind].label + " outline estimate"];
       if (check === "adjacent" && adjacent) basis.push("up to " + adjacent[1] + " with a shared aisle");
       if (best.zone.fitHold === "aisle") basis.push("check aisle access");

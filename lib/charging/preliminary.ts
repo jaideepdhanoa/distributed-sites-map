@@ -53,12 +53,13 @@ export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?
   const cash = retained ?? 0;
   const costed: LayoutCost[] = [];
   for (const layout of layouts) {
-    const build = layout.stalls * c.unitBuild;
+    const build = layout.stalls * c.unitBuild + (layout.conversionCost ?? 0);
+    const retainedForLayout = cash - (lease ? 0 : layout.lostAnnualCash ?? 0);
     const staffing = Math.ceil(layout.stalls / c.perPost) * c.attendant;
     const upkeep = c.fixed + c.insurance + Math.ceil(layout.stalls / c.ports) * c.perCharger;
     const scenario = (volume: number, upgrade: number): RangeCase => {
       const sessions = layout.stalls * chargesPerStall * volume;
-      const annualCost = annualProperty + (build + upgrade) * (recovery + c.tax!) + staffing + upkeep - cash;
+      const annualCost = annualProperty + (build + upgrade) * (recovery + c.tax!) + staffing + upkeep - retainedForLayout;
       return {sessions, upgrade, annualCost, perCharge:annualCost / sessions};
     };
     costed.push({...layout, build, staffing, upkeep, base:scenario(1, c.upgrade), downside:scenario(0.75, c.upgrade * 1.5)});

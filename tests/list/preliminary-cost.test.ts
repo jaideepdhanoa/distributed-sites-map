@@ -48,3 +48,13 @@ test("limited rights and lease terms do not inherit a purchase price or the sell
   assert.equal(estimate.price,800);
   assert.equal(estimate.layouts[0].base.annualCost,44200);
 });
+
+test("a parcel row includes documented conversion cost and income displacement once",()=>{
+  const row={stalls:4,condition:"North parking",parcel:true,conversionCost:10000,lostAnnualCash:1000};
+  const priced=preliminaryCost({...deal,chargingSpace:{count:4,value:"4 spaces",basis:"Conditional",layouts:[row]}},assumptions);
+  assert.ok("layouts" in priced);
+  const prior=preliminaryCost({...deal,chargingSpace:{count:4,value:"4 spaces",basis:"Conditional",layouts:[{...row,conversionCost:0,lostAnnualCash:0}]}},assumptions);
+  assert.ok("layouts" in prior);
+  assert.equal(priced.layouts[0].build-prior.layouts[0].build,10000);
+  assert.equal(priced.layouts[0].base.annualCost-prior.layouts[0].base.annualCost,2100);
+});

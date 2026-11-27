@@ -27,6 +27,9 @@ import OptionReview, { useOptionReviews, useSaveReview } from "./OptionReview";
 import { checkSpaceFit, fitChecks, type FitCheck } from "@/lib/spaces/fitCheck";
 import MapSpaceFit from "./MapSpaceFit";
 import OptionAerial from "./OptionAerial";
+import { bestRow, sketchCase, sketchRow, type Angle } from "@/lib/spaces/parcelLayout";
+import OutlineTools from "./OutlineTools";
+import ParcelInventory from "./ParcelInventory";
 import SpaceGeography from "./SpaceGeography";
 
 const cohorts = { active: "Active pipeline", "off-market": "Off market", dropped: "Dropped" } as const;
@@ -102,12 +105,23 @@ export default function MainMapSpaces({
   const zones = useMemo(() => (site ? candidates(site) : []), [site]);
   const linked = zones.find((z) => outlineId(z) === area);
   const requested = params.get("spaceLayout") as Option | null;
-  const layout: Option =
-    requested && Object.hasOwn(options, requested)
-      ? requested
-      : kinds[(linked || zones[0])?.kind || "pad"].option || "retain";
-  const choices = zones.filter((z) => kinds[z.kind].option === layout);
-  const active = choices.find((z) => z === linked) || choices[0];
+  const filter = requested && Object.hasOwn(options,requested) ? requested : "all";
+  const choices = zones.filter(z => filter === "all" || kinds[z.kind].option === filter);
+  const active = choices.find(z => z === linked) || choices[0];
+  const layout: Option = (active && kinds[active.kind].option) || (filter === "all" ? "retain" : filter);
+  const [study,setStudy] = useState("default");
+  const [edge,setEdge] = useState(0);
+  const [angle,setAngle] = useState<Angle>(90);
+  const cases = assessment?.parcelCases;
+  const caseIndex = study === "default" ? 0 : Number(study);
+  const selectedCase = filter === "all" && !area && cases && Number.isInteger(caseIndex) ? cases[caseIndex] : undefined;
+  const rowTrial = study === "row" && active && !["clear","bay","ground"].includes(active.kind);
+  const sketch = useMemo(() => {
+    if (draft || !site) return null;
+    if (selectedCase) return sketchCase(selectedCase,site.zones,site.frame);
+    if (rowTrial && active) return sketchRow(active,site.frame,edge,angle,100,site.zones.filter(z=>z.kind==="clear").map(z=>z.points));
+    return null;
+  },[active,angle,draft,edge,rowTrial,selectedCase,site]);
   const prior = history.reviews.find(
     (x) =>
       x.review?.option === layout &&
@@ -169,6 +183,7 @@ export default function MainMapSpaces({
     return () => controller.abort();
   }, [id, frame, open, attempt]);
   useEffect(() => {
+    setStudy("default"); setEdge(0); setAngle(90);
     setDraft(null);
     setCorner(0);
     setReviewOpen(false);
@@ -176,7 +191,7 @@ export default function MainMapSpaces({
     setThread(discussionRequested);
     setMessage("");
     setDiscard(null);
-  }, [id, area, open, layout, discussionRequested]);
+  }, [id, area, open, filter, discussionRequested]);
   useEffect(() => {
     if (!dirty) return;
     const leave = (e: BeforeUnloadEvent) => {
@@ -215,7 +230,7 @@ export default function MainMapSpaces({
   function pick(s: string, a?: string) {
     const match = !a && (needle || fitCheck) ? list.find((item) => item.id === s) : undefined;
     const first = match && candidates(match)[0];
-    leave(() => navigateSpaces(true, s, a ?? (first && outlineId(first))));
+    leave(() => navigateSpaces(true, s, a ?? (first && outlineId(first)), s === id && filter !== "all" ? filter : undefined));
   }
   function move(p: Point, i = corner) {
     setCorner(i);
@@ -279,7 +294,7 @@ export default function MainMapSpaces({
   const predicted = originalDims && fitRange(...originalDims, Math.min(6, originalDims[1]), "stalls_90");
   const plotted =
     site?.zones
-      .filter((z) => z.kind === "clear" || kinds[z.kind].option === layout)
+      .filter((z) => filter === "all" || z.kind === "clear" || kinds[z.kind].option === filter)
       .map((z) => (active && outlineId(z) === outlineId(active) && draft ? { ...z, points: draft } : z)) ||
     [];
   return (
@@ -293,7 +308,8 @@ export default function MainMapSpaces({
         image={image}
         workspace={open}
         muted={blocked || (!enabled && !open) || inSource}
-        layout={layout}
+        layout={filter}
+        sketch={sketch} whole={filter==="all" && !area && !draft && !rowTrial}
         overlays={overlays}
         edit={Boolean(draft) && !saving}
         onPick={pick}
@@ -324,18 +340,18 @@ export default function MainMapSpaces({
           </header>
           {site && (
             <div className="space-map-layouts space-tabs" role="group" aria-label="Operating layout">
-              {(Object.keys(options) as Option[]).map((key) => (
+              {(["all",...Object.keys(options)] as ("all"|Option)[]).map((key) => (
                 <button
                   type="button"
-                  className={key === layout ? "segmented on" : "segmented"}
-                  aria-pressed={key === layout}
+                  className={key === filter ? "segmented on" : "segmented"}
+                  aria-pressed={key === filter}
                   key={key}
                   disabled={saving}
                   onClick={() => {
-                    if (key !== layout) leave(() => navigateSpaces(true, site.id, undefined, key));
+                    if (key !== filter) leave(() => navigateSpaces(true, site.id, undefined, key === "all" ? undefined : key));
                   }}
                 >
-                  {options[key]}
+                  {key === "all" ? "All areas" : options[key]}
                 </button>
               ))}
             </div>
@@ -361,6 +377,7 @@ export default function MainMapSpaces({
                   <OptionAerial
                     image={image}
                     zones={overlays ? plotted : []}
+                    sketch={overlays ? sketch : null}
                     labels
                     active={active?.label}
                     reviewed={zones.filter((z) => z.edited).map((z) => z.label)}
@@ -507,7 +524,7 @@ export default function MainMapSpaces({
                 {list.length === 0 && <p>No analyzed spaces match this view.</p>}
                 <div className="space-map-list">
                   {list.map((s) => (
-                    <button className="menu-item" type="button" key={s.id} onClick={() => pick(s.id,outlineId(candidates(s)[0]))}>
+                    <button className="menu-item" type="button" key={s.id} onClick={() => pick(s.id)}>
                       <strong>{s.name}</strong>
                       <small>
                         {s.id} · {candidates(s).length} {candidates(s).length === 1 ? "space" : "spaces"} ·{" "}
@@ -518,6 +535,27 @@ export default function MainMapSpaces({
                 </div>
               </>
             )}
+            {site && filter==="all" && !draft && <ParcelInventory inventory={assessment?.inventory} zones={site.zones}/>}
+            {site && !draft && (filter==="all" && !area && cases?.length || rowTrial || active && !["bay","clear","ground"].includes(active.kind) && !active.fitHold) ? <div className="parcel-sketch">
+              <label>Charging layout<select className="secondary" value={selectedCase ? String(caseIndex) : rowTrial ? "row" : "none"} onChange={event=>{
+                const value=event.target.value;
+                if(value==="row" && active) {
+                  const best=bestRow(active,site.frame,site.zones.filter(z=>z.kind==="clear").map(z=>z.points));
+                  setEdge(best?.edge ?? 0);setAngle(best?.angle ?? 90);
+                }
+                setStudy(value);
+              }}>
+                <option value="none">Area outlines</option>
+                {filter==="all" && !area && cases?.map((c,i)=><option value={i} key={c.name}>{c.name}</option>)}
+                {active && !["bay","clear","ground"].includes(active.kind) && !active.fitHold && <option value="row">Test a row in this area</option>}
+              </select></label>
+              {rowTrial && active && <div className="space-map-filters"><label>Curb edge<select className="secondary" value={edge} onChange={e=>setEdge(Number(e.target.value))}>
+                {active.points.map((_,i)=><option key={i} value={i}>Corners {i+1}–{(i+1)%active.points.length+1}</option>)}</select></label>
+                <label>Stall angle<select className="secondary" value={angle} onChange={e=>setAngle(Number(e.target.value) as Angle)}>{[90,60,45].map(a=><option key={a} value={a}>{a}°</option>)}</select></label></div>}
+              {(selectedCase || rowTrial) && <p aria-live="polite"><strong>{sketch ? sketch.stalls.length+" stalls sketched" : "Layout needs measurement"}</strong>
+                {sketch && " · Blue stalls and amber drive aisle."} {selectedCase?.condition || (rowTrial && (angle===90 ? "Verify the two-way approach and peak availability." : "Verify one-way entry, exit and peak availability."))}</p>}
+              {selectedCase && <a className="text-link" href={"/charging?site="+site.id+"&view=explain"}>See cost per charge</a>}
+            </div> : null}
             {site && !active && (
               <>
                 <small>
@@ -562,7 +600,7 @@ export default function MainMapSpaces({
                   {prior?.review && <span>{prior.review.disposition==="Dismiss option" ? "Dismissed" : "Kept for diligence"}</span>}
                   <span>{site.frame.bounds ? "Map aligned" : "Source image · alignment needed"}</span>
                 </div>
-                {!draft && <MapSpaceFit zone={active} image={image} review={prior?.review} />}
+                {!draft && !selectedCase && <MapSpaceFit zone={active} image={image} review={prior?.review} />}
                 <div className="space-actions">
                   {!draft && assessment && (
                     <button
@@ -648,6 +686,7 @@ export default function MainMapSpaces({
                     clearPoints={() => {}}
                   />
                 )}
+                {draft && <OutlineTools points={draft} corner={corner} frame={image} disabled={saving} onChange={(next,index)=>{setDraft(next);setCorner(index);}}/>}
                 {activePoint && (
                   <details className="disclosure">
                     <summary className="disclosure">Corner coordinates</summary>

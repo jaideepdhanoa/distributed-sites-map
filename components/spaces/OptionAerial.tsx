@@ -2,8 +2,8 @@ import { useId, useState } from "react";
 import type { Aerial, Zone, Point } from "@/lib/spaces/options";
 import { kinds } from "@/lib/spaces/options";
 
-export default function OptionAerial({ image, zones, active, labels=false, reviewed = [], onSelect, onPoint, corner, onCorner }: {
-  image: Aerial; zones: Zone[]; active?: string; labels?:boolean; reviewed?: string[]; onSelect?: (area: string) => void; onPoint?: (point: Point, corner?: number) => void; corner?: number; onCorner?: (corner: number) => void;
+export default function OptionAerial({ image, zones, sketch, active, labels=false, reviewed = [], onSelect, onPoint, corner, onCorner }: {
+  sketch?: import("@/lib/spaces/parcelLayout").Sketch | null; image: Aerial; zones: Zone[]; active?: string; labels?:boolean; reviewed?: string[]; onSelect?: (area: string) => void; onPoint?: (point: Point, corner?: number) => void; corner?: number; onCorner?: (corner: number) => void;
 }) {
   const frameLabel = image.kind === "site-plan" ? "Site plan" : image.kind === "site-photo" ? "Site photo" : "Site aerial";
   const pattern = useId().replace(/:/g, "");
@@ -38,6 +38,9 @@ export default function OptionAerial({ image, zones, active, labels=false, revie
             fill="white" stroke="#17261e" strokeWidth={Math.min(image.width,image.height)*.012} paintOrder="stroke" fontSize={Math.min(image.width,image.height)*.032} fontWeight="700">{clear?"Keep clear":z.label}</text>}
         </g>;
       })}
+      {sketch && (["aisles","stalls"] as const).map(key=>sketch[key].map((ring,i)=>
+        <polygon key={key+i} pointerEvents="none" points={ring.map(([x,y])=>[x*image.width/100,y*image.height/100].join(",")).join(" ")}
+          fill={key==="stalls"?"#126b9c":"#ebaa38"} fillOpacity={.66} stroke="white" strokeWidth={1.4} vectorEffect="non-scaling-stroke" />))}
       {onPoint && zones.find(z => z.label === active)?.points.map(([x,y], index) => (
         <g key={index} transform={`translate(${x * image.width / 100},${y * image.height / 100})`}
           style={{touchAction:"none",cursor:"grab"}} onClick={event => event.stopPropagation()}

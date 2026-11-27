@@ -43,7 +43,7 @@ A `<select>` uses class `secondary`: fill `#fffdf8`, 1px `#d6cebe`, radius 999, 
 
 A text field uses class `field`: fill `#fffdf8`, 1px `#d6cebe`, radius 8px, and the focus ring. Search keeps class `search`.
 
-The desktop list sorts from the column header. That header is a `sort-header` button, so it is keyboard focusable and shows the focus ring. A click switches between ascending and descending. It does not clear the sort. Sort by and the direction sit in the list bar, and the choice stays in the URL. The same header holds a reorder grip, a resize edge, a filter field, and a pin control, each a `sort-header` or a `check` / `field` inside the column menu. The phone list is a column of cards: name, address, the stage chip on its own line, then a meta line with a gap and a dot between score, asking, and the firm. The stage chip is the stage name only. A missing open-land figure stays off that line. The shortlist heading names the market and funnel stage and gives the matching count. A stage shared by all shown rows appears once in the heading. Desktop shows summary figures alongside it. On a phone, Figures expands the evidence and coverage counts beneath the heading. Sort stays a `secondary` select. Select, export, and clear area sit in a More `paper-btn` menu so the toolbar stays one row. Search this area is not shown in list view.
+The desktop list sorts from the column header. That header is a `sort-header` button, so it is keyboard focusable and shows the focus ring. A click switches between ascending and descending. It does not clear the sort. Sort by and the direction sit in the list bar, and the choice stays in the URL. The header fits on one line. Drag a column name to reorder. Its options menu offers filtering, pinning, width and keyboard-accessible Move left and Move right. The resize edge stays at the right. Phone pipeline cards show the review priority, charging spaces and cost per charge with their basis. The stage chip is the stage name only. A missing open-land figure stays off that line. The shortlist heading names the market and funnel stage and gives the matching count. A stage shared by all shown rows appears once in the heading. Desktop shows summary figures alongside it. On a phone, Figures expands the evidence and coverage counts beneath the heading. Sort stays a `secondary` select. Select, export, and clear area sit in a More `paper-btn` menu so the toolbar stays one row. Search this area is not shown in list view.
 
 Columns is a `paper-btn` that opens a menu. It is not a `<details>` triangle. In list view the sheet fills the width. Extra space goes to Site, Asking · source, Power, Traffic, and Cash flow. A saved column layout keeps its widths, and the last of those columns fills a pane that is still wider. Those cells wrap, the full value stays on the tooltip, and the comparison bar stays under the text. Measure and the other map controls stay on the map and hide while the list is open.
 
@@ -136,7 +136,7 @@ Existing component classes: `review-launch`, `avatar`, `phone-step`, `backdrop`,
 
 ## Acquisition workspace
 
-The pine navigation bar groups work by Explore, Pipeline, My work and Review. Map and List switch the representation of a shortlist. My work reads assignments, unresolved evidence threads and NDA deadlines from their existing systems. Team gaps include unassigned findings. The record separates site fit, economics, diligence and activity, with source links returning to the originating comparison.
+The pine navigation bar links directly to the all-market acquisition shortlist alongside Explore, Pipeline, My work and Review. Keyboard search reaches the same ranked list. Map and List switch how the current pipeline filters are displayed. My work reads assignments, unresolved evidence threads and NDA deadlines from their existing systems. Team gaps include unassigned findings. The record separates site fit, economics, diligence and activity, with source links returning to the originating comparison.
 
 ### Market map and parcel preview
 
@@ -144,7 +144,9 @@ Start a new browser on Streets. Restore the last explicit basemap. At national s
 
 A selected pin's preview leads with a sourced spatial fact where available, the next check, and its evidence action. Keep the site record, comparison and satellite view reachable. Parcel tools groups Draw and Measure on a phone. A rendering failure opens the same shortlist with Retry map. Keep URL filters and the selected record across retry.
 
-At city zoom, Nearby sites follows the visible map and orders matching records by distance from its center. Its phone sheet starts collapsed. A row and its pin open the same parcel preview and preserve the same return camera.
+At city zoom, Nearby sites follows the visible map and orders matching records by distance from its center. Its phone sheet starts collapsed. A row and its pin open the same parcel preview and preserve the same return camera. Spaces is in Map tools. Opening it starts with the filtered pipeline sites. Browse all analyzed sites expands the catalog. Main map restores the market, filters, selection and camera from entry.
+
+On a site record, put section tabs before the review. Lead with one recommendation and the immediate action or condition for reconsideration. Show the owner, review date and deal stage separately. Keep charging spaces and cost per charge visible. Put dated workbook next steps in Activity when a current acquisition review exists.
 
 Saved comparisons place the decision beside its source figures. Keep the original value, basis and reporting period legible when a current figure changes. Link each citation to the underlying record and any matching evidence follow-up.
 

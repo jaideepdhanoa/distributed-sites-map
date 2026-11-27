@@ -2,6 +2,8 @@ import type { PowerRecords } from "@/lib/powerLinkIndex";
 import { PowerFollowUp } from "./PowerEvidence";
 import { useRouter } from "next/navigation";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
+import { pipelineCost } from "@/lib/charging/pipelineCost";
+import { ChargingLink } from "./ChargingLink";
 import OpportunityReview from "./OpportunityReview";
 import FinancialsEntry from "./FinancialsEntry";
 import { screeningEvidence } from "@/lib/screeningEvidence";
@@ -26,6 +28,8 @@ function FigureRow({ fact }: { fact: Figure }) {
 export default function RecordBrief({ target, pnl, power, ...input }: BriefProps) {
   const router = useRouter();
   const { status, reason, origin, review, evidence, check, missing, figures } = screeningEvidence(input);
+  const opportunity = input.signedIn && input.deal?.opportunityReview;
+  const cost = pipelineCost(input.deal?.charging);
   const financial = check === "financials" && input.signedIn;
   const coverage = financial && pnl?.statement ? financialsCard(pnl.statement, pnl.sample)?.coverage : "";
   const land = check === "space";
@@ -40,14 +44,15 @@ export default function RecordBrief({ target, pnl, power, ...input }: BriefProps
   const cash = input.signedIn && input.deal ? cashTile(input.deal) : null;
   const cashGap = !economics && cash && !cash.hidden ? (cash.value === "—" ? "Cash flow not on file" : cash.value) : "";
   const source = evidence?.kind === "county" ? evidence.href : financial && coverage ? `Financial statement · ${coverage}` : land && first?.label === "Open land" ? first.source : "";
-  const commercial = input.signedIn ? input.deal?.opportunityReview : undefined;
-  const option = commercial?.primary;
-  const active = Boolean(input.deal?.stage) && !/dropped|off[ -]?market/i.test(input.deal?.stage || "") && input.deal?.stage_group !== "dropped";
-  const visit = active && option?.disposition === "Shortlist" ? commercial?.visitPlan : undefined;
+  const metrics = input.signedIn && input.deal?.kind === "pipeline" && <dl>
+          <div><dt>Charging spaces</dt><dd>{input.deal.chargingSpace?.value ?? "No layout estimate"}<small>{input.deal.chargingSpace?.basis}</small></dd></div>
+          <div><dt>Cost per charge</dt><dd>{input.deal.charging
+            ? <ChargingLink site={input.deal.deal_id} revision={input.deal.charging.selected}>{cost.value}</ChargingLink> : cost.value}<small>{cost.basis}</small></dd></div>
+        </dl>;
   const supporting = <>
-      {reason && reason !== status && <p>{reason}</p>}
+      {!opportunity && reason && reason !== status && <p>{reason}</p>}
       <dl>
-        <div><dt>{origin}</dt><dd>{evidence?.kind === "county"
+        <div><dt>{opportunity ? "Recorded site check" : origin}</dt><dd>{evidence?.kind === "county"
           ? <a href={evidence.href} target="_blank" rel="noopener noreferrer">{review} <span aria-hidden="true">↗</span><span className="sr"> (opens in a new tab)</span></a>
           : evidence?.kind === "space" || evidence?.kind === "layout" ? <button type="button" className="text-link" onClick={() => {
             const query = new URLSearchParams(currentSearch());
@@ -72,21 +77,15 @@ export default function RecordBrief({ target, pnl, power, ...input }: BriefProps
   </>;
   return (
     <section className="record-brief" aria-label="Screening decision">
-      {commercial && option ? <>
-        <div className="acquisition-brief">
-          <small>{option.route}</small>
-          <h3>{option.disposition === "Shortlist" ? "Acquisition shortlist" : option.disposition}{option.rank != null && " #" + option.rank}</h3>
-          {visit && <p>{visit.reason}</p>}
-          <p><b>{visit ? "Before a visit" : ["Dropped","Archive listing","Watch availability","Outside mandate","Off-market prospect"].includes(option.disposition) ? "Reconsider when" : "Next step"}</b> {visit?.beforeVisit || option.next}</p>
-          <small>{option.owner ? "Owner · " + option.owner : "Commercial owner unassigned"}{option.revisitOn && <> · Review <time dateTime={option.revisitOn}>{option.revisitOn}</time></>}</small>
-          <small>Pipeline stage · {status}</small>
-        </div>
-        <details className="disclosure"><summary className="disclosure">Decision, visit plan and sources</summary>
-          <OpportunityReview review={commercial} charging={input.deal?.charging} active={active}/>
-        </details>
+      {opportunity && input.deal ? <>
+        <OpportunityReview record review={opportunity} charging={input.deal.charging}
+          active={Boolean(input.deal.stage) && !/dropped|off[ -]?market/i.test(input.deal.stage || "") && input.deal.stage_group !== "dropped"}/>
+        <p><b>Deal stage</b> · {status === "Desk screen" ? "Initial review" : status}</p>
+        {metrics}
         <details className="disclosure"><summary className="disclosure">Screening facts and follow-up</summary>{supporting}</details>
       </> : <>
-        <div className="brief-decision"><span>{input.deal ? "Pipeline stage" : "Screening status"}</span><h3>{status}</h3></div>
+        <div className="brief-decision"><span>{input.deal ? "Deal stage" : "Screening status"}</span><h3>{status}</h3></div>
+        {metrics}
         {supporting}
       </>}
     </section>

@@ -13,9 +13,7 @@ import { stageChipLabel } from "@/lib/chips";
 import { droppedDecisionLine } from "@/lib/droppedLine";
 import { isQuickLube, nextStepText, plainVerdict, QUICK_LUBE_LABEL, stageDetail, stageTone, statusOf } from "@/lib/labels";
 import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, powerSummary, revenueTile, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
-import { derivePowerRating, type PowerRatingInput } from "@/lib/score/power-rating";
 import { MeritCard } from "./SiteMerit";
-import { storedScoreView } from "@/lib/scoreDisplay";
 import FinancialsEntry, { PendingFigure, usePnlTiles, type PnlTiles } from "./FinancialsEntry";
 import { packageOnFile } from "@/lib/pnl/cue";
 import { basisBadge } from "@/lib/pricing";
@@ -160,55 +158,6 @@ function DecisionChips({
       {waiting ? <TagChip chip={waiting} compact /> : null}
       {extras.map((chip) => <TagChip key={chip.family} chip={chip} compact />)}
     </div>
-  );
-}
-
-function powerInput(deal?: DealProps | null, site?: SiteProps | null): PowerRatingInput {
-  return { ...(deal || site || {}), market: deal?.city || site?.city || "" };
-}
-
-function ScoreTile({ deal, site }: { deal?: DealProps | null; site?: SiteProps | null }) {
-  const reason = derivePowerRating(powerInput(deal, site)).reason;
-  const view = storedScoreView({
-    score: deal?.score,
-    economics: deal?.economics_points,
-    land: deal?.land_points,
-    power: deal?.power_points,
-    location: deal?.location_points,
-    deal: deal?.deal_points,
-    savingVsHub: deal?.saving_vs_hub,
-    stalls: deal?.bays_that_fit,
-    serviceArea: deal?.service_area_class,
-    dealRating: deal?.deal_rating,
-    powerDetail: reason,
-    naEconomics: isQuickLube(deal?.business_type) || isQuickLube(site?.business_type),
-  });
-  const [hover, setHover] = useState(false);
-  const [pinned, setPinned] = useState(false);
-  const open = hover || pinned;
-  return (
-    <section className="score-tile" data-testid="score-tile" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-      <span>Historical score</span>
-      {view.status === "not_scored" ? <strong data-testid="score-chip">Not scored</strong> : view.status === "provisional" ? (
-        <strong data-testid="score-chip" title={`Stored total ${view.total}. Parts sum to ${view.summed}.`}>
-          <span className="chip">Provisional</span> {view.summed}
-        </strong>
-      ) : <strong data-testid="score-chip" title={view.total && view.total !== view.chip ? `Stored total ${view.total}` : undefined}>{view.chip || "—"}</strong>}
-      <p className="score-parts" data-testid="score-parts">{view.line}</p>
-      <button type="button" className="text-link" data-testid="score-breakdown" aria-expanded={open} onClick={() => setPinned((value) => !value)}>
-        {pinned ? "Hide breakdown" : "Breakdown"}
-      </button>
-      {open ? (
-        <div className="score-pop" role="tooltip" data-testid="score-popover">
-          {view.parts.map((part) => (
-            <p key={part.id}>
-              <strong>{part.label} {part.shown}/{part.max}</strong>
-              <span>{part.detail}</span>
-            </p>
-          ))}
-        </div>
-      ) : null}
-    </section>
   );
 }
 
@@ -701,7 +650,7 @@ export default function Detail({
         listingTitle={linkedDeal?.listing_removed ? "May be removed" : undefined}
       />
       {linkedDeal?.charging && <MeritCard deal={linkedDeal}/>}
-      <ScoreTile deal={linkedDeal} site={site} />
+
       {figuresReady ? <SiteNumbers site={site} deal={linkedDeal} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />}
       {signedIn && linkedDeal && linkedDeal.kind !== "land" ? (
         <FinancialsEntry dealId={linkedDeal.deal_id} packageOnFile={packageOnFile(linkedDeal.package_status, linkedDeal.package_line)} loaded={pnl} />
@@ -1021,8 +970,12 @@ export function DealDetail({
         ) : null}
         {!decisionFirst && nextCard}
       </section>
+      {diligence.length > 0 && <details className="disclosure">
+        <summary className="disclosure">What has been verified?</summary>
+        <ChipRow chips={diligence} testId="diligence-home" titled />
+      </details>}
       {!decisionFirst && <SitePhotos card={photos} siteKey={deal.deal_id} aerialUrl={aerial?.url || ""} />}
-      <ChipRow chips={diligence} testId="diligence-home" titled />
+
       {[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).length ? <p className="note">{[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).join(" · ")}</p> : null}
       <CardLinks
         listing={cue.url}
@@ -1034,7 +987,7 @@ export function DealDetail({
         listingTitle={deal.listing_removed ? "May be removed" : undefined}
       />
       {deal?.charging && <MeritCard deal={deal}/>}
-      <ScoreTile deal={deal} site={universeSite} />
+
       {figuresReady ? <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />}
       {signedIn && deal.kind !== "land" ? (
         <FinancialsEntry dealId={deal.deal_id} packageOnFile={packageOnFile(deal.package_status, deal.package_line)} loaded={pnl} />

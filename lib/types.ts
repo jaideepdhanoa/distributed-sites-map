@@ -174,6 +174,7 @@ export type SiteProps = {
 
 export type DealProps = {
   chargingHold?: string;
+  chargingSpace?: import("./spaces/pipelineFit").PipelineFit;
   charging?: import("./charging/summary").ChargingSummary;
   statementCoverage?: "present" | "empty" | "unavailable";
   screening?: import("./selection/screen").ScreenSummary;

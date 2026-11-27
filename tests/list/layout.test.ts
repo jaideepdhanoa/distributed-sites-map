@@ -63,7 +63,7 @@ test("reorder, pin, and hide keep the site column and the saved order", () => {
 test("an untouched phone sheet uses the short column set", () => {
   const layout = defaultLayout(pipeline);
   const shown = displayIds(layout, pipeline, true, phoneColumns("pipeline"));
-  assert.deepEqual(shown, ["site", "stage", "score", "openLand"]);
+  assert.deepEqual(shown, ["site", "stage", "asking", "cashFlow"]);
 });
 
 test("column filters and numeric sort leave text facts as text", () => {

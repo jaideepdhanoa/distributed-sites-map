@@ -22,6 +22,7 @@ export type SheetColumn<Row> = {
   id: string;
   label: string;
   text: (row: Row) => string;
+  compare?: (left: Row, right: Row) => number;
   sortValue?: (row: Row) => number | null;
   /** This cell draws its own note. The cell must not set a native title. */
   customTip?: boolean;
@@ -36,6 +37,9 @@ export type SheetColumn<Row> = {
 
 /** Financials, NDA status, last contact, and next step stay off a signed-out sheet. */
 export const PRIVATE_COLUMN_IDS = [
+  "priority",
+  "spaces",
+  "chargeCost",
   "merit",
   "asking",
   "perAcre",
@@ -94,7 +98,7 @@ export function defaultLayout(ids: string[], pinned: string[] = ["site"], hidden
 }
 
 export function phoneColumns(surface: LayoutSurface): string[] {
-  if (surface === "pipeline") return ["site", "stage", "county", "merit", "score", "openLand"];
+  if (surface === "pipeline") return ["site", "priority", "spaces", "chargeCost", "stage", "asking", "cashFlow"];
   return ["site", "stage", "county", "score"];
 }
 
@@ -121,10 +125,16 @@ export function sanitizeLayout(input: unknown, allowed: string[]): ListLayout {
   const raw = input as Partial<ListLayout>;
   const known = new Set(allowed);
   const order = unique((Array.isArray(raw.order) ? raw.order : []).filter((id): id is string => typeof id === "string" && known.has(id)));
+  // Upgrade saved pipeline layouts once, including layouts stored before charging figures existed.
+  const legacy = known.has("chargeCost") && order.length > 0 && !order.includes("chargeCost");
+  if (legacy) order.splice(order.indexOf("site") + 1, 0, "priority", "spaces", "chargeCost");
   for (const id of allowed) if (!order.includes(id)) order.push(id);
   const parked = parkCounty(order);
   order.splice(0, order.length, ...parked);
   const hidden = unique((Array.isArray(raw.hidden) ? raw.hidden : []).filter((id): id is string => typeof id === "string" && known.has(id) && id !== "site"));
+  if (legacy) {
+    for (const id of ["score", "county", "openLand", "merit"]) if (known.has(id) && !hidden.includes(id)) hidden.push(id);
+  }
   const pinned = unique((Array.isArray(raw.pinned) ? raw.pinned : base.pinned).filter((id): id is string => typeof id === "string" && known.has(id) && !hidden.includes(id)));
   if (!pinned.length && order.includes("site")) pinned.push("site");
   if (known.has("site") && !hidden.includes("site") && !pinned.includes("site")) pinned.unshift("site");
@@ -139,17 +149,18 @@ export function sanitizeLayout(input: unknown, allowed: string[]): ListLayout {
   const filters: Record<string, string> = {};
   if (raw.filters && typeof raw.filters === "object") {
     for (const [id, value] of Object.entries(raw.filters)) {
-      if (!known.has(id) || typeof value !== "string") continue;
+      if (!known.has(id) || (legacy && hidden.includes(id)) || typeof value !== "string") continue;
       const text = value.trim().slice(0, FILTER_LIMIT);
       if (text) filters[id] = text;
     }
   }
+  const savedSort = sortOf(raw.sort, known);
   return {
     order,
     widths,
     pinned,
     hidden,
-    sort: sortOf(raw.sort, known),
+    sort: legacy && (!raw.touched || !savedSort || hidden.includes(savedSort.id)) ? { id: "priority", desc: false } : savedSort,
     filters,
     touched: raw.touched === true,
   };
@@ -248,6 +259,10 @@ export function prepareRows<Row>(
   const column = byId.get(sort.id);
   if (!column) return filtered;
   const copy = filtered.slice();
+  if (column.compare) {
+    const compare = column.compare;
+    return copy.sort((a, b) => sort.desc ? compare(b, a) : compare(a, b));
+  }
   const numeric = column.sortValue
     ? copy.some((row) => {
         const value = column.sortValue?.(row);

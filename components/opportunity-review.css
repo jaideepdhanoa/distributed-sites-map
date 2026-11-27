@@ -10,3 +10,14 @@
 .visit-decision table { width: 100%; font-variant-numeric: tabular-nums; }
 .visit-decision caption, .visit-decision th { text-align: left; }
 .visit-decision td, .visit-decision th:last-child { text-align: right; }
+
+.drawer .acquisition-brief h3 {
+  margin: .2rem 0 .4rem;
+  color: var(--ink);
+  font: 600 1.15rem/1.25 var(--font-sans, sans-serif);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.acquisition-brief > p > b { display: block; }
+.acquisition-brief > small { line-height: 1.45; }
+.acquisition-brief > details { margin-top: .6rem; }

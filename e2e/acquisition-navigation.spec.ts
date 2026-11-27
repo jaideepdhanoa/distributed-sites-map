@@ -44,7 +44,12 @@ test("reach the all-market shortlist from home and keyboard search", async ({pag
   await nav.getByRole("link",{name:"Acquisition shortlist"}).click();
   await expect(page).toHaveURL(url=>url.pathname+url.search===acquisitionShortlist);
   await expect(page.getByRole("heading", {name:"Example repair shop"})).toBeVisible();
-  await page.goBack();
+  await page.goto(acquisitionShortlist+"&scope="+first);
+  await expect(page.getByText("Limited to the sites from your pipeline list.",{exact:false})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Example repair shop"})).toHaveCount(0);
+  await page.getByRole("button",{name:"Show all active sites"}).click();
+  await expect(page.getByRole("heading",{name:"Example repair shop"})).toBeVisible();
+  await page.goto("/?city=PHX&funnel=pipeline&view=list");
   await page.getByTestId("scope-search").filter({visible:true}).click();
   const query=page.getByRole("textbox",{name:"Search everything"});
   await query.fill("shortlist"); await query.press("Enter");
@@ -63,7 +68,16 @@ test("open a scoped Spaces catalog and restore the original map camera",async({p
   });
   await page.waitForFunction(()=>!(window as unknown as Window & {__sitesMap:SiteMap}).__sitesMap.isMoving());
   const before=await camera();
-  await page.getByRole("group",{name:"Map tools"}).getByRole("button",{name:"Spaces"}).click();
+  const nearby=page.getByRole("button",{name:/^Nearby sites/});
+  await expect(nearby).toBeVisible();
+  const spaces=page.getByRole("group",{name:"Map tools"}).getByRole("button",{name:"Spaces"});
+  const [nearRect,spaceRect]=await Promise.all([nearby.boundingBox(),spaces.boundingBox()]);
+  expect(nearRect && spaceRect && (
+    nearRect.x + nearRect.width <= spaceRect.x || spaceRect.x + spaceRect.width <= nearRect.x ||
+    nearRect.y + nearRect.height <= spaceRect.y || spaceRect.y + spaceRect.height <= nearRect.y
+  )).toBe(true);
+  await expect(nearby).toHaveAttribute("aria-expanded",String((page.viewportSize()?.width ?? 0) >= 768));
+  await spaces.click();
   await expect(page.getByText("1 space across 1 site")).toBeVisible();
   await page.getByRole("button",{name:"Browse all analyzed sites"}).click();
   await expect(page.getByText("2 spaces across 2 sites")).toBeVisible();
@@ -79,8 +93,10 @@ test("read the action and open the bounded site-fit thumbnail",async({page},info
   const drawer=page.locator("aside.drawer");
   await expect(drawer.getByRole("tab",{name:"Site fit"})).toBeInViewport();
   const brief=drawer.locator(".acquisition-brief");
-  await expect(brief).toContainText("Acquisition shortlist #1");
+  await expect(brief).toContainText("Acquisition priority #1");
   await expect(brief).toContainText(visitPlan.beforeVisit);
+  await expect(drawer.getByText("Cost per charge", {exact:true}).first()).toBeVisible();
+  await expect(drawer.getByText("Charging spaces", {exact:true}).first()).toBeVisible();
   await mkdir("review-shots",{recursive:true});
   await brief.screenshot({path:"review-shots/"+info.project.name+"-acquisition-brief.png"});
   await drawer.getByRole("tab",{name:"Site fit"}).click();

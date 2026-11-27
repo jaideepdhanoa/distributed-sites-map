@@ -1,9 +1,10 @@
 import "./opportunity-review.css";
 import type { Opportunity, OpportunitySite } from "@/lib/selection/opportunity";
 import type { ChargingSummary } from "@/lib/charging/summary";
+import { recommendation, recommendationNote } from "@/lib/selection/opportunityDisplay";
 import VisitDecision from "./VisitDecision";
 
-function Evidence({option}:{option:Opportunity}) {
+export function Evidence({option}:{option:Opportunity}) {
   return <>
     <p>{option.rationale}</p>
     <small>Reviewed {option.reviewedOn}{option.owner && " · " + option.owner}{option.revisitOn && " · Revisit " + option.revisitOn}</small>
@@ -14,9 +15,26 @@ function Evidence({option}:{option:Opportunity}) {
   </>;
 }
 
-export default function OpportunityReview({review, matched, active, charging}:{review:OpportunitySite; matched?:Opportunity; active?:boolean; charging?:ChargingSummary}) {
+export default function OpportunityReview({review, matched, active, charging, record}:{record?:boolean; review:OpportunitySite; matched?:Opportunity; active?:boolean; charging?:ChargingSummary}) {
   const primary = matched ?? review.primary;
   const others = [review.primary, ...review.alternatives].filter(o => o.route !== primary.route);
+  const visit = active && primary.disposition === "Shortlist" ? review.visitPlan : undefined;
+  if (record) return <section className="acquisition-brief" aria-label="Team recommendation">
+    <small>Team recommendation{primary.rank != null && " · All markets"}</small>
+    <h3>{recommendation(primary)}</h3>
+    {visit && <p>{visit.reason}</p>}
+    {primary.dropReason && <p><b>Reason</b> · {primary.dropReason}</p>}
+    <p><b>{visit ? "Before a visit" : ["Dropped","Archive listing","Outside mandate","Watch availability","Off-market prospect"].includes(primary.disposition) ? "Reconsider when" : "Next step"}</b> {visit?.beforeVisit || recommendationNote(primary)}</p>
+    <small>{primary.owner ? "Owner · " + primary.owner : "Decision owner unassigned"}{primary.revisitOn && <> · Review <time dateTime={primary.revisitOn}>{primary.revisitOn}</time></>}</small>
+    <details className="disclosure"><summary className="disclosure">Review notes and sources</summary>
+      {active && primary.disposition === "Shortlist" && <VisitDecision option={primary} plan={review.visitPlan} charging={charging}/>}
+      {primary.route !== "Site lead" && <p>{primary.route}</p>}
+      {recommendationNote(primary) !== primary.next && <p>{primary.next}</p>}
+      <Evidence option={primary}/>
+      {others.map(option => <div key={option.route}><h4>{option.route} · {recommendation(option)}</h4><p>{option.next}</p>
+        {option.dropReason && <p>{option.dropReason}</p>}<Evidence option={option}/></div>)}
+    </details>
+  </section>;
   const ranked = primary.rank == null ? "" : (primary.disposition === "Shortlist" ? " · Acquisition #" : " · Service #") + primary.rank;
   return <section className="opportunity-review" aria-label="Commercial review">
     <small>{primary.route}{ranked}{primary.route !== review.primary.route && " · Alternative route"}</small>

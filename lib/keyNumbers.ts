@@ -169,7 +169,7 @@ const RANGE_KEYS = ["amin", "amax", "cmin", "cmax", "pmin", "pmax", "omin", "oma
 export function publicDeal<T extends Record<string, unknown>>(props: T): T {
   const copy = { ...props };
   for (const key of Object.keys(copy)) {
-    if (key === "charging" || key === "selectionResearch" || key === "statementCoverage" || key === "purchase" || key === "site_capacity" || key === "photos" || key.startsWith("cap_")) delete copy[key];
+    if (key === "charging" || key === "chargingSpace" || key === "opportunityReview" || key === "selectionResearch" || key === "statementCoverage" || key === "purchase" || key === "site_capacity" || key === "photos" || key.startsWith("cap_")) delete copy[key];
     if (key === "stated_revenue" || key === "stated_revenue_display" || key === "stated_cash_flow" || key === "stated_cash_flow_display") delete copy[key];
     if (key === "county_value" || key === "county_value_display" || key === "land_estimate" || key === "land_estimate_display") delete copy[key];
     if (key === "business_value" || key === "business_value_display" || key.endsWith("_multiple") || key.endsWith("_multiple_display")) delete copy[key];

@@ -1,3 +1,4 @@
+import {pipelineCost} from "../lib/charging/pipelineCost";
 import {test,expect} from "@playwright/test";
 import {mkdir} from "node:fs/promises";
 import {calculate,initialCase,modelVersion,type SavedCase} from "../lib/charging/model";
@@ -124,4 +125,59 @@ test("open released charging assumptions from the portfolio",async({page})=>{
   if(record!.charging?.selected)await expect(page.getByLabel("Work on a case")).toHaveValue(record!.charging.selected);
   await expect(page.getByRole("region",{name:"Cost per charge explanation"})).toBeVisible();
   await expect(page.getByRole("region",{name:"Charging economics editor"})).toBeVisible();
+});
+
+test("explain a preliminary range with a conditional aisle on desktop and phone", async ({page}, info) => {
+  const site = {deal_id:"PIPE-PHX-9997",name:"Example service lot",charging:{preliminary:{
+    layouts:[{stalls:4,condition:"Parking with shared aisle access",build:40000,staffing:24000,upkeep:4000,
+      base:{sessions:4000,upgrade:20000,annualCost:40600,perCharge:10.15},
+      downside:{sessions:3000,upgrade:30000,annualCost:41700,perCharge:13.90}}],
+    space:"0 spaces",price:100000,terms:"purchase",priceBasis:"Workbook property ask",cash:5000,
+    cashBasis:"Workbook retained annual cash",years:10,closing:.1,capital:0,tax:.01}}};
+  await page.route("**/api/actions/charging?site=*",route=>route.fulfill({json:{site,history:[],source:"sample",canWrite:false}}));
+  await page.goto("/charging?site="+site.deal_id+"&view=explain");
+  const panel=page.getByRole("region",{name:"Preliminary site cost"});
+  await expect(panel).toContainText("$10.15–$13.90");
+  await expect(panel).toContainText("shared aisle access");
+  await panel.getByText("How this range was calculated").click();
+  await expect(panel).toContainText("4,000 annual charges");
+  await expect(panel).toContainText("25% fewer");
+  expect(await panel.evaluate(el=>el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  await mkdir("review-shots",{recursive:true});
+  await panel.screenshot({path:"review-shots/"+info.project.name+"-preliminary-charging.png"});
+});
+
+test("open released charging ranges from the Phoenix list",async({page},info)=>{
+  test.skip(process.env.MAP_PRODUCTION_CHECK!=="1" && process.env.MAP_DEPLOYED_PREVIEW!=="1","Requires a deployed build.");
+  const response=await page.request.get("/api/data/deals");
+  expect(response.ok()).toBe(true);
+  const {features}=await response.json() as {features:{properties:import("../lib/types").DealProps}[]};
+  const byId=new Map(features.map(f=>[f.properties.deal_id,f.properties]));
+  await page.goto("/?funnel=pipeline&view=list&city=PHX&pstage=all");
+  const list=page.getByTestId("pipeline-list");
+  const rows=list.locator(info.project.name==="mobile" ? "li[data-site-row]" : "tbody tr[data-site-row]");
+  await expect(rows.first()).toBeVisible();
+  const ids=await rows.evaluateAll(elements=>elements.map(row=>row.getAttribute("data-site-row")!));
+  const deals=ids.map(id=>byId.get(id));
+  expect(deals.every(Boolean)).toBe(true);
+  const counts={priced:0,needsLayout:0,needsTerms:0,inactiveOrOutsideScope:0,other:0};
+  for (const d of deals) {
+    const c=d!.charging, p=c?.preliminary;
+    if (!c) counts.inactiveOrOutsideScope++;
+    else if (c.stale) counts.other++;
+    else if (c.result.siteCost!=null || (p && "layouts" in p)) counts.priced++;
+    else if (p && "reason" in p && /footprint|layout|spaces fit|measure|image|aisle|parcel|outline|bay/i.test(p.reason)) counts.needsLayout++;
+    else if (p && "reason" in p && /terms|rent|available|price|rights|lease|availability/i.test(p.reason)) counts.needsTerms++;
+    else counts.other++;
+  }
+  console.info("Phoenix charging coverage", JSON.stringify({visible:ids.length,...counts}));
+  const sampled=deals.find(d=>d?.charging?.preliminary && "layouts" in d.charging.preliminary && !d.charging.stale && d.charging.result.siteCost==null);
+  if (process.env.MAP_PRODUCTION_CHECK==="1") expect(Boolean(sampled)).toBe(true);
+  if (!sampled) return;
+  const label=pipelineCost(sampled.charging).value;
+  const index=ids.indexOf(sampled.deal_id);
+  expect((await rows.nth(index).textContent())?.includes(label)).toBe(true);
+  await page.goto("/charging?site="+encodeURIComponent(sampled.deal_id)+"&view=explain");
+  const panel=page.getByRole("region",{name:"Preliminary site cost"});
+  expect((await panel.textContent())?.includes(label)).toBe(true);
 });

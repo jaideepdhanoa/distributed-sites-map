@@ -1,4 +1,6 @@
 "use client";
+import { PreliminaryChargingCost } from "./PreliminaryChargingCost";
+import { pipelineCost } from "@/lib/charging/pipelineCost";
 import { siteMerit } from "@/lib/charging/merit";
 import { MeritEditor } from "./SiteMerit";
 import { useEffect,useRef,useState } from "react";
@@ -18,10 +20,11 @@ const keyOf=(r:SavedCase)=>r.id+":"+r.revision;
 export function ChargingSiteSection({deal}:{deal:DealProps}) {
   const c=deal.charging;
   if(!c)return null;
+  const cost=pipelineCost(c);
   return <section className="charging-preview" aria-label="Charging economics"><strong>Charging economics</strong>
     <p>{c.merit.action} · {c.name}</p>
-    <p>{c.result.siteCost==null?"Site cost pending":amounts(c.result.siteCost,2)+" per charge"} · {amounts(c.result.depot,2)} {c.comparator==="workbook"?"depot proxy":"depot"}</p>
-    <p>{c.merit.next}</p>{!c.selected && <p className="layer-meta">{filedScreenLabel(c.screen)}</p>}<ChargingLink site={deal.deal_id} revision={c.selected}/></section>;
+    <p>{cost.value}{cost.amount!=null && " per charge"} · {amounts(c.result.depot,2)} {c.comparator==="workbook"?"depot proxy":"depot"}</p>
+    <small>{cost.basis}</small><p>{c.merit.next}</p>{!c.selected && <p className="layer-meta">{filedScreenLabel(c.screen)}</p>}<ChargingLink site={deal.deal_id} revision={c.selected}/></section>;
 }
 export function ChargingEditor({site,revision,explain=false}:{site:string;revision?:string|null;explain?:boolean}) {
   const [payload,setPayload]=useState<Payload|null>(null),[failed,setFailed]=useState(false),[attempt,retry]=useState(0);
@@ -168,6 +171,8 @@ function Editor({data,reload,revision,explain,updateHistory}:{updateHistory:(row
     <div className="segmented cost-modes" role="group" aria-label="Charging view">
       <button type="button" className={explaining?"segmented on":"segmented"} aria-pressed={explaining} onClick={()=>setExplaining(true)}>Explanation</button>
       <button type="button" className={explaining?"segmented":"segmented on"} aria-pressed={!explaining} onClick={()=>setExplaining(false)}>Case editor</button></div>
+    {explaining && !trial && (!parent || (parent.selected && !stale && current.siteCost == null)) && site.charging?.preliminary &&
+      <PreliminaryChargingCost estimate={site.charging.preliminary} />}
     <div className="charging-controls">
       <label>Work on a case<select className="secondary" value={parent?keyOf(parent):""} onChange={e=>{const row=history.find(r=>keyOf(r)===e.target.value);load(row);pin(row);}}>
         <option value="">New planning case</option>{history.map(r=><option key={keyOf(r)} value={keyOf(r)}>{r.name} · v{r.revision}{r.selected?" · on site card":""}</option>)}</select></label>

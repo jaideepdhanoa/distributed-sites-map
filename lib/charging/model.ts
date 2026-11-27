@@ -66,6 +66,9 @@ export const decisions=["Evidence needed","Verify a condition","Reprice","Advanc
 export type Decision=typeof decisions[number];
 export type CalculationLine = {label:string; keys:Key[]; value:number|null; excluded?:boolean};
 export type CalculationTrace = {annual:CalculationLine[]; throughput:CalculationLine[]; total:number|null; hours:number|null; perHour:number|null};
+export function annualRecovery(rate: number, years: number) {
+  return rate === 0 ? 1 / years : rate / (1 - Math.pow(1 + rate, -years));
+}
 export function calculate(c:Inputs, trace?:CalculationTrace) {
   const v=c.values, missing:string[]=[];
   function need(key:Key, positive=false) {
@@ -91,7 +94,7 @@ export function calculate(c:Inputs, trace?:CalculationTrace) {
   const ownAnnual=days*(5*ownWeek+2*ownEnd)/7;
   const labor=(ownAnnual ? ownAnnual*need("posts",true)*need("wage") : 0)+(hostAnnual ? hostAnnual*need("hostFee") : 0);
   const rate=need("rate")/100, term=need("years",true);
-  const recovery=rate===0 ? 1/term : rate/(1-Math.pow(1+rate,-term));
+  const recovery=annualRecovery(rate,term);
   const capital=need("build")+need("upgrade")+need("conversion"), interruption=need("interruption");
   const retained=need("cash")-need("loss"), fixed=need("fixed"),tax=need("tax")/100;
   const utility=c.energyScope==="included" ? (sessions??0)*delivered/efficiency*need("energyRate") + need("billedPeak")*12*need("demandRate") : 0;

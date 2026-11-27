@@ -52,7 +52,7 @@ export function ChargingExplanation({draft,seed,result:r,trace,reference,referen
   const sourceLink=observation?.evidence.url || (observation?.evidence.source.startsWith("https://")?observation.evidence.source:"");
   return <section className="cost-explanation" aria-label="Cost per charge explanation">
     <div className="cost-reading">
-      <div><span>This site per completed charge</span><strong>{money(r.siteCost)}</strong><small>{r.siteCost==null?(missing.length?missing.length+" inputs to review":"Check staffed throughput"):"Annual net cost ÷ completed charges"}</small></div>
+      <div><span>{r.siteCost == null ? "Detailed case per completed charge" : "This site per completed charge"}</span><strong>{money(r.siteCost)}</strong><small>{r.siteCost==null?(missing.length?missing.length+" inputs to review":"Check staffed throughput"):"Annual net cost ÷ completed charges"}</small></div>
       <div><span>{draft.comparator==="workbook"?"Miami depot proxy":"Local depot"} per charge</span><strong>{money(r.depot)}</strong><small>{draft.energyScope==="excluded"?"Electricity excluded":"Energy and demand costs included"}</small></div>
     </div>
     <p className="cost-verdict" data-state={r.difference==null?"pending":r.difference>1e-8?"above":"parity"}>{r.difference==null?"Parity comparison pending":atParity?"At depot parity":money(Math.abs(r.difference))+(r.difference>0?" above":" below")+" depot per charge"} · {draft.comparator==="workbook"?"Workbook benchmark":draft.comparable?"Comparable scope recorded":"Confirm benchmark scope"}</p>

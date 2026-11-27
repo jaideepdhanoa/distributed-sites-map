@@ -1,5 +1,7 @@
 import { rememberSearch } from "./navSearch";
 
+export const acquisitionShortlist = "/selection-review?disposition=Shortlist";
+
 const pipeline = "/?funnel=pipeline&view=list";
 type ReviewPath = "/" | "/selection-review" | "/space-review";
 

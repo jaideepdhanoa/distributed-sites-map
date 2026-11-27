@@ -118,6 +118,27 @@ function statusMark(status: string) {
   return { label: "Awaiting approval", tone: "pending" };
 }
 
+function useWorkbookStep(id: string) {
+  const [result, setResult] = useState<{id: string; step: WorkbookStep} | null>(null);
+  useEffect(() => {
+    if (!id) return;
+    const request = new AbortController();
+    fetch(`/api/data/financials/${encodeURIComponent(id)}`, { signal: request.signal })
+      .then(async r => r.ok ? await r.json() as {workbookStep?: WorkbookStep} : null)
+      .then(body => {
+        const step = body?.workbookStep;
+        if (!request.signal.aborted) setResult(step && (step.text || step.owner || step.due) ? {id, step} : null);
+      }).catch(() => {});
+    return () => request.abort();
+  }, [id]);
+  return result?.id === id ? result.step : null;
+}
+
+export function WorkbookActivity({id}: {id: string}) {
+  const step = useWorkbookStep(id);
+  return step ? <WorkbookLine text={step.text} owner={step.owner} due={step.due ? contactDate(step.due) : ""} label="Workbook note"/> : null;
+}
+
 export function NextStepCard({
   kind,
   id,
@@ -129,6 +150,7 @@ export function NextStepCard({
   blocker,
   chips,
   waitingShown = false,
+  commercialReview = false,
 }: {
   kind: "site" | "deal";
   id: string;
@@ -141,6 +163,7 @@ export function NextStepCard({
   chips?: TagView[];
   /** The decision row already shows the waiting chip. */
   waitingShown?: boolean;
+  commercialReview?: boolean;
 }) {
   const params = useSearchParams();
   const proposal = params.get("panel") === "proposal";
@@ -189,8 +212,10 @@ export function NextStepCard({
   const moveLabel = stageMoveLabel(stageGroup, recordStage);
   const forwardRef = useRef(forward);
   forwardRef.current = forward;
-  const [workbook, setWorkbook] = useState<WorkbookStep | null>(null);
+
   const lookup = workbookId || (kind === "deal" ? id : "");
+
+  const workbook = useWorkbookStep(signedIn && !commercialReview ? lookup : "");
 
   async function reload() {
     const token = ++loadGen.current;
@@ -262,24 +287,7 @@ export function NextStepCard({
     };
   }, [proposal, reviewing, status.enabled, id]);
 
-  useEffect(() => {
-    if (!signedIn || !lookup) {
-      setWorkbook(null);
-      return undefined;
-    }
-    let cancel = false;
-    fetch(`/api/data/financials/${encodeURIComponent(lookup)}`)
-      .then(async (response) => (response.ok ? await response.json() as { workbookStep?: WorkbookStep | null } : null))
-      .then((body) => {
-        if (cancel) return;
-        const step = body?.workbookStep;
-        setWorkbook(step && (step.text || step.owner || step.due) ? step : null);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancel = true;
-    };
-  }, [signedIn, lookup]);
+
 
   useEffect(() => {
     if (!status.enabled) return undefined;
@@ -801,7 +809,7 @@ export function NextStepCard({
   );
 }
 
-function WorkbookLine({ text, owner, due }: { text: string; owner: string; due: string }) {
+function WorkbookLine({ text, owner, due, label = "Next action" }: { text: string; owner: string; due: string; label?: string }) {
   const plain = plainNextStep(text);
   const [open, setOpen] = useState(false);
 
@@ -809,7 +817,7 @@ function WorkbookLine({ text, owner, due }: { text: string; owner: string; due: 
   if (!plain.line && !owner && !due) return null;
   return (
     <div className="workbook-step" data-testid="workbook-step" data-note={open ? "full" : "line"}>
-      <h3>Next action</h3>
+      <h3>{label}</h3>
       {plain.line && !open ? <p className="next-line" title={plain.full}>{plain.line}</p> : null}
       {open ? <p className="next-full">{plain.full}</p> : null}
       <p className="step-assignment"><span>Owner <b>{owner || "Unassigned"}</b></span>{due && <span>Due <b>{due}</b></span>}</p>

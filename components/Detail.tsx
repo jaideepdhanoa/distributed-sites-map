@@ -6,7 +6,7 @@ import { NEAR_TIP, contactDate, serviceAreaChip, serviceAreaShort } from "@/lib/
 import { RowLinks } from "./RowLinks";
 import { safePackageHref } from "@/lib/financials";
 import DrawerGrip from "./DrawerGrip";
-import { NextStepCard } from "./actions/NextStepCard";
+import { NextStepCard, WorkbookActivity } from "./actions/NextStepCard";
 import Timeline from "./timeline/Timeline";
 import { ChipFace } from "./ChipFace";
 import { stageChipLabel } from "@/lib/chips";
@@ -329,7 +329,7 @@ function DealHeadline({
         <strong title={capacitySummary(facts) || "Not on file"}>{power || "—"}</strong>
       </div>
       <div>
-        <span>Bays that fit</span>
+        <span>Earlier stall estimate</span>
         <strong title={deal.bays_that_fit == null ? "Not on file" : undefined}>{bays}</strong>
         {land ? <small>{land}</small> : null}
       </div>
@@ -365,7 +365,7 @@ function SiteNumbers({ site, deal, signedIn = false, tiles = null, pending = fal
         <strong title={capacitySummary(facts) || "Not on file"}>{power || "—"}</strong>
       </div>
       <div>
-        <span>Bays that fit</span>
+        <span>Earlier stall estimate</span>
         <strong title="Not on file">—</strong>
       </div>
       <div>
@@ -616,6 +616,7 @@ export default function Detail({
       signedIn={signedIn}
       workbookId={linkedDeal?.deal_id || site.linked_deal_id || ""}
       suggestedDrop={linkedDeal?.suggested_drop}
+      commercialReview={Boolean(linkedDeal?.opportunityReview)}
       blocker={linkedDeal}
       waitingShown={Boolean(waitingChip)}
     />
@@ -664,8 +665,8 @@ export default function Detail({
         {site.land_only ? <p className="note">Land site</p> : null}
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
       </div>
-      <RecordBrief power={power} target={{ kind: "site", id: site.site_id }} pnl={pnl} site={site} deal={linkedDeal} signedIn={signedIn} />
       <RecordNavigation financials={signedIn} />
+      <RecordBrief power={power} target={{ kind: "site", id: site.site_id }} pnl={pnl} site={site} deal={linkedDeal} signedIn={signedIn} />
       <section className="decision-block" data-testid="decision-block">
         {decisionFirst && nextCard}
         <DecisionChips deal={linkedDeal} waiting={waitingChip} />
@@ -870,7 +871,7 @@ export default function Detail({
             ) : null}
           </>
         ) : <p className="note">Loading figures</p>}
-        activity={<Timeline recordId={site.site_id} relatedId={site.linked_deal_id || ""} ndaId={linkedDeal?.nda_id || ""} onOpenNda={onOpenNda} />}
+        activity={<>{signedIn && linkedDeal?.opportunityReview && <WorkbookActivity id={linkedDeal.deal_id}/>}<Timeline recordId={site.site_id} relatedId={site.linked_deal_id || ""} ndaId={linkedDeal?.nda_id || ""} onOpenNda={onOpenNda} /></>}
         discussion={extras}
       />
       <CardFooter onOpenReview={onOpenReview} onCompare={onAddCompare} compared={compared} />
@@ -970,6 +971,7 @@ export function DealDetail({
       stage={deal.stage}
       signedIn={signedIn}
       suggestedDrop={deal.suggested_drop}
+      commercialReview={Boolean(deal.opportunityReview)}
       blocker={deal}
       chips={chips}
       waitingShown={Boolean(waiting)}
@@ -1008,8 +1010,8 @@ export function DealDetail({
         {locationFix ? <LocationFix id={deal.deal_id} mode={locationFix} address={deal.address || ""} lat={lat} lng={lng} /> : null}
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
       </div>
-      <RecordBrief power={power} target={{ kind: "deal", id: deal.deal_id }} pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />
       <RecordNavigation financials={signedIn} />
+      <RecordBrief power={power} target={{ kind: "deal", id: deal.deal_id }} pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />
       <section className="decision-block" data-testid="decision-block">
         {decisionFirst && nextCard}
         <DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />
@@ -1116,7 +1118,7 @@ export function DealDetail({
             </div>
           </>
         }
-        activity={<Timeline recordId={deal.deal_id} relatedId={deal.universe_id || ""} ndaId={deal.nda_id || ""} onOpenNda={onOpenNda} />}
+        activity={<>{signedIn && deal.opportunityReview && <WorkbookActivity id={deal.deal_id}/>}<Timeline recordId={deal.deal_id} relatedId={deal.universe_id || ""} ndaId={deal.nda_id || ""} onOpenNda={onOpenNda} /></>}
         discussion={extras}
       />
       <CardFooter onOpenReview={onOpenReview} onCompare={onCompare ? () => onCompare(!compared) : undefined} compared={compared} />

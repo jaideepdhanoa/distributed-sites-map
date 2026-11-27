@@ -4181,6 +4181,8 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .bar .workspace-jobs { display:flex; align-items:stretch; width:100%; gap:18px; padding:0 16px; background:#173e33; color:#fffdf7; }
 .workspace-jobs .chip, .workspace-jobs .review-launch { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:38px; height:auto; margin:0; border:0; border-radius:0; padding:0 5px; background:transparent; color:#e7ece7; box-shadow:none; font-weight:550; }
 .workspace-jobs .chip.on, .workspace-jobs .review-launch.on, .workspace-jobs button:hover { color:white; background:transparent; box-shadow:inset 0 -3px #dfb986; }
+.workspace-shortlist { text-decoration:none; white-space:pre; }
+.workspace-shortlist:hover { box-shadow:inset 0 -3px #dfb986; }
 .workspace-jobs .split { display:none; }
 .workspace-jobs button:focus-visible { outline:2px solid white; outline-offset:-3px; }
 .empty-filter { overflow-wrap:anywhere; }
@@ -4392,7 +4394,7 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .space-top small, .space-date, .option-aerial figcaption { color:#565c50; }
 .space-thumb .text-link { position:absolute; inset:0; width:100%; height:100%; border-radius:5px; }
 .space-thumb { position:relative; width:78px; height:64px; flex:none; }
-.space-thumb .option-aerial, .space-thumb svg { width:100%; height:100%; }
+.space-thumb .option-aerial, .space-thumb .option-aerial svg { width:100%; height:100%; border-radius:5px; overflow:hidden; }
 .space-thumb figcaption { display:none; }
 .space-workspace { border-top:1px solid #d7d9c9; padding-top:12px; margin-top:8px; }
 .space-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:3px; padding:3px; background:#e4e5d9; border-radius:9px; }
@@ -4486,7 +4488,6 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .finance-filters { display:flex; gap:.5rem; flex-wrap:wrap; align-items:end; }
 .finance-filters label { display:grid; gap:2px; font-size:.8rem; }
 /* A selected space owns the map canvas. The inspector leaves the footprint in view. */
-.space-map-launch.tool { position:absolute; left:14px; bottom:48px; z-index:4; display:inline-flex; align-items:center; gap:7px; background:#fffdf5; }
 .shell:has(.space-map-open) > :not(.map-stage) { display:none; }
 .shell:has(.space-map-open) .map-stage { display:block; position:fixed; inset:0; z-index:22; }
 .shell:has(.space-map-open) .map-stage > :not(:has(.space-map-open)):not(.stage-map) { display:none; }
@@ -4567,7 +4568,6 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   .stage-map:has(.space-map-open) .maplibregl-ctrl-top-right { top:158px; }
 }
 @media(max-width:767px){
-  .space-map-launch.tool { left:8px; top:calc(var(--bar-h, 138px) + 8px); bottom:auto; min-height:44px; }
 }
 
 .purchase-funding {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;border-block:1px solid #d6cebe;padding:12px 0;}
@@ -4627,7 +4627,6 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 }
 
 @media (min-width: 768px) {
-  .map-stage:has(.market-panel) .space-map-launch.tool { left: auto; right: 14px; }
 }
 
 .power-scope-chips, .map-analysis-links { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; }

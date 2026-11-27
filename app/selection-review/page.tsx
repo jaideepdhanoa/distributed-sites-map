@@ -99,7 +99,7 @@ function SelectionList() {
     </details>
     {investment && <p>Each market starts with fleet demand after existing commitments. Each ranked site uses part of its dispatch pool. Values and peak charges show the contribution remaining at that position.</p>}
     {investment && incompatible.length>0 && <p role="status">Align the valuation date, horizon, discount rate and energy per charge before ranking {incompatible.join(", ")}.</p>}
-    {scope && <button type="button" className="text-link" onClick={()=>setReviewFilter("scope","")}>Show all active sites</button>}
+    {scope && <p className="inherited-scope">Limited to the sites from your pipeline list. <button type="button" className="text-link" onClick={()=>setReviewFilter("scope","")}>Show all active sites</button></p>}
     {!data && !error && <p role="status">Loading pipeline…</p>}
     {error && <p role="alert">Pipeline could not be loaded. <button className="text-link" onClick={()=>setAttempt(a=>a+1)}>Retry</button></p>}
     {data && <><p aria-live="polite">{droppedView ? `${droppedCount} ${droppedCount === 1 ? "site" : "sites"} with a dropped opportunity` : `${scoped.length} of ${rows.length} active sites`}</p>

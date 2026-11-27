@@ -176,7 +176,7 @@ test("a blank hosting cell stays missing, and a stored zero stays a reading", ()
       cap_b_as_of: "2026-11-05",
     });
     assert.equal(derived.rating, "Unknown");
-    assert.match(derived.reason, /no Layer B hosting/);
+    assert.match(derived.reason, /Available power is unconfirmed/);
   }
   const oneSide = derivePowerRating({
     market: "LAS",
@@ -254,7 +254,7 @@ test("OSM-only Layer A and an incomplete Layer C stay Unknown", () => {
     cap_a_substation_mi: 0.4,
   } as never);
   assert.equal(osm.rating, "Unknown");
-  assert.match(osm.reason, /no Layer B hosting and no complete Layer C/);
+  assert.match(osm.reason, /Available power is unconfirmed/);
   const partial = derivePowerRating({
     market: "PHX",
     cap_c_amps: 1200,
@@ -262,7 +262,7 @@ test("OSM-only Layer A and an incomplete Layer C stay Unknown", () => {
     cap_c_confidence: "Claimed",
   });
   assert.equal(partial.rating, "Unknown");
-  assert.match(partial.reason, /incomplete Layer C/);
+  assert.match(partial.reason, /service details are incomplete/);
   const gap = derivePowerRating({
     market: "LAS",
     cap_b_frontage: 0.4,

@@ -1,10 +1,10 @@
 "use client";
 
 import { actionColors } from "@/lib/charging/merit";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { GeoJSONSource, Map, Marker, NavigationControl, setWorkerUrl, type ExpressionSpecification, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { Ruler } from "lucide-react";
+import { Layers3, Ruler } from "lucide-react";
 import { AREA_LABELS, AREA_PAINT, areaRole } from "@/lib/areas";
 import type { NearbyWash } from "@/lib/nearbyWashes";
 import { areaTip, dealTip, depotTip, ringTip, siteTip, tipHtml, washTip, type TipModel } from "@/lib/markerTip";
@@ -19,11 +19,12 @@ import type { DealFeature, GeoFeature, SiteFeature, UnscreenedFeature } from "@/
 import type { GroundBox } from "@/lib/spaces/measure";
 import type { MapOutline } from "./spaces/SpaceOptions";
 import { worldPoint } from "@/lib/spaces/options";
-import MainMapSpaces from "./spaces/MainMapSpaces";
+import MainMapSpaces, { navigateSpaces } from "./spaces/MainMapSpaces";
 import SpaceTools, { spaceIdAt } from "./spaces/SpaceTools";
 import type { SpaceShape } from "./spaces/SpacePopover";
 
 type Props = {
+  spaceSiteIds: ReadonlySet<string>; spaceSelectedId?: string;
   signedIn?: boolean; spacesMarket?: string; spacesOpen?: boolean;
   onDrawAt?: (site: string, center: [number,number]) => void;
   layoutOverlay?: MapOutline | null;
@@ -301,15 +302,39 @@ function bboxCenter(feature: GeoFeature): [number, number] | null {
   return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
 }
 
+type Camera = { center: [number, number]; zoom: number; bearing?: number; pitch?: number; padding?: ReturnType<Map["getPadding"]> };
+
+function cameraAt(map: Map): Camera {
+  return { center: map.getCenter().toArray(), zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch(), padding: map.getPadding() };
+}
+
 export default function MapView(props: Props) {
   const node = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
-  const keptCamera = useRef<{ center: [number, number]; zoom: number } | null>(null);
-  const heldView = useRef<{ center: [number, number]; zoom: number } | null>(null);
+  const keptCamera = useRef<Camera | null>(null);
+  const heldView = useRef<Camera | null>(null);
   const skipViewReset = useRef(false);
   const freezeCamera = useRef(false);
   const clusterLeaves = useRef(new globalThis.Map<number, { properties?: Record<string, unknown> }[]>());
   const holdCamera = useRef(false);
+  const spacesOrigin = useRef<Camera | null>(null);
+  useLayoutEffect(() => {
+    const map = mapRef.current;
+    if (props.spacesOpen) {
+      if (map) spacesOrigin.current = cameraAt(map);
+      return;
+    }
+    const origin = spacesOrigin.current;
+    spacesOrigin.current = null;
+    if (!origin || props.spaceDrawing) return;
+    // Restore before any basemap cleanup captures the outgoing Spaces camera.
+    keptCamera.current = origin;
+    heldView.current = origin;
+    holdCamera.current = true;
+    freezeCamera.current = true;
+    skipViewReset.current = true;
+    map?.stop().jumpTo(origin);
+  }, [props.spacesOpen]);
   const previousScope = useRef(props.mapScope);
   const pinOrigin = useRef<{
     scope: string; id: string; center: [number, number]; zoom: number;
@@ -841,6 +866,8 @@ export default function MapView(props: Props) {
       style,
       center: kept?.center ?? [props.focusLng, props.focusLat],
       zoom: kept?.zoom ?? props.focusZoom,
+      bearing: kept?.bearing,
+      pitch: kept?.pitch,
       attributionControl: false,
       pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
       fadeDuration: 0,
@@ -1397,8 +1424,7 @@ export default function MapView(props: Props) {
       window.clearTimeout(areaDwell);
       observer?.disconnect();
       if (active) {
-        const center = active.getCenter();
-        keptCamera.current = { center: [center.lng, center.lat], zoom: active.getZoom() };
+        keptCamera.current = cameraAt(active);
       }
       tipEl?.remove();
       propsRef.current.nearbyPicker.current = null;
@@ -1701,7 +1727,7 @@ export default function MapView(props: Props) {
         freezeCamera.current = false;
         const held = heldView.current;
         heldView.current = null;
-        if (held) map.jumpTo({ center: held.center, zoom: held.zoom });
+        if (held) map.jumpTo(held);
         appliedFit.current = props.fitAll ? `all:${fitKey}:${padKey}` : fitKey;
         appliedPad.current = padKey;
         appliedFocus.current = focusToken;
@@ -2259,7 +2285,7 @@ export default function MapView(props: Props) {
       ) : null}
       {props.signedIn && <MainMapSpaces map={mapRef.current} failed={Boolean(mapFailed)} market={props.spacesMarket||"all"}
         previewSite={props.layoutOverlay?.site} enabled={props.showSpaces!==false} blocked={Boolean(props.spaceDrawing||measure)}
-        selectedSite={props.selectedId||undefined} onDraw={props.canDrawLots?props.onDrawLots:undefined} onDrawAt={props.onDrawAt}/>}
+        selectedSite={props.spaceSelectedId} mapSiteIds={props.spaceSiteIds} onDraw={props.canDrawLots?props.onDrawLots:undefined} onDrawAt={props.onDrawAt}/>}
       {mapFailed ? (
         <div className="map-empty" role="status" data-testid="map-error">
           <p>{mapFailed}</p>
@@ -2274,6 +2300,7 @@ export default function MapView(props: Props) {
         <div className={`measure-row${props.previewName ? " parcel-selected" : ""}${parcelTools ? " parcel-tools-open" : ""}`} role="group" aria-label="Map tools">
           {props.previewName && !props.spaceDrawing && !measure && <button type="button" className="tool parcel-toggle" aria-expanded={parcelTools} onClick={() => setParcelTools(open => !open)}>Parcel tools</button>}
           {!props.spaceDrawing && !measure && <span className="map-tools-label" aria-hidden="true">Map tools</span>}
+          {props.signedIn && !props.spaceDrawing && !measure && <button type="button" className="tool" data-testid="open-map-spaces" onClick={() => navigateSpaces(true, props.spaceSelectedId)}><Layers3 size={16} aria-hidden="true" />Spaces</button>}
           {props.spaceDrawing ? (
             <div className="measure-bar" data-testid="space-draw-bar" role="toolbar" aria-label="Draw a lot">
               <button type="button" className="paper-btn" data-testid="space-undo" onClick={() => sendDraw("undo")} disabled={draftPoints < 1}>Undo point</button>

@@ -349,10 +349,10 @@ export function derivePowerRating(input: PowerRatingInput): PowerRating {
   if (!clause) {
     const partialC = text(input.cap_c_amps) || text(input.cap_c_volts) || text(input.cap_c_phase);
     const reason = partialC && !completeC
-      ? "Unknown: incomplete Layer C service"
+      ? "The recorded electrical service details are incomplete."
       : bTrusted && (frontage != null || nearby != null)
-        ? "Unknown: hosting does not meet a rated band"
-        : "Unknown: no Layer B hosting and no complete Layer C service";
+        ? "The utility estimate falls outside the rating bands."
+        : "Available power is unconfirmed. Ask the utility what service it can supply.";
     clause = { rating: "Unknown", reason, inputs: [] };
   }
 

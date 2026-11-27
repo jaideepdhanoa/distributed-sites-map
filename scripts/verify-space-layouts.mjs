@@ -64,7 +64,7 @@ export async function verifySpaceLayouts(origin, file, credentials) {
             site.assessed.maximum!==Math.max(...system.map(l=>l.stalls)) ||
             system.some(l=>l.stalls!==l.parts.reduce((n,p)=>n+p.stalls,0)))) throw Error("The pipeline and map disagree on a recommended combination.");
         const filed=file.sites[site.id]?.parcelCases;
-        if (filed?.length && !site.zones.some(z=>z.edited)) {
+        if (filed?.length && !site.zones.some(z=>z.edited || z.useRight?.status==="unavailable")) {
           const original=layouts.filter(l=>l.parcel && !l.system);
           if (!isDeepStrictEqual(original.map(l=>l.stalls),filed.map(c=>c.rows.reduce((n,r)=>n+r.count,0))))
             throw Error("The pipeline does not match its filed parcel layouts.");

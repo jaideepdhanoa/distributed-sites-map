@@ -15,9 +15,11 @@ export function pipelineFit(site: MapSpaceSite | undefined, assessment: Assessme
   recorded: number | null | undefined): PipelineFit {
   const pending = (basis: string): PipelineFit => ({ value: "Needs measurement", basis, count: null });
   if (site && !current) return pending("Check the latest outline");
-  if (assessment?.status === "hold") return pending("Confirm the parcel and image");
+  if (assessment?.status === "hold") return pending(assessment.inventory ? assessment.summary : "Confirm the parcel and image");
   if (site) {
-    const options = site.zones.filter(zone => zone.kind !== "clear");
+    const options = site.zones.filter(zone => zone.kind !== "clear" && zone.useRight?.status !== "unavailable");
+    if (!options.length && site.zones.some(zone=>zone.useRight?.status==="unavailable"))
+      return {value:"Use unavailable",basis:"Reviewed rights exclude the mapped areas. Their physical outlines remain in Spaces.",count:null};
     if (assessment?.status === "reviewed") {
       const cases = assessedCases(site.zones,site.frame,assessment);
       const assessed = cases.map(c => {

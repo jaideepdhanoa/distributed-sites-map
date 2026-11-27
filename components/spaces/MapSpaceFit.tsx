@@ -56,7 +56,7 @@ export default function MapSpaceFit({
         </dd>
         {review?.measured && <><dt>Recorded measurement</dt><dd>{review.measured.stalls} stalls · {review.measured.source}</dd></>}
         <dt>Right to use</dt>
-        <dd>{zone.useRight?.status==="documented" ? "Documented" : "Pending validation"}{zone.useRight?.detail && " · "+zone.useRight.detail}</dd>
+        <dd>{zone.useRight?.status==="documented" ? "Documented" : zone.useRight?.status==="unavailable" ? "Unavailable" : "Pending validation"}{zone.useRight?.detail && " · "+zone.useRight.detail}</dd>
         <dt>Operating availability</dt>
         <dd>{zone.check || availability[zone.kind] || kinds[zone.kind].check}</dd>
         {review?.reason && <><dt>Team review</dt><dd>{review.reason}</dd></>}

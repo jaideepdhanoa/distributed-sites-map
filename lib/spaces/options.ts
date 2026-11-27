@@ -21,7 +21,7 @@ export const kinds = {
   clear: { option: null, label: "Keep clear", protect: "", check: "" },
 } as const;
 export type Zone = { kind: keyof typeof kinds; label: string; points: Point[]; check?: string; driveAisle?: Point[];
-  useRight?: { status: "documented" | "unconfirmed"; detail: string };
+  useRight?: { status: "documented" | "unconfirmed" | "unavailable"; detail: string };
   fitHold?: "footprint" | "aisle" };
 export type Aerial = { kind?: "site-plan" | "site-photo"; metersPerPixel?: number; documentUrl?: string; id: string; src: string; source: string; date: string; width: number; height: number; bounds?: Bounds };
 export type Assessment = {

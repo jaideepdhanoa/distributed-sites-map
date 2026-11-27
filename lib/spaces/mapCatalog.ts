@@ -20,18 +20,24 @@ export type OutlineNote = { target_id: string; body: string };
 /** Notes arrive newest first. A replacement source starts with its own geometry. */
 export function mapZones(site: string, row: Assessment, notes: OutlineNote[]): MapZone[] {
   const edits = new Map<string,Point[]>();
+  const validations = new Map<string,{right:NonNullable<Zone["useRight"]>; points?:Point[]}>();
   for (const note of notes) {
     if (note.target_id !== site) continue;
     const review = readReview({body:note.body, deleted:false, parentId:null});
-    if (!review?.points || review.frame !== row.image?.id) continue;
+    if (!review || review.frame !== row.image?.id) continue;
     const key = "outline:" + review.option + ":" + review.area;
-    if (!edits.has(key)) edits.set(key,review.points);
+    if (!validations.has(key) && review.revision===row.revision && review.useRight)
+      validations.set(key,{right:review.useRight,points:review.points});
+    if (review.points && !edits.has(key)) edits.set(key,review.points);
   }
   return row.zones.map(zone => {
     const points = edits.get(outlineId(zone));
     const moved = !!points && JSON.stringify(points) !== JSON.stringify(zone.points);
-    return {...zone, points:points || zone.points, edited:Boolean(points), ...(moved && zone.useRight?.status==="documented"
-      ? {useRight:{status:"unconfirmed" as const,detail:"Check that the recorded rights cover the edited footprint and its drive aisle."}} : {})};
+    const validation = validations.get(outlineId(zone));
+    const matches = validation && JSON.stringify(validation.points ?? zone.points) === JSON.stringify(points ?? zone.points);
+    const rights = matches ? validation.right : moved && (validation || zone.useRight)
+      ? {status:"unconfirmed" as const,detail:"Check that the recorded rights cover the edited footprint and its drive aisle."} : zone.useRight;
+    return {...zone, points:points || zone.points, edited:Boolean(points), ...(rights ? {useRight:rights} : {})};
   });
 }
 

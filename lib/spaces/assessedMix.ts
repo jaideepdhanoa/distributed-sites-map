@@ -111,9 +111,9 @@ export function rightsSummary(rights: ReturnType<typeof layoutRights>) {
 }
 export function assessedCases(zones:Zone[], frame:ScaleFrame, assessment:Assessment):ParcelCase[] {
   if (assessment.status!=="reviewed" || !(frame.bounds || frame.metersPerPixel)) return [];
-  const filed=(assessment.parcelCases??[]).filter(c=>sketchCase(c,zones,frame));
+  const filed=(assessment.parcelCases??[]).filter(c=>!c.rows.some(r=>zones.find(z=>z.label===r.area)?.useRight?.status==="unavailable") && sketchCase(c,zones,frame));
   const blocked=zones.filter(z=>z.kind==="clear").map(z=>z.points);
-  const full=zones.filter(z=>z.kind!=="clear" && !z.fitHold && zones.filter(other=>other.label===z.label).length===1)
+  const full=zones.filter(z=>z.kind!=="clear" && z.useRight?.status!=="unavailable" && !z.fitHold && zones.filter(other=>other.label===z.label).length===1)
     .map(z=>choices(z,frame,blocked,adjacentObstacles(z,zones),filed.flatMap(c=>c.rows.filter(r=>r.area===z.label))))
     .filter(g=>g.length);
   const groups=full.map((group,i)=>{

@@ -7,6 +7,21 @@ import {mkdir} from "node:fs/promises";
 import {calculate,initialCase,modelVersion,type SavedCase} from "../lib/charging/model";
 import type {SelectionRow} from "../lib/selection/screen";
 
+test("try an unpriced upgrade directly in the detailed ledger",async({page})=>{
+  const site={deal_id:"PIPE-PHX-9998",name:"Example shop with open power terms",asking_price:500000};
+  await page.route("**/api/actions/charging?site=*",route=>route.fulfill({json:{site,source:"example-revision",history:[],canWrite:true}}));
+  await page.goto("/charging?site="+site.deal_id+"&view=explain&basis=detail");
+  const detail=page.getByRole("region",{name:"Cost per charge explanation"});
+  const slider=detail.getByRole("slider",{name:"Utility upgrade cost ($) · trial",exact:true});
+  await expect(slider).toHaveAttribute("aria-valuetext","Unset. Choose a trial value.");
+  await slider.focus();
+  await expect(detail.getByRole("button",{name:/^Type exact Utility upgrade cost/})).toContainText("Set value");
+  await slider.press("ArrowRight");
+  await expect(slider).not.toHaveAttribute("aria-valuetext","Unset. Choose a trial value.");
+  await detail.getByRole("button",{name:"Discard trial"}).click();
+  await expect(slider).toHaveAttribute("aria-valuetext","Unset. Choose a trial value.");
+});
+
 test("edit, save, reopen and compare a charging case",async({page},info)=>{
   const site={deal_id:"PIPE-PHX-9998",name:"Example wash and service",asking_price:500000,bays_that_fit:6};
   const source="aaaaaaaaaaaaaaaaaaaaaaaa", inputs=initialCase(site);
@@ -164,7 +179,28 @@ test("explain a preliminary range with a conditional aisle on desktop and phone"
   await layout.getByRole("button",{name:/Convert two wash bays/}).click();
   await expect(panel.getByLabel("Additional works ($)",{exact:true})).toHaveValue("25000");
   await expect(panel.getByLabel("Displaced cash ($/year)",{exact:true})).toHaveValue("2000");
-  await panel.getByLabel("Purchase price ($)",{exact:true}).fill("90000");
+  const price=panel.getByRole("slider",{name:"Purchase price ($)",exact:true});
+  await expect(panel.getByRole("spinbutton")).toHaveCount(0);
+  const oldResult = await panel.locator(".screen-result strong").innerText();
+  if (info.project.name === "mobile") await price.tap({position:{x:12,y:18}});
+  else await price.click({position:{x:12,y:14}});
+  await expect(panel.locator(".screen-result strong")).not.toHaveText(oldResult);
+  await price.focus();await price.press("ArrowRight");
+  await expect(price).not.toHaveValue("100000");
+  const exact=panel.getByRole("spinbutton",{name:"Exact Purchase price ($)",exact:true});
+  await panel.getByRole("button",{name:/^Type exact Purchase price/}).click();
+  await exact.fill("212345.67");await exact.press("Enter");
+  await expect(panel.getByRole("button",{name:/^Type exact Purchase price/})).toContainText("$212,345.67");
+  await panel.getByRole("button",{name:/^Type exact Purchase price/}).click();
+  await exact.fill("3");await exact.press("Escape");
+  await expect(panel.getByRole("button",{name:/^Type exact Purchase price/})).toContainText("$212,345.67");
+  await panel.getByRole("button",{name:/^Type exact Purchase price/}).click();
+  await exact.fill("90000");await exact.press("Enter");
+  const cashAmount = panel.getByRole("button",{name:/^Type exact Business cash before displacement/});
+  await cashAmount.click();
+  const exactCash = panel.getByRole("spinbutton",{name:/^Exact Business cash before displacement/});
+  await exactCash.fill("-1250.25");await exactCash.press("Tab");
+  await expect(cashAmount).toContainText("-$1,250.25");
   await layout.getByRole("button",{name:/Parking with shared aisle/}).click();
   await expect(panel.getByLabel("Purchase price ($)",{exact:true})).toHaveValue("90000");
   await expect(panel.getByLabel("Additional works ($)",{exact:true})).toHaveValue("0");
@@ -183,6 +219,10 @@ test("explain a preliminary range with a conditional aisle on desktop and phone"
   await panel.getByRole("heading",{name:"Stall configuration"}).evaluate(el=>el.scrollIntoView({block:"start"}));
   await page.screenshot({path:"review-shots/"+info.project.name+"-preliminary-charging.png",animations:"disabled"});
   await panel.getByRole("heading",{name:"Annual cost ledger"}).evaluate(el=>el.scrollIntoView({block:"start"}));
+  const purchase=panel.getByRole("region",{name:"Purchase and closing"});
+  const rowHeights = await Promise.all([purchase, panel.getByRole("region",{name:"Utility upgrade",exact:true})].map(async row => Math.round((await row.boundingBox())!.height)));
+  await test.info().attach("Ledger row heights",{body:JSON.stringify({purchase:rowHeights[0],utility:rowHeights[1]}),contentType:"application/json"});
+  expect(rowHeights[0]).toBeLessThan(info.project.name==="mobile"?300:210);
   await page.screenshot({path:"review-shots/"+info.project.name+"-charging-ledger-rows.png",animations:"disabled"});
 });
 

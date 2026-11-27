@@ -117,13 +117,17 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
     cash:[[basis.withheldOperatingCash!=null?"Source cash":"Starting cash",availableCash],...(availableCash>0?[["Half",availableCash/2],["None",0]] as [string,number][]:[])],
     displaced:testedCash>0?[["No loss",0],["Lose 25%",testedCash*.25],["Lose all",testedCash]]:[["No loss",0],["$10k/year",10000]],
   };
-  function control(k:LedgerKey){
+  const captions:Partial<Record<LedgerKey,string>>={closing:"Closing",years:"Term",rate:"Capital rate",perPost:"Stalls per post",ports:"Stalls / charger",insurance:"Insurance / yr",perCharger:"Upkeep / charger"};
+  function control(k:LedgerKey,primary:boolean){
     const label=k==="price"?(lease?"Monthly rent ($)":"Purchase price ($)"):k==="cash"?"Business cash before displacement ($/year)":ledgerFields[k];
-    return <div className="ledger-control" key={k}><LedgerNumber label={label} value={v[k]} valid={n=>validChange(k,n)} onValue={n=>change(k,n)}/>
+    const unit=k==="years"?"years":["closing","rate","tax"].includes(k)?"percent":["stalls","ports","perPost"].includes(k)?"count":"money";
+    const scale=primary?{base:k==="cash"?availableCash:k==="displaced"?testedCash || basis.inputs.displaced:basis.inputs[k],
+      fallback:k==="tax"?5:k==="conversion" || k==="upgrade"?250000:100000,negative:k==="cash",factor:k==="displaced"?1:k==="price"?1.5:2,limit:unit==="percent"?100:1e10}:undefined;
+    return <div className={primary?"ledger-control":"ledger-secondary"} key={k}><LedgerNumber label={label} caption={primary?undefined:captions[k]} unit={unit} scale={scale} value={v[k]} valid={n=>validChange(k,n)} onValue={n=>change(k,n)}/>
       {presets[k] && <div className="ledger-presets" role="group" aria-label={label+" scenarios"}>
         {presets[k]!.map(([title,n])=>{const amount=Math.round(n*100)/100;
           const impact=diff(screenLedger(basis,{...changes,[k]:amount}).perCharge);
-          return <button key={title} type="button" className="paper-btn" aria-pressed={v[k]===amount && !(basis.withheldOperatingCash!=null && k==="displaced" && changes.displaced==null)} onClick={()=>change(k,amount)}>{title}{impact!=null && impact!==0 && <small>{delta(impact)}/charge</small>}</button>;})}</div>}
+          return <button key={title} type="button" className="paper-btn" aria-pressed={Math.abs(v[k]-amount)<1e-7 && !(basis.withheldOperatingCash!=null && k==="displaced" && changes.displaced==null)} onClick={()=>change(k,amount)}>{title}{impact!=null && impact!==0 && <small>{delta(impact)}/charge</small>}</button>;})}</div>}
     </div>;
   }
   const linesByPriority=(["property","upgrade","construction","conversion","cash","displaced","staffing","upkeep","tax"] as const).flatMap(key=>lines.filter(l=>l.key===key));
@@ -139,7 +143,7 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
         const stress=higherUpgradeCase(b,{...common,...locals[i]});
         return <button type="button" className="paper-btn layout-choice" key={i} aria-pressed={index===i} onClick={()=>{setIndex(i);clearStatus();}}>
           <span>{nameOf(b)}</span><b>{stalls} stalls <small>· {c.perCharge==null?"Unpriced":amounts(c.perCharge,2)+"/charge"}</small></b>
-          {!initial && stress.perCharge!=null && <small>{amounts(stress.perCharge,2)}/charge with a 50% higher upgrade</small>}
+          {!initial && stress.perCharge!=null && <small>+50% utility · {amounts(stress.perCharge,2)}/charge</small>}
           {!!b.parts?.length && <small>{b.parts.filter(p=>!(areas[i]??[]).includes(p.area)).map(p=>p.area+" ("+p.stalls+")").join(" + ")}</small>}
         </button>;})}</div>
       {basis.condition!==nameOf(basis) && <p>{basis.condition.slice(nameOf(basis).length+2)}</p>}
@@ -148,7 +152,7 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
           const next=e.target.checked?omitted.filter(a=>a!==part.area):[...omitted,part.area];
           setAreas(old=>({...old,[index]:next}));change("stalls",basis.parts!.reduce((n,p)=>n+(next.includes(p.area)?0:p.stalls),0));
         }}/>{part.area} · {part.stalls}</label>)}</fieldset>}
-      <div className="ledger-control"><LedgerNumber label="Operating stalls" value={v.stalls} valid={n=>validChange("stalls",n)} onValue={n=>change("stalls",n)}/>
+      <div className="ledger-control"><LedgerNumber label="Operating stalls" caption="Stalls" unit="count" scale={{base:Math.max(layoutCount,...bases.map(b=>b.inputs.stalls)),factor:1,fallback:12,limit:200}} value={v.stalls} valid={n=>validChange("stalls",n)} onValue={n=>change("stalls",n)}/>
         <div className="ledger-presets" role="group" aria-label="Stall count scenarios">
           {stallTrials.map(t=><button type="button" key={t.step} className="paper-btn" disabled={!t.valid} onClick={()=>change("stalls",t.stalls)}>{t.step<0?"−1 stall":"+1 stall"}{t.impact!=null && <small>{delta(t.impact)}/charge</small>}</button>)}
           <button type="button" className="paper-btn" onClick={()=>change("stalls",layoutCount)}>Restore {layoutCount} stalls</button></div></div>
@@ -156,19 +160,20 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
       <small>Same utilization per stall across layouts. Confirm circulation, aisle access and operating rights. {omitted.length>0 && "Selected areas retain the full site and conversion allowances."}</small>
     </section>
     {ranked.length>0 && <p className="screen-insight"><b>Largest tested change</b> · {ranked[0].label} · {ranked[0].test} · <b>{delta(ranked[0].impact!)}/charge</b></p>}
-    <h3>Annual cost ledger</h3><p className="layer-meta">Adjust an amount or choose a scenario. Upfront dollars use {recovery}.</p>
+    <h3>Annual cost ledger</h3><p className="layer-meta">Drag to try a value. Click the amount to enter an exact figure, even outside the slider range. Upfront costs use {recovery}.</p>
     <div className="screen-table"><div className="screen-line screen-head"><span>Site driver</span><span>Annual cost</span><span>$/charge</span></div>
       {linesByPriority.map(line=>{const impact=diff(screenLedger(basis,{...changes,...line.test}).perCharge);
+        const secondary=line.fields.slice(1).filter(k=>line.key!=="construction" || lease || (k!=="years" && k!=="rate"));
         return <section key={line.key} aria-label={line.label} className="screen-item"><div className="screen-line"><div><b>{line.label}</b><small>{source(line)}{line.fields.some(k=>changes[k]!=null)?" · trial override":""}</small></div>
           <span>{amounts(r.costs[line.key])}</span><b>{priced?amounts(r.costs[line.key]/r.sessions,2):"—"}</b></div>
-          <p>{line.fact}</p>
+          <p className="ledger-math">{line.fact}</p>
           {line.key==="cash" && basis.withheldOperatingCash!=null && <p>The source carries {amounts(basis.withheldOperatingCash)}/year before conversion. Entering a loss tests how much of that cash survives.</p>}
           {line.key==="property" && basis.source?.startsWith("https://") && <a className="text-link" href={basis.source} target="_blank" rel="noopener noreferrer">Property source ↗</a>}
           {line.key==="displaced" && pendingCash && <p>The starting estimate credits $0 of the {amounts(availableCash)} in annual source cash. Choose a loss to credit the remaining earnings.</p>}
-          <div className="ledger-controls">{line.fields.filter(k=>!(lease && ["closing","rate","years"].includes(k)) && !(line.key==="construction" && !lease && (k==="years" || k==="rate"))).map(control)}
-            {lease && line.key==="construction" && ["rate","years"].map(k=>control(k as LedgerKey))}</div>
-          {impact!=null && <small>{line.testLabel} · {delta(impact)}/charge with other inputs held fixed</small>}
-    {line.key==="property" && parity!=null && <p>{parity<0?"These site costs exceed the depot benchmark even with free property.":(lease?"Monthly rent":"Purchase price")+" at the "+amounts(basis.proxy!,2)+"/charge depot benchmark · "+amounts(parity)}. All other inputs stay at the values shown.</p>}
+          {control(line.fields[0],true)}
+          {secondary.length>0 && <div className="ledger-terms">{secondary.map(k=>control(k,false))}</div>}
+          {impact!=null && (!presets[line.fields[0]] || (line.key==="displaced" && pendingCash)) && <small>{line.testLabel} · {delta(impact)}/charge</small>}
+          {line.key==="property" && parity!=null && <p className="ledger-parity">{parity<0?"Site costs exceed the benchmark even with free property.":(lease?"Rent":"Price")+" at depot parity: "+amounts(parity)+" ("+amounts(basis.proxy!,2)+"/charge)"}</p>}
           {line.key==="displaced" && <p><b>{amounts(netCash)}</b> net annual business cash credited after displacement.</p>}
         </section>;})}
       <div className="screen-line screen-total"><b>Net site cost</b><b>{amounts(r.annualCost)}</b><b>{priced?amounts(r.perCharge,2):"—"}</b></div></div>

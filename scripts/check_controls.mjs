@@ -51,12 +51,13 @@ const ALLOW = new Set([
   "propose",
   "check",
   "field",
+  "ledger-slider",
   "search",
   "disclosure",
   "act-thread",
 ]);
 
-const INPUT_TYPES = new Set(["checkbox", "radio", "number", "text", "search", "password"]);
+const INPUT_TYPES = new Set(["checkbox", "radio", "number", "text", "search", "password", "range"]);
 
 function files(dir) {
   const out = [];

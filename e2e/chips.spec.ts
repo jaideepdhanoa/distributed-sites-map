@@ -83,7 +83,7 @@ test("structured chips on the card, the sheet, and the reason pickers", async ({
     await waiting.scrollIntoViewIfNeeded();
     await waiting.hover();
     await waiting.getByRole("button", { name: "Column options for Waiting on" }).click({ force: true });
-    await page.getByRole("group", { name: "Column options for Waiting on" }).getByText("Broker reply", { exact: true }).click();
+    await page.getByRole("group", { name: "Filter Waiting on" }).getByText("Broker reply", { exact: true }).click();
     await expect(page.locator("[data-testid='chip-waiting_on']").first()).toBeVisible();
     const filterMenu = page.locator(".col-menu");
     const headerBox = await waiting.boundingBox();

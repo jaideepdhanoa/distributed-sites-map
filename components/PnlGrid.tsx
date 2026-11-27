@@ -150,11 +150,12 @@ export default function PnlGrid({
     const rect = target.getBoundingClientRect();
     const width = 280;
     const height = 220;
+    const sheetTop = Math.max(8, scrollRef.current?.getBoundingClientRect().top ?? 8);
     let top = rect.top - height - 8;
     let left = rect.left;
-    if (top < 8) {
+    if (top < sheetTop) {
       left = rect.right + 8;
-      top = Math.max(8, rect.top);
+      top = Math.max(sheetTop, rect.top);
       if (left + width > window.innerWidth - 8) left = Math.max(8, rect.left - width - 8);
     }
     if (left + width > window.innerWidth - 8) left = window.innerWidth - width - 8;

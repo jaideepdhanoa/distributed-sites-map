@@ -208,7 +208,7 @@ test("command search opens from the keyboard and the scope bar, then deeplinks",
 
   await page.goto("/?funnel=pipeline&view=list&q=3510+W+Cactus+Rd", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("queue-count")).toHaveText("4");
-  await page.getByRole("button", { name: /^Review/ }).click();
+  await page.getByRole("navigation", {name:"Acquisition workspace"}).getByRole("button", { name: /^Review/ }).click();
   await expect(page).toHaveURL(/review=1/);
   await expect(page).not.toHaveURL(/[?&]q=/);
   await expect(page.getByTestId("queue-count")).toHaveText("4");

@@ -24,6 +24,8 @@ test("number values stay whole in the drawer and on a phone", async ({ page }) =
   await scroller.evaluate((node) => { node.scrollTop = 0; });
   await expect(page.locator("aside.drawer h2")).toBeInViewport();
   await expect(page.locator("aside.drawer .stage-pill").first()).toBeInViewport();
+  await page.getByRole("tab", {name:"Site fit",exact:true}).click();
+  await page.locator("aside.drawer").getByText("View imagery",{exact:true}).click();
   const covered = await page.evaluate(() => {
     const bar = document.querySelector(".bar");
     const title = document.querySelector("aside.drawer h2");
@@ -48,6 +50,7 @@ test("number values stay whole in the drawer and on a phone", async ({ page }) =
   expect(hero.width / hero.height).toBeLessThan(1.4);
   expect(hero.overlap).toBeGreaterThan(20);
   expect(hero.below).toBe(false);
+  await page.getByRole("tab", {name:"Overview",exact:true}).click();
   await page.getByTestId("card-numbers").scrollIntoViewIfNeeded();
   expect(await brokenValues(page)).toEqual([]);
 });

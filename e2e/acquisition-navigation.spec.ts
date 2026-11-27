@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import type { Map as SiteMap } from "maplibre-gl";
+import { sampleStatement } from "../lib/pnl/fixture";
 import { acquisitionShortlist } from "../lib/reviewNavigation";
 
 const first = "PIPE-PHX-9001";
@@ -30,10 +31,15 @@ async function fixtures(page: Page) {
     revision:"abcdef012345",baseline:"recorded",recorded:4,image:{...frame,src:"/example-layout.svg"},zones
   }}}}));
   await page.route("**/example-layout.svg",route=>route.fulfill({contentType:"image/svg+xml",body:'<svg xmlns="http://www.w3.org/2000/svg" width="400" height="260"><rect width="400" height="260" fill="#a3afa2"/></svg>'}));
+  await page.route("**/api/data/financials/"+first,route=>route.fulfill({json:{pnl:sampleStatement(),pnlDemo:true}}));
   await page.route("**/api/data/deals",route=>route.fulfill({json:{type:"FeatureCollection",features:sites.map(s=>({
     type:"Feature", geometry:{type:"Point",coordinates:s.city==="PHX"?[-112.005,33.405]:[-115.16,36.15]},
     properties:{deal_id:s.id,kind:"pipeline",city:s.city,name:s.name,address:"Example parcel",business_type:"Car Wash",
-      stage:"Financial screen",stage_group:"financial",service_area_class:"Inside",opportunityReview:review}
+      stage:"Financial screen",stage_group:"financial",service_area_class:"Inside",opportunityReview:review,
+      ...(s.id===first ? {asking_price_display:"$950,000",trade_aadt:28500,trade_washes_1mi:2,
+        chargingSpace:{value:"4–6 spaces",basis:"Parking outline estimate",count:4},
+        charging:{merit:{action:"Evidence needed",next:"Confirm the layout."},energyScope:"excluded",
+          result:{siteCost:7.25,missing:[]},screen:[],selected:null,stale:false}} : {})}
   }))}}));
   await page.route("**/api/data/selection-review",route=>route.fulfill({json:{hasInputs:true,mismatches:0,rows:sites.map((s,i)=>({
     ...s,stage:"Financial screen",priority:"Check space",section:"Operating",review:{...review,primary:{...primary,rank:i+1}}
@@ -101,7 +107,10 @@ test("read the action and open the bounded site-fit thumbnail",async({page},info
   await expect(drawer.getByRole("tab",{name:"Site fit"})).toBeInViewport();
   const brief=drawer.locator(".acquisition-brief");
   await expect(brief).toContainText("Acquisition priority #1");
-  await expect(brief).toContainText(visitPlan.beforeVisit);
+  await expect(brief).toContainText(visitPlan.decision);
+  await drawer.getByText("Review notes and sources",{exact:true}).click();
+  await expect(drawer.locator("details[open]").getByText("Before booking "+visitPlan.beforeVisit,{exact:true})).toBeVisible();
+  await drawer.getByText("Review notes and sources",{exact:true}).click();
   await expect(drawer.getByText("Cost per charge", {exact:true}).first()).toBeVisible();
   await expect(drawer.getByText("Charging spaces", {exact:true}).first()).toBeVisible();
   await mkdir("review-shots",{recursive:true});
@@ -126,4 +135,40 @@ test("open the scoped inventory if a map style is unavailable",async({page})=>{
   await expect(page.getByText("1 space across 1 site")).toBeVisible();
   await page.getByRole("button",{name:"Main map"}).click();
   await expect(fallback.getByRole("button",{name:"Retry map"})).toBeVisible();
+});
+
+test("the record keeps its identity while each section shows its own evidence", async ({page}, info) => {
+  await fixtures(page);
+  await page.goto("/?city=PHX&funnel=pipeline&sheet=full&site="+first);
+  const card = page.locator("aside.site-record");
+  const overview = card.getByRole("tabpanel", {name:"Overview"});
+  await expect(overview.getByRole("heading", {name:"Acquisition priority #1"})).toBeVisible();
+  await expect(overview.getByRole("region", {name:"Charging feasibility"})).toContainText("4–6 spaces");
+  await expect(overview.getByRole("link", {name:"$7.25"})).toBeVisible();
+  await expect(overview.getByTestId("overview-cash")).toContainText("2 of 12 months");
+  await expect(overview.locator(".stage-actions, .market-evidence, .fin-entry, .space-options")).toHaveCount(0);
+  await expect(card.getByRole("tab", {name:"Overview"})).toHaveAttribute("aria-selected","true");
+  await mkdir("review-shots", {recursive:true});
+  await page.addStyleTag({content:"nextjs-portal { display:none !important; }"});
+  await card.screenshot({path:`review-shots/${info.project.name}-site-record.png`, animations:"disabled"});
+  const heading = card.getByRole("heading", {name:review.name,exact:true});
+  for (const tab of ["Site fit","Market","Financials","Diligence","Activity"]) {
+    await card.getByRole("tab", {name:tab,exact:true}).click();
+    const section = card.getByRole("tabpanel", {name:tab,exact:true});
+    await expect(section).toBeVisible();
+    await expect(card.getByRole("region",{name:"Team recommendation"})).toHaveCount(0);
+    await expect(card.getByRole("tabpanel")).toHaveCount(1);
+    await expect(heading).toBeInViewport();
+    expect(await section.evaluate(el=>el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  }
+  await card.getByRole("tab", {name:"Activity"}).press("Home");
+  await expect(overview).toBeVisible();
+  await expect(card.getByRole("tab", {name:"Overview"})).toBeFocused();
+  await page.reload();
+  await expect(heading).toBeVisible();
+  await expect(overview).toBeVisible();
+  await page.goto("/?city=LAS&funnel=pipeline&sheet=full&site="+other);
+  await expect(card.getByRole("heading",{name:"Example repair shop"})).toBeVisible();
+  await expect(overview.getByText("No layout estimate")).toBeVisible();
+  await expect(overview.getByText("No charging case")).toBeVisible();
 });

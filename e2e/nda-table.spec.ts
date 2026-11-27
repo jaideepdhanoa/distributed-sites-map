@@ -107,6 +107,7 @@ test("the phone NDA panel covers the site sheet", async ({ page }, info) => {
   });
   expect(found).toMatch(/^PIPE-|^LAND-/);
   await page.goto(`/?funnel=pipeline&site=${found}`, { waitUntil: "domcontentloaded" });
+  await page.getByRole("tab", {name:"Diligence",exact:true}).click();
   await page.getByTestId("nda-open").click();
   await expect(page.getByTestId("nda-detail")).toBeVisible();
   const covered = await page.evaluate(() => {

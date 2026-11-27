@@ -6,7 +6,7 @@ import { numberEvidence } from "@/lib/comparison";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
 
 const TABS = [
-  ["overview", "Record"],
+  ["overview", "Overview"],
   ["numbers", "Site fit"],
   ["market-context", "Market"],
   ["purchase", "Financials"],
@@ -17,6 +17,7 @@ const TABS = [
 type TabId = (typeof TABS)[number][0];
 
 function recordTab(panel: string | null): TabId {
+  if (panel === "proposal") return "discussion";
   if (panel === "economics") return "purchase";
   if (panel === "open-land" || panel === "space-options") return "numbers";
   return TABS.find(([id])=>id===panel)?.[0] || "overview";
@@ -30,6 +31,7 @@ export default function PanelSections({
   numbers,
   activity,
   discussion,
+  workflow,
 }: {
   purchase?: ReactNode;
   overview: ReactNode;
@@ -38,6 +40,7 @@ export default function PanelSections({
   numbers: ReactNode;
   activity: ReactNode;
   discussion: ReactNode;
+  workflow: ReactNode;
 }) {
   const params = useSearchParams();
   const site = params.get("site");
@@ -47,10 +50,16 @@ export default function PanelSections({
   const measure = params.get("measure") || "";
   const tab = recordTab(panel);
   useEffect(() => {
-    if (panel !== "purchase" && panel !== "market-context" && panel !== "economics" && panel !== "space-options" && panel !== "open-land" && panel !== "discussion" && panel !== "numbers" && panel !== "activity") return;
     const node = sections.current;
     const scroller = node?.closest(".drawer-scroll");
     if (!node || !(scroller instanceof HTMLElement)) return;
+    // Ordinary tab changes open at the beginning. Only evidence links need to
+    // track the position of asynchronously loaded details.
+    if (panel === "proposal" || panel === "finding") return;
+    if (!measure && !note && panel !== "space-options" && panel !== "open-land") {
+      scroller.scrollTop = 0;
+      return;
+    }
     let frame = 0;
     const align = () => {
       const evidence = panel === "space-options" ? "space-options" : panel === "market-context" ? "market-context" : panel === "open-land" ? "open-land" : panel === "numbers" ? numberEvidence[measure] : "";
@@ -63,8 +72,7 @@ export default function PanelSections({
         }
       }
       const top = (target || node).getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
-      const navigation = scroller.querySelector<HTMLElement>(":scope > .panel-tabs");
-      const next = Math.max(0, top - (navigation?.offsetHeight || 0) - 8);
+      const next = Math.max(0, top - 8);
       if (Math.abs(scroller.scrollTop - next) > 2) scroller.scrollTo({ top: next });
     };
     const sizes = new ResizeObserver(() => {
@@ -80,18 +88,21 @@ export default function PanelSections({
     });
     added.observe(scroller, { childList: true, subtree: true });
     align();
-    const stop = window.setTimeout(() => {
-      sizes.disconnect();
-      added.disconnect();
-    }, 8000);
-    return () => {
+    const stopTracking = () => {
       cancelAnimationFrame(frame);
-      window.clearTimeout(stop);
       sizes.disconnect();
       added.disconnect();
     };
+    const stop = window.setTimeout(stopTracking, 8000);
+    const events = ["wheel", "touchstart", "pointerdown", "keydown"];
+    events.forEach(event => scroller.addEventListener(event, stopTracking, { passive: true }));
+    return () => {
+      stopTracking();
+      window.clearTimeout(stop);
+      events.forEach(event => scroller.removeEventListener(event, stopTracking));
+    };
   }, [site, panel, note, measure]);
-  const panels = { purchase:<>{purchase}{economics}</>, "market-context":market, overview, numbers, activity, discussion };
+  const panels = { purchase:<>{purchase}{economics}</>, "market-context":market, overview, numbers, activity, discussion: <>{workflow}{tab === "discussion" && discussion}</> };
   const intel = panel === "intel";
   return (
     <div className="panel-sections" ref={sections}>
@@ -101,7 +112,7 @@ export default function PanelSections({
           <p className="layer-meta">No intel is recorded for this site.</p>
         </section>
       ) : null}
-      {TABS.filter(([id]) => id === tab || id === "numbers").map(([id]) => (
+      {TABS.filter(([id]) => id === tab || id === "numbers" || id === "discussion").map(([id]) => (
         <div key={id} id={`panel-${id}`} role="tabpanel" aria-labelledby={`record-tab-${id}`} hidden={tab !== id}>
           {panels[id]}
         </div>
@@ -110,26 +121,38 @@ export default function PanelSections({
   );
 }
 
+export function chooseRecordTab(id: TabId) {
+  const next = new URLSearchParams(currentSearch().replace(/^\?/, ""));
+  const shown = next.get("panel") || "overview";
+  if (shown === id && (id === "activity" || !next.get("msg"))) return;
+  next.delete("q");
+  if (id !== "activity") next.delete("msg");
+  if (id !== "discussion") next.delete("note");
+  if (id === "overview") next.delete("panel");
+  else next.set("panel", id);
+  const href = next.toString() ? `/?${next.toString()}` : "/";
+  rememberSearch(href);
+  window.history.replaceState(null, "", href);
+}
+
 export function RecordNavigation({financials=false}:{financials?:boolean} = {}) {
   const params = useSearchParams();
   const panel = params.get("panel");
   const tab = recordTab(panel);
   const tabs=TABS.filter(([id])=>id!=="purchase" || financials);
-  function chooseTab(id: TabId) {
-    const next = new URLSearchParams(currentSearch().replace(/^\?/, ""));
-    const shown = next.get("panel") || "overview";
-    if (shown === id && (id === "activity" || !next.get("msg"))) return;
-    next.delete("q");
-    if (id !== "activity") next.delete("msg");
-    if (id !== "discussion") next.delete("note");
-    if (id === "overview") next.delete("panel");
-    else next.set("panel", id);
-    const href = next.toString() ? `/?${next.toString()}` : "/";
-    rememberSearch(href);
-    window.history.replaceState(null, "", href);
-  }
+  const rail = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const list = rail.current;
+    const selected = list?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!list || !selected) return;
+    const edge = selected.getBoundingClientRect();
+    const frame = list.getBoundingClientRect();
+    if (edge.right > frame.right) list.scrollLeft += edge.right - frame.right;
+    if (edge.left < frame.left) list.scrollLeft += edge.left - frame.left;
+  }, [tab]);
+
   return (
-      <div className="panel-tabs" role="tablist" aria-label="Panel sections">
+      <div ref={rail} className="panel-tabs" role="tablist" aria-label="Panel sections">
         {tabs.map(([id, label], index) => (
           <button
             key={id}
@@ -143,13 +166,13 @@ export function RecordNavigation({financials=false}:{financials?:boolean} = {}) 
               event.preventDefault();
               const dest = tabs[next][0];
               document.getElementById("record-tab-"+dest)?.focus();
-              chooseTab(dest);
+              chooseRecordTab(dest);
             }}
             aria-selected={tab === id}
             aria-controls={`panel-${id}`}
             className={tab === id ? "chip on" : "chip"}
             data-testid={`panel-tab-${id}`}
-            onClick={() => chooseTab(id)}
+            onClick={() => chooseRecordTab(id)}
           >
             {label}
           </button>

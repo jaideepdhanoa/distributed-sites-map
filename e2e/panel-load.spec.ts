@@ -36,7 +36,6 @@ test("overview tiles hold a skeleton until the P&L arrives", async ({ page }) =>
       return {
         revenue: box("overview-revenue"),
         cash: box("overview-cash"),
-        card: Math.round(node.querySelector(".fin-entry")?.getBoundingClientRect().height || 0),
         stripRevenue: box("revenue-tile"),
         stripCash: box("cash-flow-tile"),
         summaryRevenue: box("summary-revenue"),
@@ -53,7 +52,6 @@ test("overview tiles hold a skeleton until the P&L arrives", async ({ page }) =>
       drawer.getByTestId("overview-cash"),
       drawer.getByTestId("revenue-tile"),
       drawer.getByTestId("cash-flow-tile"),
-      drawer.getByTestId("financials-loading"),
     ];
     if (summary) tiles.push(drawer.getByTestId("summary-revenue"), drawer.getByTestId("summary-cash"));
     await expect(tiles[0].getByTestId("figure-loading")).toBeVisible();
@@ -66,7 +64,7 @@ test("overview tiles hold a skeleton until the P&L arrives", async ({ page }) =>
 
   const suffix = `${sheetQuery(page)}`;
   try {
-    await page.goto(`/?funnel=pipeline&site=${PIPE}&panel=numbers${suffix}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`/?funnel=pipeline&site=${PIPE}${suffix}`, { waitUntil: "domcontentloaded" });
     await assertLoading(PIPE, true);
     const loadingHeights = await tileHeights(PIPE);
     held = false;
@@ -74,17 +72,18 @@ test("overview tiles hold a skeleton until the P&L arrives", async ({ page }) =>
     const loaded = page.locator(`aside.drawer[data-record='${PIPE}']`);
     await expect(loaded.getByTestId("overview-revenue").locator("strong")).toHaveText("$1,000,000");
     await expect(loaded.getByTestId("overview-cash").locator("strong")).toHaveText("$520,000");
-    await expect(loaded.getByTestId("financials-entry")).toContainText("$1,000,000 revenue");
     await expect(loaded.getByTestId("revenue-tile").locator("strong")).toHaveText("$1,000,000");
     await expect(loaded.getByTestId("cash-flow-tile").locator("strong")).toHaveText("$520,000");
     const loadedHeights = await tileHeights(PIPE);
     expect(loadedHeights).toEqual(loadingHeights);
+    await page.getByRole("tab", {name:"Financials",exact:true}).click();
+    await expect(loaded.getByTestId("financials-entry")).toContainText("$1,000,000 revenue");
 
     held = true;
     gate = new Promise<void>((resolve) => {
       release = resolve;
     });
-    await page.goto(`/?funnel=pipeline&site=${SITE}&panel=numbers${suffix}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`/?funnel=pipeline&site=${SITE}${suffix}`, { waitUntil: "domcontentloaded" });
     await assertLoading(SITE, false);
     const siteLoadingHeights = await tileHeights(SITE);
     held = false;
@@ -92,9 +91,10 @@ test("overview tiles hold a skeleton until the P&L arrives", async ({ page }) =>
     const site = page.locator(`aside.drawer[data-record='${SITE}']`);
     await expect(site.getByTestId("overview-revenue").locator("strong")).toHaveText("$1,000,000");
     await expect(site.getByTestId("overview-cash").locator("strong")).toHaveText("$520,000");
-    await expect(site.getByTestId("financials-entry")).toContainText("SDE $520,000");
     const siteLoadedHeights = await tileHeights(SITE);
     expect(siteLoadedHeights).toEqual(siteLoadingHeights);
+    await page.getByRole("tab", {name:"Financials",exact:true}).click();
+    await expect(site.getByTestId("financials-entry")).toContainText("SDE $520,000");
   } finally {
     held = false;
     release();

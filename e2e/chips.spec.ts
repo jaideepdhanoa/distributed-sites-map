@@ -35,6 +35,7 @@ test("structured chips on the card, the sheet, and the reason pickers", async ({
   await drawer.locator(".drawer-scroll").evaluate((node) => { node.scrollTop = 0; });
   await header.screenshot({ path: shotPath(`chips-header-${suffix}`) });
 
+  await page.locator("aside.drawer").getByText("Property, contacts and sources",{exact:true}).click();
   const section = drawer.getByTestId("section-chips");
   await section.scrollIntoViewIfNeeded();
   await expect(section).toBeVisible();
@@ -110,6 +111,7 @@ test("structured chips on the card, the sheet, and the reason pickers", async ({
 
   await page.goto(`/?funnel=pipeline&site=${SITE}${phone ? "&sheet=full" : ""}`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("aside.drawer");
+  await page.getByRole("tab", {name:"Diligence",exact:true}).click();
   const move = page.getByTestId("empty-step-stage_move");
   await move.waitFor({ state: "visible", timeout: 20_000 }).catch(() => undefined);
   if (await move.count()) {

@@ -23,6 +23,8 @@ test("a universe card embeds street view and can switch to the aerial", async ({
   });
   expect(found.plain).toMatch(/^WB-/);
   await page.goto(`/?funnel=universe&site=${found.plain}`, { waitUntil: "domcontentloaded" });
+  await page.getByRole("tab", {name:"Site fit",exact:true}).click();
+  await page.locator("aside.drawer").getByText("View imagery",{exact:true}).click();
   await expect(page.getByRole("tab", { name: "Aerial" })).toHaveAttribute("aria-selected", "true");
   await page.getByRole("tab", { name: "Street View" }).click();
   const frame = page.getByTestId("street-view-frame");
@@ -80,6 +82,8 @@ test("a universe card embeds street view and can switch to the aerial", async ({
   await expect(page.getByTestId("street-view-frame")).toBeVisible();
   if (!found.photo) return;
   await page.goto(`/?funnel=universe&site=${found.photo}`, { waitUntil: "domcontentloaded" });
+  await page.getByRole("tab", {name:"Site fit",exact:true}).click();
+  await page.locator("aside.drawer").getByText("View imagery",{exact:true}).click();
   const photos = page.getByRole("tab", { name: /^Photos/ });
   if (await photos.count()) await expect(photos).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("tab", { name: "Street View" })).toBeVisible();

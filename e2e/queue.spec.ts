@@ -696,6 +696,7 @@ for (const width of [1440, 390]) {
     await capture("saved", tray);
     await expect(figure).toBeVisible();
     await figure.click();
+    await page.getByRole("tab", {name:"Overview",exact:true}).click();
     const brief = drawer.getByRole("region", { name: "Screening decision" });
     await expect(brief).toContainText(source);
     const gap = brief.getByRole("status");
@@ -708,6 +709,8 @@ for (const width of [1440, 390]) {
     await work.getByLabel("Assignee", { exact: true }).selectOption("contributor");
     await work.getByLabel("Due", { exact: true }).fill("2030-04-15");
     await work.getByRole("button", { name: "Submit for approval" }).click();
+    await expect(work).toBeHidden();
+    await page.getByRole("tab", {name:"Overview",exact:true}).click();
     await expect(gap).toContainText("Awaiting approval");
     await expect(gap).toContainText("Contributor");
     await expect(gap).toContainText("2030-04-15");

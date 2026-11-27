@@ -3,7 +3,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DealProps, SiteProps, UnscreenedProps } from "@/lib/types";
 import { cleanNote, folderHref, formatRecordedDate, leadSourceLine, listingCue, shownBroker, shownFirm, shownPriceSource } from "@/lib/format";
 import { NEAR_TIP, contactDate, serviceAreaChip, serviceAreaShort } from "@/lib/cardStatus";
-import { RowLinks } from "./RowLinks";
+import { cityLabel } from "@/lib/search/siteLine";
+import { marketEvidence } from "@/lib/marketContext";
+import "./site-record.css";
 import { safePackageHref } from "@/lib/financials";
 import DrawerGrip from "./DrawerGrip";
 import { NextStepCard, WorkbookActivity } from "./actions/NextStepCard";
@@ -11,11 +13,10 @@ import Timeline from "./timeline/Timeline";
 import { ChipFace } from "./ChipFace";
 import { stageChipLabel } from "@/lib/chips";
 import { droppedDecisionLine } from "@/lib/droppedLine";
-import { isQuickLube, nextStepText, plainVerdict, QUICK_LUBE_LABEL, stageDetail, stageTone, statusOf } from "@/lib/labels";
-import { acreUnit, capacitySummary, cashTile, checkedPhrase, countYear, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, powerSummary, revenueTile, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
+import { isQuickLube, nextStepText, plainVerdict, QUICK_LUBE_LABEL, stageTone, statusOf } from "@/lib/labels";
+import { acreUnit, cashTile, checkedPhrase, factsForDeal, factsForSite, fullMoney, isOpenLandBlank, powerSummary, revenueTile, sheetMoney, spareLandSqft, universeTrafficLine } from "@/lib/keyNumbers";
 import { MeritCard } from "./SiteMerit";
-import FinancialsEntry, { PendingFigure, usePnlTiles, type PnlTiles } from "./FinancialsEntry";
-import { packageOnFile } from "@/lib/pnl/cue";
+import { PendingFigure, usePnlTiles, type PnlTiles } from "./FinancialsEntry";
 import { basisBadge } from "@/lib/pricing";
 import { nearestSheetSnap, stepSheet, type SheetSnap } from "@/lib/sheetSnap";
 import { cardPhotos, isPanoUrl } from "@/lib/photos";
@@ -154,7 +155,7 @@ function DecisionChips({
   if (!deal && !waiting && !extras.length) return null;
   return (
     <div className="card-chips decision-chips" data-testid={testId}>
-      {deal ? <StageChip deal={deal} /> : null}
+      {deal ? <><span className="sr">Deal stage</span><StageChip deal={deal} /></> : null}
       {waiting ? <TagChip chip={waiting} compact /> : null}
       {extras.map((chip) => <TagChip key={chip.family} chip={chip} compact />)}
     </div>
@@ -210,120 +211,35 @@ function FigureSkeleton() {
   );
 }
 
-function HeldNote({ note }: { note: string }) {
-  return <small className="figure-hold" aria-hidden={note ? undefined : true}>{note}</small>;
-}
-
-function DealHeadline({
-  deal,
-  censusAcres,
-  signedIn = false,
-  tiles = null,
-  pending = false,
-}: {
-  deal: DealProps;
-  censusAcres?: number | null;
-  signedIn?: boolean;
-  tiles?: PnlTiles | null;
-  pending?: boolean;
+function SiteSnapshot({ site, deal, signedIn, tiles, pending }: {
+  site?: SiteProps | null; deal?: DealProps | null; signedIn: boolean; tiles: PnlTiles | null; pending: boolean;
 }) {
-  const cash = cashTile(deal);
-  const revenue = revenueTile(deal);
-  const shownRevenue = tiles?.revenue ?? { text: revenue.text, title: revenue.title, note: deal.revenue_basis || "" };
-  const shownCash = tiles?.cash ?? {
-    text: cash.value || "—",
-    title: cash.value === "—" ? "Not on file" : (cash.value || "Not on file"),
-    note: [cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · "),
-  };
-  const spare = spareLandSqft(deal.open_land_sqft, censusAcres, deal.open_land_basis);
-  const bays = deal.bays_that_fit == null ? "—" : String(Math.round(deal.bays_that_fit));
-  const land = deal.land_acres != null ? `Land ${deal.land_acres} ac` : "";
-  const negative = shownCash.text.startsWith("-");
-  const showMoney = signedIn && !cash.hidden;
-  const traffic = deal.trade_aadt != null ? Math.round(deal.trade_aadt).toLocaleString() : "—";
-  const facts = factsForDeal(deal);
-  const power = powerSummary(facts);
-  const phrase = (text: string) => (text === "Not in package" ? "phrase" : undefined);
-  return (
-    <div className="headline" data-testid="card-numbers">
-      {showMoney ? (
-        <div data-testid="overview-revenue">
-          <span data-evidence="revenue">Revenue</span>
-          {pending ? <PendingFigure /> : (
-            <>
-              <strong className={phrase(shownRevenue.text)} title={shownRevenue.title}>{shownRevenue.text}</strong>
-              <HeldNote note={shownRevenue.note} />
-            </>
-          )}
-        </div>
-      ) : null}
-      {showMoney ? (
-        <div data-testid="overview-cash">
-          <span data-evidence="cash-flow">{tiles?.cash.note.split(" · ")[0] || deal.cash_flow_label || "Cash flow"}</span>
-          {pending ? <PendingFigure /> : (
-            <>
-              <strong className={`${negative ? "neg" : ""} ${phrase(shownCash.text) || ""}`.trim() || undefined} title={shownCash.title}>{shownCash.text}</strong>
-              <HeldNote note={shownCash.note} />
-            </>
-          )}
-        </div>
-      ) : null}
-      <div>
-        <span>Open land</span>
-        <strong title={isOpenLandBlank(spare.value) ? "Not on file" : undefined}>{spare.value}</strong>
-        {spare.note ? <small>{spare.note}</small> : null}
-      </div>
-      <div className="headline-wide">
-        <span data-evidence="power">Power</span>
-        <strong title={capacitySummary(facts) || "Not on file"}>{power || "—"}</strong>
-      </div>
-      <div>
-        <span>Earlier stall estimate</span>
-        <strong title={deal.bays_that_fit == null ? "Not on file" : undefined}>{bays}</strong>
-        {land ? <small>{land}</small> : null}
-      </div>
-      <div>
-        <span data-evidence="traffic">Traffic</span>
-        <strong title={deal.trade_aadt == null ? "Not on file" : undefined}>{traffic}</strong>
-        {deal.trade_aadt != null ? <small>vehicles/day</small> : null}
-      </div>
-    </div>
-  );
-}
-
-function SiteNumbers({ site, deal, signedIn = false, tiles = null, pending = false }: { site: SiteProps; deal?: DealProps | null; signedIn?: boolean; tiles?: PnlTiles | null; pending?: boolean }) {
-  if (deal) return <DealHeadline deal={deal} censusAcres={site.spare_ac_own} signedIn={signedIn} tiles={tiles} pending={pending} />;
-  const spare = spareLandSqft(null, site.spare_ac_own);
-  const traffic = site.aadt_count != null && site.aadt_count !== "" ? site.aadt_count : "—";
-  const year = countYear(site.aadt_year);
-  const facts = factsForSite(site, deal);
-  const power = powerSummary(facts);
-  return (
-    <div className="headline" data-testid="card-numbers">
-      <div>
-        <span data-evidence="cash-flow">Cash flow</span>
-        <strong title="Not on file">—</strong>
-      </div>
-      <div>
-        <span>Open land</span>
-        <strong title={isOpenLandBlank(spare.value) ? "Not on file" : undefined}>{spare.value}</strong>
-        {spare.note ? <small>{spare.note}</small> : null}
-      </div>
-      <div className="headline-wide">
-        <span data-evidence="power">Power</span>
-        <strong title={capacitySummary(facts) || "Not on file"}>{power || "—"}</strong>
-      </div>
-      <div>
-        <span>Earlier stall estimate</span>
-        <strong title="Not on file">—</strong>
-      </div>
-      <div>
-        <span data-evidence="traffic">Traffic</span>
-        <strong>{traffic}</strong>
-        {site.aadt_count ? <small>{year ? `vehicles/day · ${year}` : "vehicles/day"}</small> : null}
-      </div>
-    </div>
-  );
+  const market = marketEvidence(deal, site);
+  const power = powerSummary(deal ? factsForDeal(deal) : site ? factsForSite(site) : []);
+  const cash = deal && cashTile(deal);
+  const revenue = deal && revenueTile(deal);
+  const showIncome = signedIn && cash && !cash.hidden;
+  const terms = deal?.asking_price_display || deal?.asking_price != null ? deal : site;
+  const ask = sheetMoney(terms?.asking_price, terms?.asking_price_display);
+  const statementLabel = tiles?.cash.note.split(" · ")[0];
+  const cashLabel = statementLabel || deal?.cash_flow_label || "Cash flow";
+  const cashNote = tiles ? tiles.cash.note.replace(cashLabel + " · ", "") : [cash?.note, basisBadge(deal?.earnings_basis) || basisBadge(cash?.basis)].filter(Boolean).join(" · ");
+  const revenueNote = tiles ? tiles.revenue.note : deal?.revenue_basis;
+  return <section className="record-snapshot" aria-label="Site at a glance" data-testid="card-numbers">
+    <h3>Site at a glance</h3>
+    <dl>
+      {signedIn && <div><dt>Asking price</dt><dd>{ask === "—" ? "Not on file" : ask}</dd></div>}
+      {showIncome && <>
+        <div data-testid="overview-revenue"><dt>Revenue</dt><dd>{pending ? <PendingFigure/> : <><strong>{tiles?.revenue.text || revenue?.text || "Not on file"}</strong>
+          {revenueNote && <small>{revenueNote}</small>}</>}</dd></div>
+        <div data-testid="overview-cash"><dt>{cashLabel}</dt><dd>{pending ? <PendingFigure/> : <><strong>{tiles?.cash.text || cash.value || "Not on file"}</strong>
+          {cashNote && <small>{cashNote}</small>}</>}</dd></div>
+      </>}
+      <div><dt>Power evidence</dt><dd>{power || "No reading on file"}</dd></div>
+      <div><dt>{market.trafficBasis || "Road traffic"}</dt><dd>{market.traffic == null ? "No count on file" : market.traffic.toLocaleString("en-US") + " vehicles/day"}</dd></div>
+      {market.washes != null && <div><dt>Washes within 1 mi</dt><dd>{market.washes}</dd></div>}
+    </dl>
+  </section>;
 }
 
 function visibleChips(deal: DealProps, signedIn: boolean): TagView[] {
@@ -386,7 +302,9 @@ function CardLinks({
 }) {
   return (
     <p className="card-links">
-      <RowLinks listing={listing} folder={folder} packageHref={signedIn ? packageHref : ""} listingTitle={listingTitle} showMissing testIds="card" />
+      <CardLink href={listing} label={listing ? "Listing" : "No listing on file"} testId="listing-link" title={listingTitle} />
+      {folder && <CardLink href={folder} label="Site folder" testId="site-folder-link" />}
+      {signedIn && packageHref && <CardLink href={packageHref} label="Financial package" testId="package-link" />}
       <CardLink href={map} label="Map" testId="map-link" />
       {hideEmptyStreet && !street ? null : <CardLink href={street} label={streetLabel} testId="street-view-link" />}
     </p>
@@ -475,6 +393,44 @@ function mapsLinks(
   );
 }
 
+function RecordDrawer({ id, name, address, context, status, banner, tools, navigation = true, sheet, onClose, onSwipe, signedIn, children }: {
+  id: string; name: string; address?: string; context?: string; status?: ReactNode; banner?: ReactNode; tools?: ReactNode; navigation?: boolean;
+  sheet?: SheetControl; onClose?: () => void; onSwipe?: (direction: "next" | "prev") => void; signedIn: boolean; children: ReactNode;
+}) {
+  return <aside aria-label={name || id} data-record={id} className={`drawer site-record ${sheet?.expanded ? "expanded" : ""} snap-${sheet?.snap || (sheet?.expanded ? "full" : "half")}`}
+      onTouchStart={(event) => {
+        if ((event.target as HTMLElement).closest(".drawer-grip, .sheet-handle, .panel-tabs, input, select, textarea, button, a")) return;
+        (event.currentTarget as HTMLElement).dataset.x = String(event.changedTouches[0]?.clientX ?? "");
+        (event.currentTarget as HTMLElement).dataset.y = String(event.changedTouches[0]?.clientY ?? "");
+      }}
+      onTouchEnd={(event) => {
+        if ((event.target as HTMLElement).closest(".drawer-grip, .sheet-handle, .panel-tabs, input, select, textarea, button, a")) return;
+        const startX = Number((event.currentTarget as HTMLElement).dataset.x || "");
+        const startY = Number((event.currentTarget as HTMLElement).dataset.y || "");
+        const dx = (event.changedTouches[0]?.clientX ?? startX) - startX;
+        const dy = (event.changedTouches[0]?.clientY ?? startY) - startY;
+        if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return;
+        onSwipe?.(dx < 0 ? "next" : "prev");
+      }}
+    >
+      <span className="sr">{id}</span>
+      <DrawerGrip />
+      <SheetHandle sheet={sheet} />
+      <header className="record-identity" data-testid="panel-top">
+        <div className="record-title">
+          <p className="eyebrow">{context || "Site record"}</p>
+          <h2>{name || address || id}</h2>
+          {address && address !== name && <p className="record-address">{address}</p>}
+          {status}
+        </div>
+        <button className="close" type="button" aria-label="Close" onClick={onClose}>×</button>
+      </header>
+      {banner}
+      {navigation && <RecordNavigation financials={signedIn} />}
+      <div className="drawer-scroll">{tools}{children}</div>
+    </aside>;
+}
+
 export default function Detail({
   site,
   depotMiles,
@@ -506,12 +462,12 @@ export default function Detail({
   onLayoutOverlay,
   washInspection,
   power,
-  decisionFirst = false,
+
   onOpenNda,
 }: {
   washInspection?: WashInspection;
   power?: PowerRecords;
-  decisionFirst?: boolean;
+
   site: SiteProps | null;
   depotMiles?: number | null;
   lat?: number | null;
@@ -571,221 +527,163 @@ export default function Detail({
     />
   );
   return (
-    <aside
-      data-record={site.site_id}
-      className={`drawer ${sheet?.expanded ? "expanded" : ""} snap-${sheet?.snap || (sheet?.expanded ? "full" : "half")}`}
-      onTouchStart={(event) => {
-        if ((event.target as HTMLElement).closest(".drawer-grip, .sheet-handle")) return;
-        (event.currentTarget as HTMLElement).dataset.x = String(event.changedTouches[0]?.clientX ?? "");
-        (event.currentTarget as HTMLElement).dataset.y = String(event.changedTouches[0]?.clientY ?? "");
-      }}
-      onTouchEnd={(event) => {
-        if ((event.target as HTMLElement).closest(".drawer-grip, .sheet-handle")) return;
-        const startX = Number((event.currentTarget as HTMLElement).dataset.x || "");
-        const startY = Number((event.currentTarget as HTMLElement).dataset.y || "");
-        const dx = (event.changedTouches[0]?.clientX ?? startX) - startX;
-        const dy = (event.changedTouches[0]?.clientY ?? startY) - startY;
-        if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return;
-        onSwipe?.(dx < 0 ? "next" : "prev");
-      }}
-    >
-      <span className="sr">{site.site_id}</span>
-      <DrawerGrip />
-      <div className="drawer-head">
-        <SheetHandle sheet={sheet} />
-        <button
-          type="button"
-          className="paper-btn"
-          data-testid="copy-site-link"
-          onClick={() => { void navigator.clipboard.writeText(siteHref(window.location.origin, site.site_id)); }}
-        >
-          Copy link
-        </button>
-        <button className="close" type="button" aria-label="Close" onClick={onClose}><span aria-hidden="true">×</span></button>
-      </div>
-      {banner}
-      <div className="drawer-scroll">
-      <div className="card-top" data-testid="panel-top">
-        <h2>{site.name || site.address || site.site_id}</h2>
-        {site.also_known_as ? <p className="note">Also known as: {site.also_known_as}</p> : null}
-        <p className="note">{site.address || "—"}</p>
+    <RecordDrawer id={site.site_id} name={site.name} address={site.address} context={[cityLabel(site.city), site.business_type || (site.land_only ? "Land" : "Universe site")].filter(Boolean).join(" · ")}
+      status={<DecisionChips deal={linkedDeal} waiting={waitingChip} />} banner={banner} sheet={sheet} onClose={onClose} onSwipe={onSwipe} signedIn={signedIn}
+      tools={<>
         {locationFix ? <LocationFix id={site.site_id} mode={locationFix} address={site.address || ""} lat={lat} lng={lng} /> : null}
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
         {site.land_only ? <p className="note">Land site</p> : null}
         {site.origin === "off-market" ? <p className="note">Other off-market</p> : null}
-      </div>
-      <RecordNavigation financials={signedIn} />
-      <RecordBrief power={power} target={{ kind: "site", id: site.site_id }} pnl={pnl} site={site} deal={linkedDeal} signedIn={signedIn} />
-      <section className="decision-block" data-testid="decision-block">
-        {decisionFirst && nextCard}
-        <DecisionChips deal={linkedDeal} waiting={waitingChip} />
-        {!decisionFirst && nextCard}
-      </section>
-      {!decisionFirst && <SitePhotos card={card} aerialUrl={aerial?.url || ""} siteKey={site.site_id} emptyNote={aerial && !pano ? "Aerial only — no site photos yet" : ""} />}
-      <div className="card-chips">
-        <span className={`badge ${linkedDeal ? "" : "screening-repeat"} ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={statusOf(site).note}>{statusOf(site).label}</span>
-        <AreaChip record={linkedDeal?.service_area_class ? linkedDeal : site} />
-        <NdaChip deal={linkedDeal || undefined} signedIn={signedIn} showMissing onOpen={onOpenNda} />
-        {onOpenNda && linkedDeal?.nda_id && cardNdaLabel(linkedDeal, Boolean(signedIn)) ? (
-          <NdaCardLine ndaId={linkedDeal.nda_id} mirror={linkedDeal} onOpen={onOpenNda} />
-        ) : null}
-      </div>
-      {signedIn && figuresReady && price ? <p className="note">Asking {price}</p> : figuresReady ? null : <p className="note">Loading figures</p>}
-      {site.linked_deal_id ? (
-        <p>
-          <button className="text-link" type="button" data-testid="pipeline-deal-link" title={site.linked_deal_id} onClick={onOpenDeal}>
-            Open the pipeline deal
-          </button>
-        </p>
-      ) : null}
-      <CardLinks
-        listing={linkedDeal?.listing_url || site.listing_url || ""}
-        folder={folderHref(site.folder_url || linkedDeal?.folder_url)}
-        packageHref={packageHref}
-        map={mapHref(lat, lng)}
-        street={pano ? "" : streetViewHref(lat, lng)}
-        streetLabel="Open Street View"
-        hideEmptyStreet
-        signedIn={signedIn}
-        listingTitle={linkedDeal?.listing_removed ? "May be removed" : undefined}
-      />
-      {linkedDeal?.charging && <MeritCard deal={linkedDeal}/>}
 
-      {figuresReady ? <SiteNumbers site={site} deal={linkedDeal} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />}
-      {signedIn && linkedDeal && linkedDeal.kind !== "land" ? (
-        <FinancialsEntry dealId={linkedDeal.deal_id} packageOnFile={packageOnFile(linkedDeal.package_status, linkedDeal.package_line)} loaded={pnl} />
-      ) : null}
-      {decisionFirst && <details className="disclosure record-imagery"><summary className="disclosure">View imagery</summary><SitePhotos card={card} aerialUrl={aerial?.url || ""} siteKey={site.site_id} emptyNote={aerial && !pano ? "Aerial only — no site photos yet" : ""} /></details>}
-
-      {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
-      {signedIn && savedLots}
-      {related}
+      </>}>
       <PanelSections
         purchase={signedIn && linkedDeal?.kind==="pipeline" && !site.land_only && <PurchaseReview power={power} key={linkedDeal.deal_id} deal={linkedDeal} pnl={pnl}/>}
         market={<MarketEvidence deal={linkedDeal} site={site} inspection={washInspection} expanded />}
-        economics={<Economics pnl={pnl} deal={linkedDeal} site={site} signedIn={signedIn} />}
+        economics={<>{signedIn && linkedDeal?.charging && (linkedDeal.kind !== "pipeline" || site.land_only) && <MeritCard deal={linkedDeal}/>}<Economics pnl={pnl} deal={linkedDeal} site={site} signedIn={signedIn} /></>}
         overview={
           <>
-            <MarketEvidence deal={linkedDeal} site={site} inspection={washInspection} />
-            <details className="disclosure">
-              <summary className="disclosure">Record</summary>
-              <p>{site.site_id}{site.linked_deal_id ? ` · ${site.linked_deal_id}` : ""}</p>
-            </details>
-            {unscreened ? (
-              <p>Not screened yet.</p>
-            ) : (
-              <>
-                <h3>Summary</h3>
-                <p><strong>{plainVerdict(site.verdict)}.</strong> {why}</p>
-                <p>Next step: {next}</p>
-              </>
-            )}
-            <h3>Lead source</h3>
-            <p>{leadSourceLine(site, linkedDeal)}</p>
-            {linkedDeal && (shownBroker(linkedDeal) || shownFirm(linkedDeal) || linkedDeal.last_broker_contact) ? (
-              <>
-                <h3>Broker</h3>
-                <div className="kv">
-                  <span>Broker</span>
-                  <div>
-                    {shownBroker(linkedDeal) ? <button className="text-link" type="button" data-testid="broker-link" onClick={() => onOpenParty?.(shownBroker(linkedDeal))}>{shownBroker(linkedDeal)}</button> : <span title="Not on file">—</span>}
-                    {linkedDeal.last_broker_contact ? ` · Last contact ${contactDate(linkedDeal.last_broker_contact)}` : ""}
-                  </div>
-                  <span>Firm</span>
-                  <div>{shownFirm(linkedDeal) ? <button className="text-link" type="button" data-testid="firm-link" onClick={() => onOpenParty?.(shownFirm(linkedDeal))}>{shownFirm(linkedDeal)}</button> : <span title="Not on file">—</span>}</div>
-                </div>
-              </>
-            ) : null}
-            {site.place_note ? (
-              <>
-                <h3>Contact</h3>
-                <div className="kv">
-                  <span>Note</span><div>{site.place_note}{site.place_note_source ? ` · ${site.place_note_source}` : ""}</div>
-                </div>
-              </>
-            ) : site.phone || site.website ? (
-              <>
-                <h3>Contact</h3>
-                <div className="kv">
-                  {site.phone ? <><span>Phone</span><div>{site.phone}{site.phone_source ? ` · ${site.phone_source}` : ""}</div></> : null}
-                  {site.website ? (
-                    <>
-                      <span>Website</span>
-                      <div>
-                        <a href={site.website} target="_blank" rel="noopener noreferrer">{websiteLabel(site.website)}</a>
-                        {site.website_source ? ` · ${site.website_source}` : ""}
-                      </div>
-                    </>
-                  ) : null}
-                </div>
-              </>
-            ) : null}
-            <QuickLubeFacts site={site} deal={linkedDeal} />
-            <h3>Owner</h3>
-            <p>{site.owner || "—"}</p>
-            {site.owner_mail ? <p className="note">Mailing address: {site.owner_mail}</p> : null}
-            {sameOwner && sameOwner.length ? (
-              <>
-                <h3>Other sites with this owner</h3>
-                <ul>{sameOwner.map((item) => <li key={item.site_id}>{item.name || item.site_id}</li>)}</ul>
-              </>
-            ) : null}
-            {site.assessor_source ? <p className="note">{site.assessor_source}</p> : null}
-            <h3>Verdict</h3>
-            <div className="kv">
-              <span>Verdict</span><div>{plainVerdict(site.verdict)}</div>
-              <span>Operating</span><div>{site.operating || "—"}</div>
-              <span>Tenure</span><div>{site.tenure || "—"}</div>
-            </div>
-            {site.research_sources ? (
-              <>
-                <h3>Research sources</h3>
-                <p>{site.research_sources}</p>
-                {site.research_note ? <p>{site.research_note}</p> : null}
-              </>
-            ) : null}
-            {cleanNote(site.evidence) ? (
-              <details className="disclosure">
-                <summary className="disclosure">Research notes</summary>
-                <p>{cleanNote(site.evidence)}</p>
-              </details>
-            ) : null}
-            <h3>Status</h3>
-            <div className="kv">
-              <span>Listed</span><div>{site.listed ? "Yes" : "No"}</div>
-              <span>Contacted</span><div>{site.contacted ? "Yes" : "No"}</div>
-              <span>Depot</span><div title={depotMiles == null && site.miles_to_depot == null ? "Not on file" : undefined}>{depotMiles == null ? (site.miles_to_depot == null ? "—" : `${site.miles_to_depot.toFixed(1)} mi`) : `${depotMiles.toFixed(1)} mi`}</div>
-              <span>County parcel</span><div>{site.county_url ? <a href={site.county_url} target="_blank" rel="noopener noreferrer">Open county record</a> : "—"}</div>
-              <span>Parcel</span><div>{site.parcel_match === "none" ? "No parcel found" : site.parcel_match === "pin location" ? "Matched by pin location" : site.parcel_match === "parcel number" ? "Matched by parcel number" : "—"}</div>
-              {site.listed ? (
+            <RecordBrief power={power} target={{ kind: "site", id: site.site_id }} pnl={pnl} site={site} deal={linkedDeal} signedIn={signedIn}
+              snapshot={figuresReady ? <SiteSnapshot site={site} deal={linkedDeal} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />} />
+            <details className="disclosure record-disclosure">
+              <summary className="disclosure">Property, contacts and sources</summary>
+              <CardLinks
+                listing={linkedDeal?.listing_url || site.listing_url || ""}
+                folder={folderHref(site.folder_url || linkedDeal?.folder_url)}
+                packageHref={packageHref}
+                map={mapHref(lat, lng)}
+                street={pano ? "" : streetViewHref(lat, lng)}
+                streetLabel="Open Street View"
+                hideEmptyStreet
+                signedIn={signedIn}
+                listingTitle={linkedDeal?.listing_removed ? "May be removed" : undefined}
+              />
+              {related}
+              <div className="record-ids">
+                <button className="text-link" type="button" data-testid="copy-site-link" onClick={() => void navigator.clipboard.writeText(siteHref(window.location.origin, site.site_id))}>Copy site link</button>
+                {site.also_known_as && <p>Also known as {site.also_known_as}</p>}
+                <AreaChip record={linkedDeal?.service_area_class ? linkedDeal : site} />
+                <span className="badge quiet" title={statusOf(site).note}>{statusOf(site).label}</span>
+                <p>{site.site_id}{site.linked_deal_id ? ` · ${site.linked_deal_id}` : ""}</p>
+              </div>
+              {unscreened ? (
+                <p>Not screened yet.</p>
+              ) : (
                 <>
-                  <span>Listing</span>
-                  <div>
-                    {site.listing_url ? (
-                      <a href={site.listing_url} target="_blank" rel="noopener noreferrer">View listing</a>
-                    ) : (
-                      "No listing link on file"
-                    )}
+                  <h3>Summary</h3>
+                  <p><strong>{plainVerdict(site.verdict)}.</strong> {why}</p>
+                  <p>Next step: {next}</p>
+                </>
+              )}
+              <h3>Lead source</h3>
+              <p>{leadSourceLine(site, linkedDeal)}</p>
+              {linkedDeal && (shownBroker(linkedDeal) || shownFirm(linkedDeal) || linkedDeal.last_broker_contact) ? (
+                <>
+                  <h3>Broker</h3>
+                  <div className="kv">
+                    <span>Broker</span>
+                    <div>
+                      {shownBroker(linkedDeal) ? <button className="text-link" type="button" data-testid="broker-link" onClick={() => onOpenParty?.(shownBroker(linkedDeal))}>{shownBroker(linkedDeal)}</button> : <span title="Not on file">—</span>}
+                      {linkedDeal.last_broker_contact ? ` · Last contact ${contactDate(linkedDeal.last_broker_contact)}` : ""}
+                    </div>
+                    <span>Firm</span>
+                    <div>{shownFirm(linkedDeal) ? <button className="text-link" type="button" data-testid="firm-link" onClick={() => onOpenParty?.(shownFirm(linkedDeal))}>{shownFirm(linkedDeal)}</button> : <span title="Not on file">—</span>}</div>
                   </div>
                 </>
               ) : null}
-            </div>
-            {site.linked_deal_id ? (
-              <>
-                <h3>Pipeline deal</h3>
-                <p>
-                  <button className="text-link" type="button" onClick={onOpenDeal}>
-                    {site.linked_deal_name || site.linked_deal_id}
-                  </button>
-                  {site.linked_deal_stage ? ` · ${site.linked_deal_stage}` : ""}
-                </p>
-              </>
-            ) : null}
+              {site.place_note ? (
+                <>
+                  <h3>Contact</h3>
+                  <div className="kv">
+                    <span>Note</span><div>{site.place_note}{site.place_note_source ? ` · ${site.place_note_source}` : ""}</div>
+                  </div>
+                </>
+              ) : site.phone || site.website ? (
+                <>
+                  <h3>Contact</h3>
+                  <div className="kv">
+                    {site.phone ? <><span>Phone</span><div>{site.phone}{site.phone_source ? ` · ${site.phone_source}` : ""}</div></> : null}
+                    {site.website ? (
+                      <>
+                        <span>Website</span>
+                        <div>
+                          <a href={site.website} target="_blank" rel="noopener noreferrer">{websiteLabel(site.website)}</a>
+                          {site.website_source ? ` · ${site.website_source}` : ""}
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+                </>
+              ) : null}
+              <QuickLubeFacts site={site} deal={linkedDeal} />
+              <h3>Owner</h3>
+              <p>{site.owner || "—"}</p>
+              {site.owner_mail ? <p className="note">Mailing address: {site.owner_mail}</p> : null}
+              {sameOwner && sameOwner.length ? (
+                <>
+                  <h3>Other sites with this owner</h3>
+                  <ul>{sameOwner.map((item) => <li key={item.site_id}>{item.name || item.site_id}</li>)}</ul>
+                </>
+              ) : null}
+              {site.assessor_source ? <p className="note">{site.assessor_source}</p> : null}
+              <h3>Verdict</h3>
+              <div className="kv">
+                <span>Verdict</span><div>{plainVerdict(site.verdict)}</div>
+                <span>Operating</span><div>{site.operating || "—"}</div>
+                <span>Tenure</span><div>{site.tenure || "—"}</div>
+              </div>
+              {site.research_sources ? (
+                <>
+                  <h3>Research sources</h3>
+                  <p>{site.research_sources}</p>
+                  {site.research_note ? <p>{site.research_note}</p> : null}
+                </>
+              ) : null}
+              {cleanNote(site.evidence) ? (
+                <details className="disclosure">
+                  <summary className="disclosure">Research notes</summary>
+                  <p>{cleanNote(site.evidence)}</p>
+                </details>
+              ) : null}
+              <h3>Status</h3>
+              <div className="kv">
+                <span>Listed</span><div>{site.listed ? "Yes" : "No"}</div>
+                <span>Contacted</span><div>{site.contacted ? "Yes" : "No"}</div>
+                <span>Depot</span><div title={depotMiles == null && site.miles_to_depot == null ? "Not on file" : undefined}>{depotMiles == null ? (site.miles_to_depot == null ? "—" : `${site.miles_to_depot.toFixed(1)} mi`) : `${depotMiles.toFixed(1)} mi`}</div>
+                <span>County parcel</span><div>{site.county_url ? <a href={site.county_url} target="_blank" rel="noopener noreferrer">Open county record</a> : "—"}</div>
+                <span>Parcel</span><div>{site.parcel_match === "none" ? "No parcel found" : site.parcel_match === "pin location" ? "Matched by pin location" : site.parcel_match === "parcel number" ? "Matched by parcel number" : "—"}</div>
+                {site.listed ? (
+                  <>
+                    <span>Listing</span>
+                    <div>
+                      {site.listing_url ? (
+                        <a href={site.listing_url} target="_blank" rel="noopener noreferrer">View listing</a>
+                      ) : (
+                        "No listing link on file"
+                      )}
+                    </div>
+                  </>
+                ) : null}
+              </div>
+              {site.linked_deal_id ? (
+                <>
+                  <h3>Pipeline deal</h3>
+                  <p>
+                    <button className="text-link" type="button" data-testid="pipeline-deal-link" onClick={onOpenDeal}>
+                      {site.linked_deal_name || site.linked_deal_id}
+                    </button>
+                    {site.linked_deal_stage ? ` · ${site.linked_deal_stage}` : ""}
+                  </p>
+                </>
+              ) : null}
+            </details>
           </>
         }
         numbers={figuresReady ? (
           <>
             {signedIn && !site.land_only && linkedDeal?.kind === "pipeline" && <SpaceOptions key={linkedDeal.deal_id} site={linkedDeal.deal_id} photos={card} onOverlay={onLayoutOverlay} />}
+            <details className="disclosure record-disclosure record-imagery"><summary className="disclosure">View imagery</summary><SitePhotos card={card} aerialUrl={aerial?.url || ""} siteKey={site.site_id} emptyNote={aerial && !pano ? "Aerial only — no site photos yet" : ""} /></details>
+            {signedIn && <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} />}
+            {signedIn && savedLots}
             <SitePacket power={power} site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} />
             <div className="kv">
               <span data-evidence="asking">Asking price</span>
@@ -821,11 +719,20 @@ export default function Detail({
           </>
         ) : <p className="note">Loading figures</p>}
         activity={<>{signedIn && linkedDeal?.opportunityReview && <WorkbookActivity id={linkedDeal.deal_id}/>}<Timeline recordId={site.site_id} relatedId={site.linked_deal_id || ""} ndaId={linkedDeal?.nda_id || ""} onOpenNda={onOpenNda} /></>}
+        workflow={<section className="decision-block record-workflow" data-testid="decision-block">
+          <h3>Deal actions</h3>
+          {nextCard}
+          <div className="card-chips">
+            <NdaChip deal={linkedDeal || undefined} signedIn={signedIn} showMissing onOpen={onOpenNda} />
+            {onOpenNda && linkedDeal?.nda_id && cardNdaLabel(linkedDeal, Boolean(signedIn)) ? (
+              <NdaCardLine ndaId={linkedDeal.nda_id} mirror={linkedDeal} onOpen={onOpenNda} />
+            ) : null}
+          </div>
+        </section>}
         discussion={extras}
       />
       <CardFooter onOpenReview={onOpenReview} onCompare={onAddCompare} compared={compared} />
-      </div>
-    </aside>
+    </RecordDrawer>
   );
 }
 
@@ -861,12 +768,12 @@ export function DealDetail({
   onLayoutOverlay,
   washInspection,
   power,
-  decisionFirst = false,
+
   onOpenNda,
 }: {
   washInspection?: WashInspection;
   power?: PowerRecords;
-  decisionFirst?: boolean;
+
   deal: DealProps;
   peers?: DealProps[];
   universeSite?: SiteProps | null;
@@ -927,129 +834,82 @@ export function DealDetail({
     />
   );
   return (
-    <aside
-      data-record={deal.deal_id}
-      className={`drawer ${sheet?.expanded ? "expanded" : ""} snap-${sheet?.snap || (sheet?.expanded ? "full" : "half")}`}
-      onTouchStart={(event) => {
-        if ((event.target as HTMLElement).closest(".drawer-grip, .sheet-handle")) return;
-        (event.currentTarget as HTMLElement).dataset.x = String(event.changedTouches[0]?.clientX ?? "");
-        (event.currentTarget as HTMLElement).dataset.y = String(event.changedTouches[0]?.clientY ?? "");
-      }}
-      onTouchEnd={(event) => {
-        if ((event.target as HTMLElement).closest(".drawer-grip, .sheet-handle")) return;
-        const startX = Number((event.currentTarget as HTMLElement).dataset.x || "");
-        const startY = Number((event.currentTarget as HTMLElement).dataset.y || "");
-        const dx = (event.changedTouches[0]?.clientX ?? startX) - startX;
-        const dy = (event.changedTouches[0]?.clientY ?? startY) - startY;
-        if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return;
-        onSwipe?.(dx < 0 ? "next" : "prev");
-      }}
-    >
-      <span className="sr">{deal.deal_id}</span>
-      <DrawerGrip />
-      <div className="drawer-head">
-        <SheetHandle sheet={sheet} />
-        <button className="close" type="button" aria-label="Close" onClick={onClose}><span aria-hidden="true">×</span></button>
-      </div>
-      {banner}
-      <div className="drawer-scroll">
-      <div className="card-top" data-testid="panel-top">
-        <h2>{deal.name || deal.address}</h2>
-        <p className="note">{deal.address}</p>
+    <RecordDrawer id={deal.deal_id} name={deal.name} address={deal.address} context={[cityLabel(deal.city), deal.business_type || (deal.kind === "land" ? "Land" : "Pipeline site")].filter(Boolean).join(" · ")}
+      status={<DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />} banner={banner} sheet={sheet} onClose={onClose} onSwipe={onSwipe} signedIn={signedIn}
+      tools={<>
         {locationFix ? <LocationFix id={deal.deal_id} mode={locationFix} address={deal.address || ""} lat={lat} lng={lng} /> : null}
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
-      </div>
-      <RecordNavigation financials={signedIn} />
-      <RecordBrief power={power} target={{ kind: "deal", id: deal.deal_id }} pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />
-      <section className="decision-block" data-testid="decision-block">
-        {decisionFirst && nextCard}
-        <DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />
-        <NdaChip deal={deal} signedIn={signedIn} showMissing onOpen={onOpenNda} />
-        {onOpenNda && deal.nda_id && cardNdaLabel(deal, Boolean(signedIn)) ? (
-          <NdaCardLine ndaId={deal.nda_id} mirror={deal} onOpen={onOpenNda} />
-        ) : null}
-        {!decisionFirst && nextCard}
-      </section>
-      {diligence.length > 0 && <details className="disclosure">
-        <summary className="disclosure">What has been verified?</summary>
-        <ChipRow chips={diligence} testId="diligence-home" titled />
-      </details>}
-      {!decisionFirst && <SitePhotos card={photos} siteKey={deal.deal_id} aerialUrl={aerial?.url || ""} />}
 
-      {[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).length ? <p className="note">{[deal.checked_live ? checkedPhrase(deal.checked_live) : "", signedIn ? `Asking ${deal.asking_price_display || "—"}` : ""].filter(Boolean).join(" · ")}</p> : null}
-      <CardLinks
-        listing={cue.url}
-        folder={folderHref(deal.folder_url)}
-        packageHref={packageHref}
-        map={mapHref(lat, lng)}
-        street={streetHref(lat, lng, photos.frontageUrl || deal.street_view_url)}
-        signedIn={signedIn}
-        listingTitle={deal.listing_removed ? "May be removed" : undefined}
-      />
-      {deal?.charging && <MeritCard deal={deal}/>}
-
-      {figuresReady ? <DealHeadline deal={deal} censusAcres={universeSite?.spare_ac_own} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />}
-      {signedIn && deal.kind !== "land" ? (
-        <FinancialsEntry dealId={deal.deal_id} packageOnFile={packageOnFile(deal.package_status, deal.package_line)} loaded={pnl} />
-      ) : null}
-      {decisionFirst && <details className="disclosure record-imagery"><summary className="disclosure">View imagery</summary><SitePhotos card={photos} siteKey={deal.deal_id} aerialUrl={aerial?.url || ""} /></details>}
-
-      {signedIn ? <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} /> : null}
-      {signedIn && savedLots}
-      {related}
+      </>}>
       <PanelSections
         purchase={signedIn && deal.kind==="pipeline" && <PurchaseReview power={power} key={deal.deal_id} deal={deal} pnl={pnl}/>}
         market={<MarketEvidence deal={deal} site={universeSite} inspection={washInspection} expanded />}
-        economics={<Economics pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} />}
+        economics={<>{signedIn && deal.kind !== "pipeline" && deal.charging && <MeritCard deal={deal}/>}<Economics pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn} /></>}
         overview={
           <>
-            <MarketEvidence deal={deal} site={universeSite} inspection={washInspection} />
-            <details className="disclosure">
-              <summary className="disclosure">Record</summary>
-              <p>{deal.deal_id}{deal.universe_id ? ` · ${deal.universe_id}` : ""}</p>
+            <RecordBrief power={power} target={{ kind: "deal", id: deal.deal_id }} pnl={pnl} deal={deal} site={universeSite} signedIn={signedIn}
+              snapshot={figuresReady ? <SiteSnapshot site={universeSite} deal={deal} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : <FigureSkeleton />} />
+            <details className="disclosure record-disclosure">
+              <summary className="disclosure">Property, contacts and sources</summary>
+              <CardLinks
+                listing={cue.url}
+                folder={folderHref(deal.folder_url)}
+                packageHref={packageHref}
+                map={mapHref(lat, lng)}
+                street={streetHref(lat, lng, photos.frontageUrl || deal.street_view_url)}
+                signedIn={signedIn}
+                listingTitle={deal.listing_removed ? "May be removed" : undefined}
+              />
+              {related}
+              <div className="record-ids">
+                <p>{deal.deal_id}{deal.universe_id ? ` · ${deal.universe_id}` : ""}</p>
+              </div>
+              <AreaChip record={deal} />
+              <ChipRow chips={recordChips} testId="section-chips" />
+              <QuickLubeFacts site={universeSite} deal={deal} />
+              {deal.checked_live && <p className="note">{checkedPhrase(deal.checked_live)}</p>}
+              <h3>Broker and property record</h3>
+              <div className="kv">
+                <span>Broker</span>
+                <div>
+                  {shownBroker(deal) ? <button className="text-link" type="button" data-testid="broker-link" onClick={() => onOpenParty?.(shownBroker(deal))}>{shownBroker(deal)}</button> : <span title="Not on file">—</span>}
+                  {deal.last_broker_contact ? ` · Last contact ${contactDate(deal.last_broker_contact)}` : ""}
+                </div>
+                <span>Firm</span>
+                <div>{shownFirm(deal) ? <button className="text-link" type="button" data-testid="firm-link" onClick={() => onOpenParty?.(shownFirm(deal))}>{shownFirm(deal)}</button> : <span title="Not on file">—</span>}</div>
+                <span>Lead source</span><div>{leadSourceLine({ origin: deal.source_kind === "off-market" ? "off-market" : "universe", research_sources: "", verification: "" } as SiteProps, deal)}</div>
+                <span>Parcel</span><div>{deal.parcel_match === "none" ? "No parcel found" : deal.parcel_match === "pin location" ? "Matched by pin location" : deal.parcel_match === "parcel number" ? "Matched by parcel number" : "Not matched"}</div>
+                <span>Depot</span><div title={depotMiles == null && hasPin ? "Not on file" : undefined}>{depotMiles == null ? (hasPin ? "—" : "No pin yet") : `${depotMiles.toFixed(1)} mi`}</div>
+                <span>Listing</span>
+                <div>
+                  {deal.listing_url ? (
+                    <a href={deal.listing_url} target="_blank" rel="noopener noreferrer">{listingCue(deal).label}</a>
+                  ) : (
+                    cue.label
+                  )}
+                </div>
+              </div>
+              {deal.universe_id ? (
+                <div data-testid="universe-preview">
+                  <h3>Universe site</h3>
+                  <p>
+                    <button className="text-link" type="button" onClick={onOpenSite}>{universeName || deal.universe_id}</button>
+                    {` · ${deal.universe_id}`}
+                  </p>
+                  <p>{universeTrafficLine(universeSite) || "—"}</p>
+                </div>
+              ) : hasPin ? (
+                <p className="note" data-testid="universe-gap">This listing has a location and is not linked to a universe site yet.</p>
+              ) : null}
             </details>
-            <AreaChip record={deal} />
-            <ChipRow chips={recordChips} testId="section-chips" />
-            <QuickLubeFacts site={universeSite} deal={deal} />
-            <h3>Broker</h3>
-            <div className="kv">
-              <span>Broker</span>
-              <div>
-                {shownBroker(deal) ? <button className="text-link" type="button" data-testid="broker-link" onClick={() => onOpenParty?.(shownBroker(deal))}>{shownBroker(deal)}</button> : <span title="Not on file">—</span>}
-                {deal.last_broker_contact ? ` · Last contact ${contactDate(deal.last_broker_contact)}` : ""}
-              </div>
-              <span>Firm</span>
-              <div>{shownFirm(deal) ? <button className="text-link" type="button" data-testid="firm-link" onClick={() => onOpenParty?.(shownFirm(deal))}>{shownFirm(deal)}</button> : <span title="Not on file">—</span>}</div>
-              <span>Lead source</span><div>{leadSourceLine({ origin: deal.source_kind === "off-market" ? "off-market" : "universe", research_sources: "", verification: "" } as SiteProps, deal)}</div>
-              <span>Stage</span><div>{stageDetail(deal.stage, deal.stage_group)}</div>
-              <span>Parcel</span><div>{deal.parcel_match === "none" ? "No parcel found" : deal.parcel_match === "pin location" ? "Matched by pin location" : deal.parcel_match === "parcel number" ? "Matched by parcel number" : "Not matched"}</div>
-              <span>Depot</span><div title={depotMiles == null && hasPin ? "Not on file" : undefined}>{depotMiles == null ? (hasPin ? "—" : "No pin yet") : `${depotMiles.toFixed(1)} mi`}</div>
-              <span>Listing</span>
-              <div>
-                {deal.listing_url ? (
-                  <a href={deal.listing_url} target="_blank" rel="noopener noreferrer">{listingCue(deal).label}</a>
-                ) : (
-                  cue.label
-                )}
-              </div>
-            </div>
-            {deal.universe_id ? (
-              <div data-testid="universe-preview">
-                <h3>Universe site</h3>
-                <p>
-                  <button className="text-link" type="button" onClick={onOpenSite}>{universeName || deal.universe_id}</button>
-                  {` · ${deal.universe_id}`}
-                </p>
-                <p>{universeTrafficLine(universeSite) || "—"}</p>
-              </div>
-            ) : hasPin ? (
-              <p className="note" data-testid="universe-gap">This listing has a location and is not linked to a universe site yet.</p>
-            ) : null}
           </>
         }
         numbers={
           <>
             {signedIn && deal.kind === "pipeline" && <SpaceOptions key={deal.deal_id} site={deal.deal_id} photos={photos} onOverlay={onLayoutOverlay} />}
+            <details className="disclosure record-disclosure record-imagery"><summary className="disclosure">View imagery</summary><SitePhotos card={photos} siteKey={deal.deal_id} aerialUrl={aerial?.url || ""} /></details>
+            {signedIn && <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} />}
+            {signedIn && savedLots}
             {figuresReady ? <KeyStrip power={power} deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : null}
             <ChipRow chips={diligence} testId="diligence-strip" titled />
             <div className="kv">
@@ -1072,11 +932,23 @@ export function DealDetail({
           </>
         }
         activity={<>{signedIn && deal.opportunityReview && <WorkbookActivity id={deal.deal_id}/>}<Timeline recordId={deal.deal_id} relatedId={deal.universe_id || ""} ndaId={deal.nda_id || ""} onOpenNda={onOpenNda} /></>}
+        workflow={<section className="decision-block record-workflow" data-testid="decision-block">
+          <h3>Deal actions</h3>
+          {nextCard}
+          {diligence.length > 0 && <details className="disclosure"><summary className="disclosure">What has been verified?</summary>
+            <ChipRow chips={diligence} testId="diligence-home" titled />
+          </details>}
+          <div className="card-chips">
+            <NdaChip deal={deal} signedIn={signedIn} showMissing onOpen={onOpenNda} />
+            {onOpenNda && deal.nda_id && cardNdaLabel(deal, Boolean(signedIn)) ? (
+              <NdaCardLine ndaId={deal.nda_id} mirror={deal} onOpen={onOpenNda} />
+            ) : null}
+          </div>
+        </section>}
         discussion={extras}
       />
       <CardFooter onOpenReview={onOpenReview} onCompare={onCompare ? () => onCompare(!compared) : undefined} compared={compared} />
-      </div>
-    </aside>
+    </RecordDrawer>
   );
 }
 
@@ -1096,21 +968,15 @@ export function UnscreenedDetail({
   sheet?: SheetControl;
 }) {
   return (
-    <aside className={`drawer ${sheet?.expanded ? "expanded" : ""} snap-${sheet?.snap || (sheet?.expanded ? "full" : "half")}`}>
-      <div className="drawer-head">
-        <SheetHandle sheet={sheet} />
-        <button className="close" type="button" aria-label="Close" onClick={onClose}><span aria-hidden="true">×</span></button>
-      </div>
-      <div className="drawer-scroll">
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+    <RecordDrawer id={row.listing_id} name={row.name} address={row.address} context={row.kind} navigation={false}
+      signedIn={signedIn} sheet={sheet} onClose={onClose}
+      status={<div className="card-chips">
         <span className="badge quiet">Listed, not yet screened</span>
-        <span className="badge quiet">{row.kind}</span>
-        {row.approximate ? <span className="badge quiet">Approximate location</span> : null}
-        {!row.pinned ? <span className="badge quiet">Address withheld</span> : null}
-      </div>
-      <h2>{row.name}</h2>
-      <p className="note">{row.address}</p>
+        {row.approximate && <span className="badge quiet">Approximate location</span>}
+        {!row.pinned && <span className="badge quiet">Address withheld</span>}
+      </div>}>
       <RecordBrief listing={row} signedIn={signedIn} />
+      <details className="disclosure record-disclosure"><summary className="disclosure">Listing details</summary>
       <p className="note">{row.listing_id}</p>
       {mapsLinks(lat, lng)}
       <h3>Listing</h3>
@@ -1131,7 +997,7 @@ export function UnscreenedDetail({
           )}
         </div>
       </div>
-      </div>
-    </aside>
+      </details>
+    </RecordDrawer>
   );
 }

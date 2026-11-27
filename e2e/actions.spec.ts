@@ -768,7 +768,8 @@ for (const size of [
     });
     expect(found.nda).toMatch(/^NDA-/);
     await page.goto(`/?funnel=pipeline&site=${found.deal}`);
-    await page.getByTestId("nda-open").click();
+    await page.getByRole("tab", {name:"Diligence",exact:true}).click();
+  await page.getByTestId("nda-open").click();
     await expect(page.getByTestId("nda-detail")).toBeVisible();
     const text = `Sample note ${size.label} on the agreement.`;
     const discussion = page.getByTestId("nda-discussion");

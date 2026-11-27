@@ -1,0 +1,107 @@
+.site-record {
+  --record-gutter: clamp(14px, 1.7vw, 24px);
+  --record-rule: #ded9ce;
+  --record-muted: #635f54;
+  container-type: inline-size;
+}
+.site-record > .sheet-handle { flex: none; }
+.record-identity {
+  flex: none; display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; padding: 18px var(--record-gutter) 10px; margin: 0;
+}
+.record-title { max-height: min(15rem, 29dvh); overflow-y: auto; min-width: 0; overflow-wrap: anywhere; }
+.record-title .eyebrow { margin: 0 0 4px; color: var(--green); }
+.site-record .record-identity h2 { margin: 0; font: 600 clamp(23px, 5.8cqi, 32px)/1.08 var(--font-serif), Georgia, serif; }
+.record-identity .record-address { margin: 4px 0 0; font-size: 14px; color: var(--record-muted); }
+.record-identity .close { position: static; flex: none; float: none; margin: 0; }
+.record-identity .card-chips { margin: 8px 0 0; }
+.record-identity .stage-decision { font-size: 12px; }
+.site-record > .panel-tabs {
+  flex: none; display: flex; flex-wrap: nowrap; gap: 12px; margin: 0;
+  padding: 0 var(--record-gutter); overflow-x: auto; scrollbar-width: thin;
+  border-bottom: 1px solid var(--record-rule); background: var(--paper-card);
+}
+.site-record .panel-tabs .chip {
+  flex: none; min-height: 40px; padding: 5px 1px; border: 0; border-bottom: 3px solid transparent;
+  border-radius: 0; background: transparent; box-shadow: none; color: var(--record-muted); font-weight: 550;
+}
+.site-record .panel-tabs .chip.on { color: var(--green); border-bottom-color: var(--green); font-weight: 750; }
+.site-record .panel-tabs .chip:focus-visible { outline-offset: -3px; }
+.site-record.drawer .drawer-scroll { padding: 12px var(--record-gutter) 24px; overscroll-behavior: contain; }
+.site-record .panel-sections { display: block; }
+.site-record .panel-sections > [hidden] { display: none; }
+.site-record .record-brief {
+  padding: 0; margin: 0; border: 0; background: transparent; border-radius: 0;
+}
+.site-record .recommendation-body {
+  padding: 15px 17px; border-radius: 10px; background: #eaf1e9; border-left: 3px solid var(--green);
+}
+.site-record .recommendation-body .recommendation-label,
+.site-record .record-snapshot h3, .site-record .record-charging h3, .site-record .brief-decision h3,
+.site-record .record-workflow > h3 {
+  margin: 0; font: 700 12px/1.35 var(--font-sans), sans-serif;
+  text-transform: uppercase; letter-spacing: .065em; color: var(--green);
+}
+.site-record .acquisition-brief h3 { font: 600 clamp(22px, 5.1cqi, 28px)/1.15 var(--font-serif), Georgia, serif; margin: 4px 0; }
+.site-record .recommendation-body > small { color: #4d5b50; }
+.site-record .recommendation-body > p { margin: 8px 0; }
+.site-record .recommendation-body .recommended-next { border-top: 1px solid #c8d6c9; padding-top: 9px; }
+.site-record .recommended-next b { display: block; color: var(--green); }
+.site-record .record-charging, .site-record .record-snapshot { margin: 18px 0 10px; }
+.site-record .record-charging dl {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;
+  padding: 10px 0 0; margin: 7px 0 0; border-top: 1px solid var(--record-rule);
+}
+.site-record .record-charging dl > div { display: block; min-width: 0; }
+.site-record .record-charging dl > div + div { border-left: 1px solid var(--record-rule); padding-left: 12px; }
+.site-record .record-charging dt, .record-snapshot dt { color: var(--record-muted); font-size: 13px; }
+.site-record .record-charging dd { margin: 4px 0; font-size: 17px; font-weight: 650; line-height: 1.25; }
+.site-record .record-charging dd .text-link { display: inline; font: inherit; }
+.site-record .record-charging small, .record-snapshot dd small { display: block; margin-top: 2px; font-size: 12px; color: var(--record-muted); line-height: 1.35; }
+.record-snapshot dl { margin: 6px 0 0; }
+.record-snapshot dl > div {
+  display: grid; grid-template-columns: minmax(95px, .85fr) minmax(0, 1.5fr); gap: 12px;
+  padding: 8px 0; border-top: 1px solid var(--record-rule); align-items: baseline;
+}
+.record-snapshot dd { margin: 0; color: var(--ink); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.record-snapshot dd small { font-weight: 400; }
+.site-record .record-disclosure { margin: 10px 0 0; }
+.site-record .record-brief > details, .site-record .acquisition-brief > details, .site-record .record-disclosure {
+  padding: 0; border: 0; border-bottom: 1px solid var(--record-rule); border-radius: 0; background: transparent;
+}
+.site-record .record-brief > details > summary, .site-record .acquisition-brief > details > summary, .site-record .record-disclosure > summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 38px;
+  padding: 5px 0; color: var(--green); text-decoration: none; font-size: 13px; font-weight: 600;
+}
+.site-record .record-brief > details > summary::after, .site-record .acquisition-brief > details > summary::after, .site-record .record-disclosure > summary::after {
+  content: ""; width: 7px; height: 7px; margin-right: 4px; border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor; transform: rotate(45deg); flex: none;
+}
+.site-record details[open] > summary.disclosure::after { transform: rotate(225deg); }
+.site-record .record-disclosure .card-links { gap: 6px 16px; flex-wrap: wrap; }
+.site-record .brief-decision { margin-bottom: 8px; }
+.site-record .card-footer { justify-content: flex-start; gap: 18px; border-top: 1px solid var(--record-rule); margin-top: 16px; }
+.site-record .record-workflow > h3 { margin: 4px 0 10px; }
+.site-record .record-workflow .card-chips { align-items: flex-start; }
+@media (max-width: 767px) {
+  .site-record .record-identity { padding-top: 2px; padding-bottom: 6px; }
+  .site-record .record-identity .close, .site-record .panel-tabs .chip { min-height: 44px; }
+  .site-record .record-identity .close { min-width: 44px; }
+  .site-record > .panel-tabs { gap: 15px; }
+  .site-record.drawer.snap-peek .panel-sections { display: block; }
+  .site-record > .sheet-handle .sheet-grab { height: 22px; }
+  .site-record .record-brief > details > summary, .site-record .acquisition-brief > details > summary, .site-record .record-disclosure > summary { min-height: 44px; }
+}
+.site-record .record-sources-heading { margin: 20px 0 2px; color: var(--green); }
+.site-record .screening-lead { padding: 14px 16px; background: #edf2eb; border-left: 3px solid var(--green); border-radius: 9px; }
+.site-record .record-snapshot dl { display: block; border-top: 0; padding: 0; }
+.site-record .record-snapshot dl > div { display: grid; grid-template-columns: minmax(95px, .85fr) minmax(0, 1.5fr); }
+.site-record .record-charging dd small { font-weight: 400; }
+.site-record .shared-basis { margin-top: 7px; }
+.site-record .record-snapshot dl > div:first-child { border-top: 1px solid var(--record-rule); }
+.site-record .record-brief .record-snapshot dd { font-size: 14px; }
+.record-snapshot dd:has(strong) { min-height: 36px; }
+.record-snapshot .figure-hold { display: block; }
+@media (min-width: 380px) and (max-width: 767px) {
+  .site-record > .panel-tabs { gap: 12px; }
+}

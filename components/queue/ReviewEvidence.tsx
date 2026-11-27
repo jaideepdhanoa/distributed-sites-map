@@ -7,7 +7,7 @@ export function changeDestination(type: string) {
   if (["activity", "bring_back", "stage_repair"].includes(type)) return { label: "Activity", panel: "activity" };
   if (type === "price") return { label: "Site figures", selector: '[data-testid="card-numbers"]' };
   if (type === "materials" || type === "document_request") return { label: "Site documents", selector: ".card-links" };
-  if (type === "assignment" || type.startsWith("next_") || type === "drop_suggested") return { label: "Next step", selector: ".decision-block" };
+  if (type === "assignment" || type.startsWith("next_") || type === "drop_suggested") return { label: "Next step", panel: "proposal", selector: ".decision-block" };
   if (["stage", "verdict", "drop", "new_site"].includes(type)) return { label: "Screening decision", selector: ".record-brief" };
   return { label: "Review change" };
 }
@@ -24,6 +24,9 @@ export default function ReviewEvidence({ reason, onReturn }: { reason: QueueReas
     if (!selector) return;
     function align() {
       const node = scroll?.querySelector(selector!);
+      for (let parent = node?.parentElement; parent && parent !== scroll; parent = parent.parentElement) {
+        if (parent instanceof HTMLDetailsElement) parent.open = true;
+      }
       if (node && scroll) scroll.scrollTop += node.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 6;
       return Boolean(node);
     }

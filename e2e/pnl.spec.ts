@@ -157,7 +157,7 @@ test("a P&L comment is a cell pin, not a row link", async ({ page }, info) => {
   });
   const mobile = info.project.name === "mobile";
   if (mobile) await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`/?funnel=pipeline&site=PIPE-LAS-0011&panel=numbers${mobile ? "&sheet=full" : ""}`, { waitUntil: "domcontentloaded" });
+  await page.goto(`/?funnel=pipeline&site=PIPE-LAS-0011&panel=purchase${mobile ? "&sheet=full" : ""}`, { waitUntil: "domcontentloaded" });
   await page.getByTestId("financials-entry").click();
   const overlay = page.getByTestId("pnl-overlay");
   await expect(overlay).toBeVisible();
@@ -196,7 +196,7 @@ test("the sample site overview uses the same P&L as the Financials card", async 
   });
   const mobile = (page.viewportSize()?.width ?? 1440) < 768;
   if (mobile) await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`/?funnel=pipeline&site=PIPE-LAS-0011&panel=numbers${mobile ? "&sheet=full" : ""}`, { waitUntil: "domcontentloaded" });
+  await page.goto(`/?funnel=pipeline&site=PIPE-LAS-0011${mobile ? "&sheet=full" : ""}`, { waitUntil: "domcontentloaded" });
   const numbers = page.getByTestId("card-numbers");
   await numbers.scrollIntoViewIfNeeded();
   const revenue = numbers.locator("div").filter({ hasText: "Revenue" }).first();
@@ -209,6 +209,7 @@ test("the sample site overview uses the same P&L as the Financials card", async 
   await expect(cash).toContainText("2 of 12 months");
   await expect(revenue).not.toContainText("Not on file");
   await expect(cash).not.toContainText("Not on file");
+  await page.getByRole("tab", {name:"Financials",exact:true}).click();
   const entry = page.getByTestId("financials-entry");
   await expect(entry).toContainText("$1,000,000 revenue");
   await expect(entry).toContainText("SDE $520,000");
@@ -218,6 +219,7 @@ test("the sample site overview uses the same P&L as the Financials card", async 
   const linked = page.locator(mobile ? ".pnl-phone-line[data-linked=true] button" : ".pnl-desktop td[data-linked=true]").first();
   await expect(linked).toContainText("$520,000");
   await page.getByRole("button", {name:"Close profit and loss"}).click();
+  await page.getByRole("tab", {name:"Site fit",exact:true}).click();
   const numbersList = page.locator("#panel-numbers .kv");
   await expect(numbersList).toContainText("$1,000,000");
   await expect(numbersList).toContainText("$520,000");
@@ -229,6 +231,7 @@ test("the sample site overview uses the same P&L as the Financials card", async 
   const siteNumbers = siteDrawer.getByTestId("card-numbers");
   await expect(siteNumbers.locator("div").filter({ hasText: "Revenue" }).first().locator("strong")).toHaveText("$1,000,000");
   await expect(siteNumbers.getByTestId("overview-cash").locator("strong")).toHaveText("$520,000");
+  await page.getByRole("tab", {name:"Financials",exact:true}).click();
   await expect(page.getByTestId("financials-entry")).toContainText("SDE $520,000");
   await page.unrouteAll({ behavior: "ignoreErrors" });
 });

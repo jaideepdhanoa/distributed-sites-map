@@ -55,7 +55,7 @@ test.beforeAll(() => {
 test("desktop summary opens drawing on the main map", async ({ page }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await openAs(page, `/?funnel=universe&site=${site}`);
+  await openAs(page, `/?funnel=universe&panel=numbers&site=${site}`);
   await expect(page.getByTestId("space-summary")).toContainText("No lots drawn yet");
   await expect(page.getByTestId("open-map-spaces")).toBeVisible();
   const seeded = await markSample(page);
@@ -115,7 +115,7 @@ test("desktop summary opens drawing on the main map", async ({ page }) => {
 test("phone mark space uses the full map and can comment", async ({ page }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 390, height: 844 });
-  await openAs(page, `/?funnel=universe&site=${site}`);
+  await openAs(page, `/?funnel=universe&panel=numbers&site=${site}`);
   const seeded = await markSample(page);
   expect(seeded.status, seeded.error).toBe(200);
   await page.reload();
@@ -195,7 +195,7 @@ async function clickSavedLot(page: Page) {
 test("a saved lot opens its popover outside drawing mode", async ({ page }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await openAs(page, `/?funnel=universe&site=${site}`);
+  await openAs(page, `/?funnel=universe&panel=numbers&site=${site}`);
   const seeded = await markSample(page);
   expect(seeded.status, seeded.error).toBe(200);
   await page.reload();
@@ -228,7 +228,7 @@ test("a saved lot opens its popover outside drawing mode", async ({ page }) => {
 test("cancel and Escape discard an unfinished lot", async ({ page }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await openAs(page, `/?funnel=universe&site=${site}`);
+  await openAs(page, `/?funnel=universe&panel=numbers&site=${site}`);
   const seeded = await markSample(page);
   expect(seeded.status, seeded.error).toBe(200);
   await page.reload();
@@ -249,7 +249,7 @@ test("cancel and Escape discard an unfinished lot", async ({ page }) => {
 });
 
 test("remove one saved Draw lot from its site list", async ({ page }) => {
-  await openAs(page, `/?funnel=universe&site=${site}`);
+  await openAs(page, `/?funnel=universe&panel=numbers&site=${site}`);
   async function liveIds() {
     const response = await page.request.get("/api/data/spaces?site=" + site);
     expect(response.ok()).toBeTruthy();

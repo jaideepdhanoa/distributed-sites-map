@@ -4493,7 +4493,7 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   .space-map-bar h2 { flex:1; font-size:19px; }
   .space-map-inspector { width:auto; left:6px; right:6px; bottom:max(6px,env(safe-area-inset-bottom)); top:auto; max-height:52%; padding:12px; }
   .space-map-inspector.selected { max-height:34%; }
-  .space-map-inspector.selected:has([aria-expanded=true]),.space-map-inspector.selected:has(details[open]) { max-height:52%; }
+  .space-map-inspector.selected:has(#space-inspector-content [aria-expanded=true]),.space-map-inspector.selected:has(details[open]) { max-height:52%; }
   .space-map-inspector h3 { font-size:19px; margin:3px 0 6px; }
   .space-map-source { padding:60px 6px 36dvh; }
   .space-source-zoom { left:10px; top:63px; bottom:auto; }
@@ -4521,7 +4521,7 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   .space-map-layouts { top:64px; left:6px; right:6px; gap:0; }
   .space-map-layouts .segmented { flex:1; font-size:12px; line-height:1.1; padding:6px; }
   .space-map-inspector.selected { width:auto; max-height:42%; }
-  .space-map-inspector.selected:has([aria-expanded=true]) { max-height:55%; }
+  .space-map-inspector.selected:has(#space-inspector-content [aria-expanded=true]) { max-height:55%; }
   .space-map-inspector.selected:has(.space-edit),.space-map-inspector.selected:has(.space-actions button:disabled) { max-height:34%; }
   .space-map-source { padding-top:110px; padding-bottom:43dvh; }
   .space-source-zoom { top:116px; }
@@ -4646,3 +4646,46 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .pipeline-measure small, .phone-measure b, .evidence-item b { color: var(--ink-2); font-size: var(--type-cap); }
 .phone-measure { line-height: 1.4; white-space: normal; margin-top: 3px; }
 .evidence-item { padding: 4px 10px 4px 0; }
+
+/* Map work panels use their normal layout until the user places them. */
+.panel-grip-row { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.tool.panel-grip {
+  display: inline-grid; place-items: center; flex: 0 0 28px; width: 28px; height: 30px;
+  min-width: 28px; min-height: 30px; padding: 0; cursor: grab; touch-action: none;
+  user-select: none; color: var(--ink-3); box-shadow: none;
+}
+.tool.panel-grip:active { cursor: grabbing; transform: none; }
+.panel-grip-row .panel-grip, .space-map-inspector .panel-grip {
+  background: transparent; border-color: transparent;
+}
+.panel-grip-row .panel-grip:hover, .space-map-inspector .panel-grip:hover { background: var(--cream); }
+.space-map-inspector .panel-grip { float: right; }
+.panel-position-menu {
+  position: fixed; inset: auto; margin: 0; padding: 12px; width: 200px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--paper-card); color: var(--ink); box-shadow: var(--shadow-3);
+}
+.panel-position-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 8px 0; }
+.panel-position-menu .paper-btn { white-space: nowrap; }
+.space-inspector-toggle { display: none; }
+@media (min-width: 768px) {
+  .shell .map-stage [data-map-panel][data-placed] {
+    position: fixed; inset: var(--panel-top) auto auto var(--panel-left); margin: 0;
+    transform: none; animation: none; max-height: var(--panel-room);
+  }
+  .shell .map-stage .market-panel[data-placed] { max-height: min(57vh, var(--panel-room)); }
+  .shell .map-stage .map-key[data-placed] { max-width: min(320px, 100%); overflow: auto; }
+  .map-stage [data-map-panel]:focus-within, .map-corner:has([data-map-panel]:focus-within) { z-index: 7; }
+  .map-key:not(.key-expanded) .key-grip-row {
+    background: var(--paper-card); border: 1px solid var(--line); border-radius: 99px;
+    box-shadow: var(--shadow-1); gap: 0; padding-left: 3px;
+  }
+  .map-key:not(.key-expanded) .key-toggle { background: transparent; border: 0; box-shadow: none; }
+  .nearby-sites .panel-grip { margin-left: 4px; }
+  .nearby-sites .nearby-toggle { flex: 1; min-width: 0; }
+}
+@media (max-width: 767px) {
+  .tool.panel-grip { display: none; }
+  .space-inspector-toggle { display: block; float: right; min-height: 44px; }
+  .space-map-inspector[data-compact=true] { width: auto; left: auto; padding: 0 12px; }
+  .space-map-inspector[data-compact=true] #space-inspector-content { display: none; }
+}

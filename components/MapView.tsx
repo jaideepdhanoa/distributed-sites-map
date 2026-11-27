@@ -20,6 +20,7 @@ import type { GroundBox } from "@/lib/spaces/measure";
 import type { MapOutline } from "./spaces/SpaceOptions";
 import { worldPoint } from "@/lib/spaces/options";
 import { navigateSpaces } from "@/lib/spaces/navigation";
+import MapPanelGrip from "./MapPanelGrip";
 import MainMapSpaces from "./spaces/MainMapSpaces";
 import SpaceTools, { spaceIdAt } from "./spaces/SpaceTools";
 import type { SpaceShape } from "./spaces/SpacePopover";
@@ -2293,12 +2294,13 @@ export default function MapView(props: Props) {
           {props.onShowList ? <button type="button" className="paper-btn" data-testid="map-switch-list" onClick={props.onShowList}>Switch to list</button> : null}
         </div>
       ) : null}
-      <div className="map-float">
+      <div className="map-float" data-map-panel="tools">
         <div className="segmented map-basemap only-desktop" role="group" aria-label="Basemap" data-testid="basemap-desktop">
           <button type="button" className={`segmented ${(props.basemap || "positron") === "satellite" ? "on" : ""}`} onClick={() => props.onBasemap?.("satellite")}>Satellite</button>
           <button type="button" className={`segmented ${(props.basemap || "positron") === "positron" ? "on" : ""}`} onClick={() => props.onBasemap?.("positron")}>Streets</button>
         </div>
         <div className={`measure-row${props.previewName ? " parcel-selected" : ""}${parcelTools ? " parcel-tools-open" : ""}`} role="group" aria-label="Map tools">
+          <MapPanelGrip label="Map tools" />
           {props.previewName && !props.spaceDrawing && !measure && <button type="button" className="tool parcel-toggle" aria-expanded={parcelTools} onClick={() => setParcelTools(open => !open)}>Parcel tools</button>}
           {!props.spaceDrawing && !measure && <span className="map-tools-label" aria-hidden="true">Map tools</span>}
           {props.signedIn && !mapFailed && !props.spaceDrawing && !measure && <button type="button" className="tool" data-testid="open-map-spaces" onClick={() => navigateSpaces(true, props.spaceSelectedId)}><Layers3 size={16} aria-hidden="true" />Spaces</button>}

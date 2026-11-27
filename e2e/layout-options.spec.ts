@@ -130,6 +130,21 @@ test("open an analyzed space on the main map and adjust a source-plan corner", a
   await work.getByLabel("Horizontal %").fill("16");
   await expect(work.getByRole("button",{name:"Save outline"})).toBeEnabled();
   await work.getByText("Corner coordinates").click();
+  const inspector = work.locator(".space-map-inspector");
+  const inspectorUrl = page.url();
+  if (info.project.name === "mobile") {
+    await inspector.getByRole("button", {name:"Hide space details"}).click();
+    await expect(work.getByRole("button", {name:"Save outline"})).toBeHidden();
+    await mkdir("review-shots",{recursive:true});
+    await page.screenshot({path:"review-shots/mobile-folded-spaces.png",animations:"disabled"});
+    await inspector.getByRole("button", {name:"Show space details"}).click();
+  } else {
+    await inspector.getByRole("button", {name:"Move Spaces inspector"}).click();
+    await inspector.getByRole("button", {name:"Bottom left"}).click();
+    await expect(inspector).toHaveAttribute("data-placed", "true");
+  }
+  expect(page.url()).toBe(inspectorUrl);
+  await expect(work.getByRole("button",{name:"Save outline"})).toBeEnabled();
   await mkdir("review-shots",{recursive:true});
   await page.screenshot({path:"review-shots/"+info.project.name+"-main-map-spaces.png",animations:"disabled"});
   await work.getByRole("button",{name:"Browse spaces"}).click();

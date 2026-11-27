@@ -177,7 +177,7 @@ test("the map key reflects the workspace and enabled layers", async ({ page,base
   }
   await page.goto("/?city=PHX&funnel=pipeline&pstage=desk", { waitUntil: "domcontentloaded" });
   const key = page.getByRole("complementary", { name: "Key" });
-  const open = key.getByRole("button", { name: "Map key" });
+  const open = key.getByRole("button", { name: "Map key", exact: true });
   await open.click();
   const response=await page.request.get("/api/data/deals");
   expect(response.ok()).toBe(true);
@@ -203,7 +203,7 @@ test("the map key reflects the workspace and enabled layers", async ({ page,base
 test("browse two nearby sites and keep the city camera", async ({ page }, info) => {
   await page.goto("/?city=PHX&funnel=universe&stage=in_area");
   const nearby = page.getByRole("complementary", { name: "Nearby sites" });
-  const toggle = nearby.getByRole("button", { name: /Nearby sites/ });
+  const toggle = nearby.getByRole("button", { name: /^Nearby sites/ });
   await expect(toggle).toBeVisible();
   await page.waitForFunction(() => {
     const map = (window as unknown as MapWindow).__sitesMap;
@@ -332,7 +332,7 @@ test("screen property, street and grid evidence from a selected pin", async ({pa
   await expect(shortlist.locator('[data-site-row="'+id+'"]')).toContainText("Example service site");
   await viewSwitch.getByRole("button",{name:"Map",exact:true}).click();
   const nearby=page.getByRole("complementary",{name:"Nearby sites"});
-  const toggle=nearby.getByRole("button",{name:/Nearby sites/});
+  const toggle=nearby.getByRole("button",{name:/^Nearby sites/});
   if(await toggle.getAttribute("aria-expanded")==="false") await toggle.click();
   await nearby.locator('[data-nearby-id="'+id+'"]').click();
   const card=page.getByRole("region",{name:"Site power"});
@@ -377,7 +377,7 @@ test("released Power view filters open and clear on the market map", async ({pag
   await expect(filters.getByLabel("Utility coverage")).toHaveValue("all");
   await page.getByRole("button",{name:"Close layers"}).click();
   const nearby=page.getByRole("complementary",{name:"Nearby sites"});
-  const toggle=nearby.getByRole("button",{name:/Nearby sites/});
+  const toggle=nearby.getByRole("button",{name:/^Nearby sites/});
   if (await toggle.getAttribute("aria-expanded")==="false") await toggle.click();
   await nearby.locator("[data-nearby-id]").first().click();
   const card=page.getByRole("region",{name:"Site power"});
@@ -434,4 +434,60 @@ test("scan market readings and open the mapped wash radius", async ({page}, info
   await expect(page).toHaveURL(/washRadius=3/);
   await preview.getByRole("button",{name:"Close site preview"}).click();
   await expect(panel).toBeVisible();
+});
+
+test("move the map key without panning and restore its position", async ({ page }, info) => {
+  await page.goto("/?city=all&funnel=universe&stage=in_area");
+  const key = page.locator('[data-map-panel="key"]');
+  const toggle = key.getByRole("button", { name: "Map key", exact: true });
+  await toggle.click();
+  const grip = key.getByRole("button", { name: "Move Map key", exact: true });
+  if (info.project.name === "mobile") {
+    await expect(grip).toBeHidden();
+    await expect(key.locator("#map-key-items")).toBeVisible();
+    return;
+  }
+  await page.waitForFunction(() => {
+    const map = (window as unknown as MapWindow).__sitesMap;
+    return map?.getLayer("sites") && !map.isMoving();
+  });
+  const before = await camera(page);
+  const url = page.url();
+  const handle = await grip.boundingBox();
+  const start = await key.boundingBox();
+  if (!handle || !start) throw new Error("Map key is missing");
+  const x = handle.x + handle.width / 2, y = handle.y + handle.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 170, y - 90, { steps: 12 });
+  await page.mouse.up();
+  await expect(key).toHaveAttribute("data-placed", "true");
+  expect((await key.boundingBox())!.x).toBeGreaterThan(start.x + 100);
+  await expect(key.locator("#map-key-items")).toBeVisible();
+  await expect(key.getByRole("group", { name: "Map key position" })).toBeHidden();
+  expect(await camera(page)).toEqual(before);
+  expect(page.url()).toBe(url);
+
+  await grip.focus();
+  await grip.press("Enter");
+  const choices = key.getByRole("group", { name: "Map key position" });
+  await expect(choices).toBeVisible();
+  if (!process.env.MAP_PRODUCTION_CHECK) {
+    await mkdir("review-shots", { recursive: true });
+    await choices.screenshot({ path: "review-shots/desktop-panel-positions.png" });
+  }
+  await choices.getByRole("button", { name: "Bottom right" }).press("Enter");
+  await page.reload();
+  await expect(key).toHaveAttribute("data-placed", "true");
+  await page.setViewportSize({ width: 1024, height: 700 });
+  const stage = await page.locator(".map-stage").boundingBox();
+  if (!stage) throw new Error("Map stage is missing");
+  await expect.poll(async () => {
+    const box = (await key.boundingBox())!;
+    return Math.abs(box.x + box.width - (stage.x + stage.width - 8))
+      + Math.abs(box.y + box.height - (stage.y + stage.height - 8));
+  }).toBeLessThan(3);
+  await grip.click();
+  await choices.getByRole("button", { name: "Restore default position" }).click();
+  await expect(key).not.toHaveAttribute("data-placed", "true");
 });

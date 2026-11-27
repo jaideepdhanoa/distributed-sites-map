@@ -10,3 +10,17 @@
 .visit-decision table { width: 100%; font-variant-numeric: tabular-nums; }
 .visit-decision caption, .visit-decision th { text-align: left; }
 .visit-decision td, .visit-decision th:last-child { text-align: right; }
+.site-coverage { margin-block: .55rem; overflow-wrap: anywhere; }
+.site-coverage h4 { margin: .85rem 0 .22rem; }
+.site-coverage p { margin: .35rem 0; }
+.site-coverage table { width: 100%; border-collapse: collapse; font-size: .9rem; font-variant-numeric: tabular-nums; }
+.site-coverage caption { text-align: left; margin-block: .65rem .3rem; }
+.site-coverage th, .site-coverage td { padding: .4rem .25rem; border-bottom: 1px solid var(--line, #d6cebe); text-align: right; }
+.site-coverage th:first-child { text-align: left; }
+.site-coverage th, .site-coverage td { white-space: normal; cursor: default; }
+.site-coverage th { position: static; }
+@media (max-width: 600px) {
+  .site-coverage table { table-layout: fixed; }
+  .site-coverage th:first-child { width: 17%; white-space: nowrap; }
+  .site-coverage th:last-child { width: 32%; }
+}

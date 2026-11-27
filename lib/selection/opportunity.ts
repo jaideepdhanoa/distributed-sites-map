@@ -22,7 +22,18 @@ const visitPlanSchema = z.object({
   decision: text, reason: text, commercial: text, power: text, beforeVisit: text,
   fieldwork: text, scenario: text, beforeLoi: text, basis: text,
 });
-const siteSchema = z.object({ name: text, primary: optionSchema, alternatives: z.array(optionSchema).max(20), visitPlan: visitPlanSchema.optional() })
+const caseSchema = z.object({
+  stalls: z.number().int().positive(), kind: text, price: z.number().nonnegative().nullable(),
+  cash: z.number(), base: z.number().nullable(), downside: z.number().nullable(),
+  ceiling: z.number(), replicas: z.number().int().positive(),
+}).refine(row => (row.base === null) === (row.downside === null) && (row.price === null) === (row.base === null));
+const coverageSchema = z.object({
+  reviewedOn: z.iso.date(), countyStatus: text, county: text, countySource: link.nullish(),
+  spaceStatus: text, space: text, layoutSource: link, financeStatus: text, finance: text, next: text, source: link,
+  cases: z.array(caseSchema).max(24),
+}).refine(row => new Set(row.cases.map(c => c.stalls)).size === row.cases.length);
+export type SiteCoverage = z.infer<typeof coverageSchema>;
+const siteSchema = z.object({ name: text, primary: optionSchema, alternatives: z.array(optionSchema).max(20), visitPlan: visitPlanSchema.optional(), coverage: coverageSchema.optional() })
   .refine(row => new Set([row.primary, ...row.alternatives].map(o => o.route)).size === row.alternatives.length + 1);
 const fileSchema = z.object({
   version: z.literal(1), register: z.url().regex(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[\w-]+\/edit$/).nullable(),

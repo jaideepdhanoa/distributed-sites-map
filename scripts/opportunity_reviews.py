@@ -37,6 +37,46 @@ def attach_visit_plans(book, sites):
         site["visitPlan"] = dict(zip(VISIT_COLUMNS.values(), cells[1:], strict=True))
 
 
+COVERAGE_COLUMNS = {
+    "Checked on": "reviewedOn", "County status": "countyStatus", "County evidence": "county",
+    "County source": "countySource", "Space status": "spaceStatus", "Space evidence": "space",
+    "Layout source": "layoutSource", "Finance status": "financeStatus", "Financial basis": "finance",
+    "Next decision": "next", "Source record": "source",
+}
+CASE_COLUMNS = {
+    "Stalls": "stalls", "Scenario": "kind", "Price tested": "price", "Retained cash per year": "cash",
+    "Base cost per charge": "base", "Downside cost per charge": "downside",
+    "Downside parity price": "ceiling", "Replica count": "replicas",
+}
+
+
+def coverage_rows(book, tab, columns):
+    rows = iter(book[tab].values)
+    if tuple(next(rows, ())) != ("Site ID", *columns):
+        raise ValueError(f"Check the {tab} column headings.")
+    for cells in rows:
+        if any(value is not None for value in cells):
+            yield cells[0], dict(zip(columns.values(), cells[1:], strict=True))
+
+
+def attach_coverage(book, sites):
+    if "Evidence coverage" not in book and "Screen cases" not in book:
+        return
+    if "Evidence coverage" not in book or "Screen cases" not in book:
+        raise ValueError("Both evidence coverage and screen cases are required.")
+    for site_id, entry in coverage_rows(book, "Evidence coverage", COVERAGE_COLUMNS):
+        site = sites.get(site_id)
+        if site is None or "coverage" in site:
+            raise ValueError("Invalid or duplicate evidence coverage site.")
+        entry["reviewedOn"] = date_text(entry["reviewedOn"])
+        site["coverage"] = {**entry, "cases": []}
+    for site_id, case in coverage_rows(book, "Screen cases", CASE_COLUMNS):
+        evidence = sites.get(site_id, {}).get("coverage")
+        if evidence is None or any(row["stalls"] == case["stalls"] for row in evidence["cases"]):
+            raise ValueError("Invalid or duplicate evidence footprint.")
+        evidence["cases"].append(case)
+
+
 def build(book, register=None):
     rows = iter(book["Opportunities"].values)
     headers = tuple(next(rows, ()))
@@ -66,6 +106,7 @@ def build(book, register=None):
     if not sites or any(not row["primary"] for row in sites.values()):
         raise ValueError("Each site needs one primary opportunity.")
     attach_visit_plans(book, sites)
+    attach_coverage(book, sites)
     return {"version": 1, "register": register, "sites": sites}
 
 

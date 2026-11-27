@@ -59,6 +59,12 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
   }
   const recovery=num(r.recovery*100)+"% annual recovery ("+num(v.rate)+"% over "+num(v.years)+" years)";
   const tenPct=(n:number)=>n===0?10000:n*1.1;
+  const availableCash=basis.withheldOperatingCash??basis.inputs.cash;
+  const pendingCash=basis.withheldOperatingCash!=null && changes.cash==null && changes.displaced==null;
+  const testedCash=v.cash>0?v.cash:availableCash;
+  const lossTest=pendingCash?availableCash*.25:v.displaced+(v.cash>0?v.cash*.25:10000);
+  const lossLabel=pendingCash?"Credit 75% of source cash after conversion":v.cash>0?"Lose another 25% of operating cash":"$10k more displaced";
+  const netCash=-(r.costs.cash+r.costs.displaced) || 0;
   const lines:Line[]=[
     {key:"property",label:lease?"Lease":"Purchase and closing",fact:lease?amounts(v.price)+"/month × 12":"("+amounts(v.price)+" × "+(1+v.closing/100).toLocaleString("en-US",{maximumFractionDigits:5})+") × annual recovery · "+num(v.closing)+"% closing",fields:lease?["price"]:["price","closing","years","rate"],test:{price:v.price*.9},testLabel:"10% lower terms"},
     {key:"construction",label:"Stall construction",fact:v.stalls+" stalls × "+amounts(v.unitBuild)+" per stall × annual recovery",fields:["unitBuild","years","rate"],test:{unitBuild:tenPct(v.unitBuild)},testLabel:v.unitBuild?"10% higher build":"$10k more per stall"},
@@ -68,7 +74,7 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
     {key:"upkeep",label:"Upkeep and insurance",fact:amounts(v.fixed)+" fixed + "+amounts(v.insurance)+" insurance + "+r.chargers+" chargers × "+amounts(v.perCharger)+" · "+v.ports+" stalls per charger",fields:["fixed","insurance","perCharger","ports"],test:{fixed:v.fixed+10000},testLabel:"$10k more per year"},
     {key:"conversion",label:"Additional conversion works",fact:amounts(v.conversion)+" × annual recovery",fields:["conversion"],test:{conversion:v.conversion+100000},testLabel:"$100k more in works"},
     ...(!lease?[{key:"cash" as const,label:/wash/i.test(basis.businessType??"")?"Car wash operating cash":"Business cash before displacement",fact:basis.creditCash===false?"Business income offsets displacement only.":amounts(v.cash)+"/year before any cash lost to conversion",fields:["cash" as const],test:{cash:v.cash>0?0:v.cash},testLabel:v.cash>0?"No positive cash credit":"Current cash credit"},
-      {key:"displaced" as const,label:/wash/i.test(basis.businessType??"")?"Car wash cash lost to conversion":"Lost business cash",fact:amounts(v.displaced)+" per year",fields:["displaced" as const],test:{displaced:v.displaced+(v.cash>0?v.cash*.25:10000)},testLabel:v.cash>0?"Lose another 25% of operating cash":"$10k more displaced"}]:[]),
+      {key:"displaced" as const,label:/wash/i.test(basis.businessType??"")?"Car wash cash lost to conversion":"Lost business cash",fact:amounts(v.displaced)+" per year",fields:["displaced" as const],test:{displaced:lossTest},testLabel:lossLabel}]:[]),
   ];
   function source(line:Line){
     if(line.fields.some(k=>basis.workbookDefaults?.[k]!=null && basis.workbookDefaults[k]!==basis.inputs[k]))return "Pipeline trial assumption";
@@ -103,15 +109,13 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
   const parity=basis.proxy!=null && r.sessions>0?(basis.proxy*r.sessions-(r.annualCost-r.costs.property))/(lease?12:(1+v.closing/100)*r.recovery):null;
   const starting=screenLedger(basis,index===initialIndex?subset:{});
   const high=higherUpgradeCase(basis,index===initialIndex?subset:{});
-  const availableCash=basis.withheldOperatingCash??basis.inputs.cash;
-  const testedCash=v.cash>0?v.cash:availableCash;
   const presets:Partial<Record<LedgerKey,[string,number][]>>={
     price:[["Starting price",basis.inputs.price],["−10%",basis.inputs.price*.9],["−20%",basis.inputs.price*.8]],
     upgrade:basis.inputs.upgrade?[["Base",basis.inputs.upgrade],["−50%",basis.inputs.upgrade*.5],["+50%",basis.inputs.upgrade*1.5]]:[["Base",0],["$100k",100000],["$250k",250000]],
     unitBuild:[["Base",basis.inputs.unitBuild],["+10%",basis.inputs.unitBuild*1.1]],
     conversion:[["As modeled",basis.inputs.conversion],["+$100k",basis.inputs.conversion+100000]],
-    cash:[["Starting cash",availableCash],...(availableCash>0?[["Half",availableCash/2],["None",0]] as [string,number][]:[])],
-    displaced:testedCash>0?[["No loss",0],["25% of cash",testedCash*.25],["All cash",testedCash]]:[["No loss",0],["$10k/year",10000]],
+    cash:[[basis.withheldOperatingCash!=null?"Source cash":"Starting cash",availableCash],...(availableCash>0?[["Half",availableCash/2],["None",0]] as [string,number][]:[])],
+    displaced:testedCash>0?[["No loss",0],["Lose 25%",testedCash*.25],["Lose all",testedCash]]:[["No loss",0],["$10k/year",10000]],
   };
   function control(k:LedgerKey){
     const label=k==="price"?(lease?"Monthly rent ($)":"Purchase price ($)"):k==="cash"?"Business cash before displacement ($/year)":ledgerFields[k];
@@ -160,11 +164,12 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
           <p>{line.fact}</p>
           {line.key==="cash" && basis.withheldOperatingCash!=null && <p>The source carries {amounts(basis.withheldOperatingCash)}/year before conversion. Entering a loss tests how much of that cash survives.</p>}
           {line.key==="property" && basis.source?.startsWith("https://") && <a className="text-link" href={basis.source} target="_blank" rel="noopener noreferrer">Property source ↗</a>}
+          {line.key==="displaced" && pendingCash && <p>The starting estimate credits $0 of the {amounts(availableCash)} in annual source cash. Choose a loss to credit the remaining earnings.</p>}
           <div className="ledger-controls">{line.fields.filter(k=>!(lease && ["closing","rate","years"].includes(k)) && !(line.key==="construction" && !lease && (k==="years" || k==="rate"))).map(control)}
             {lease && line.key==="construction" && ["rate","years"].map(k=>control(k as LedgerKey))}</div>
           {impact!=null && <small>{line.testLabel} · {delta(impact)}/charge with other inputs held fixed</small>}
     {line.key==="property" && parity!=null && <p>{parity<0?"These site costs exceed the depot benchmark even with free property.":(lease?"Monthly rent":"Purchase price")+" at the "+amounts(basis.proxy!,2)+"/charge depot benchmark · "+amounts(parity)}. All other inputs stay at the values shown.</p>}
-          {line.key==="displaced" && <p><b>{amounts(-r.costs.cash-r.costs.displaced)}</b> net annual business cash credited after displacement.</p>}
+          {line.key==="displaced" && <p><b>{amounts(netCash)}</b> net annual business cash credited after displacement.</p>}
         </section>;})}
       <div className="screen-line screen-total"><b>Net site cost</b><b>{amounts(r.annualCost)}</b><b>{priced?amounts(r.perCharge,2):"—"}</b></div></div>
     <small>Rows round separately. Shared management overhead and one-time business interruption are outside this screen.</small>

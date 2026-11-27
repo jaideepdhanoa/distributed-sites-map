@@ -134,7 +134,7 @@ test("explain a preliminary range with a conditional aisle on desktop and phone"
   const a={horizon:10,demand:10,hub:1000000,capital:0,closing:.1,charging:{charges:100000,perPost:3,ports:2,
     unitBuild:10000,upgrade:20000,attendant:12000,fixed:2000,insurance:1000,perCharger:500,tax:.01}} as PurchaseAssumptions;
   const site={deal_id:"PIPE-PHX-9997",name:"Example car wash",business_type:"Car wash",kind:"pipeline",asking_price:100000,
-    purchase:{inputs:{cash:5000,ownership:"Yes"},assumptions:a},chargingSpace:{count:0,value:"0 spaces",layouts:[{stalls:4,condition:"Parking with shared aisle access",parts:[{area:"Rear parking",stalls:3},{area:"Side parking",stalls:1}]},{stalls:6,condition:"Convert two wash bays",operatingConversion:true,conversionCost:25000,lostAnnualCash:2000,parts:[{area:"Existing parking",stalls:4},{area:"Wash bays",stalls:2}]}]}} as DealProps;
+    purchase:{inputs:{cash:5000,ownership:"Yes"},assumptions:a},chargingSpace:{count:0,value:"0 spaces",layouts:[{stalls:4,condition:"Parking with shared aisle access",parts:[{area:"Rear parking",stalls:3},{area:"Side parking",stalls:1}]},{stalls:6,condition:"Convert two wash bays",operatingConversion:true,conversionCost:25000,lostAnnualCash:2000,parts:[{area:"Existing parking",stalls:4},{area:"Wash bays",stalls:2}]},{stalls:7,condition:"Unpriced wash conversion",operatingConversion:true}]}} as DealProps;
   site.charging={preliminary:preliminaryCost(site,a),result:{siteCost:null},stale:false} as NonNullable<DealProps["charging"]>;
   let saved:unknown;
   await page.route("**/api/actions/charging?site=*",route=>{
@@ -155,6 +155,12 @@ test("explain a preliminary range with a conditional aisle on desktop and phone"
   await expect(panel.locator(".screen-result")).toContainText("$10.43");
   await utility.getByRole("button",{name:/^Base/}).click();
   const layout=panel.getByRole("region",{name:"Stall configuration"});
+  await layout.getByRole("button",{name:/Unpriced wash conversion/}).click();
+  const lostCash=panel.getByRole("region",{name:"Car wash cash lost to conversion"});
+  await expect(lostCash).toContainText("Credit 75% of source cash after conversion");
+  await expect(lostCash).toContainText("The starting estimate credits $0 of the $5,000");
+  await lostCash.getByRole("button",{name:/^Lose 25%/}).click();
+  await expect(lostCash).toContainText("$3,750 net annual business cash");
   await layout.getByRole("button",{name:/Convert two wash bays/}).click();
   await expect(panel.getByLabel("Additional works ($)",{exact:true})).toHaveValue("25000");
   await expect(panel.getByLabel("Displaced cash ($/year)",{exact:true})).toHaveValue("2000");

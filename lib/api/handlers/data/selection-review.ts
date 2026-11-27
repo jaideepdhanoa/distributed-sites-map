@@ -1,3 +1,5 @@
+import { sheetMoney } from "@/lib/keyNumbers";
+import { shownPriceSource } from "@/lib/format";
 import { NextResponse } from "next/server";
 import { isSession, privateHeaders, requireUser } from "@/lib/guard";
 import { canReadFinancials } from "@/lib/agent/access";
@@ -64,7 +66,11 @@ export async function loadSelectionReview(role:ActionRole) {
     const {priority,instruction} = summary;
     const extra=financeVisible && !mapped.has(id)?unmappedChargingSite(id,stage):null;
     const charging=financeVisible ? (p as unknown as DealProps).charging ?? (extra?summarize(extra,sourceRevision(extra),active?.get(id)):undefined) : undefined;
-    rows.push({id,charging,review:register?.sites[id],city,name:String(p.name || p.address || register?.sites[id]?.name || id),mapped:Boolean(mapped.get(id)?.geometry),hasRecord:mapped.has(id),stage,mirrorStage:input?.stage || "",
+    const priced = mapped.has(id) ? deal : extra;
+    const asking = financeVisible && priced && (priced.asking_price != null || priced.asking_price_display)
+      ? [sheetMoney(priced.asking_price, priced.asking_price_display), shownPriceSource(priced)].filter(Boolean).join(" · ") : undefined;
+    rows.push({id,charging,asking,chargingSpace:financeVisible ? deal.chargingSpace : undefined,
+      pendingDrop:financeVisible ? deal.pendingDrop : undefined,review:register?.sites[id],city,name:String(p.name || p.address || register?.sites[id]?.name || id),mapped:Boolean(mapped.get(id)?.geometry),hasRecord:mapped.has(id),stage,mirrorStage:input?.stage || "",
       research:evidence?.get(id),priority,instruction,geometry:!a && typeof input?.recorded === "number" ? input.recorded+" stalls in the workbook" : view.baseline,option:summary.fit || view.finding || view.focus,assessed:Boolean(a),evidenceDate:a?.reviewedOn || "",
       section:input?.section || (input ? "Missing section" : "Workbook input unavailable"),amount:financeVisible ? input?.screen ?? null : null,
       readiness:investmentScreen(input,financeVisible),financeVisible,quickLube:(input?.segment || a?.row.segment || "").toLowerCase().includes("lube") });

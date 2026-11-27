@@ -1,6 +1,8 @@
+import SiteCoverageReview from "./SiteCoverageReview";
 import type { SelectionRow } from "@/lib/selection/screen";
 import type { Opportunity, OpportunitySite } from "@/lib/selection/opportunity";
 import { reviewLink } from "@/lib/reviewNavigation";
+import { pipelineCost } from "@/lib/charging/pipelineCost";
 import { amounts } from "@/lib/charging/model";
 import { filedScreenLabel } from "@/lib/charging/summary";
 import { ChargingLink } from "./ChargingLink";
@@ -14,6 +16,7 @@ const marketNames:Record<string,string> = {LAS:"Las Vegas", MIA:"Miami", PHX:"Ph
 export default function ShortlistCard({ row, review, option, origin }:Props) {
   const plan = option.route === review.primary.route ? review.visitPlan : undefined;
   const charging = row.charging;
+  const cost = pipelineCost(charging);
   const alternatives = [review.primary, ...review.alternatives].filter(other => other.route !== option.route);
   return <article aria-labelledby={"title-"+row.id} className="shortlist-card">
     <header>
@@ -28,9 +31,18 @@ export default function ShortlistCard({ row, review, option, origin }:Props) {
         <p><b>Why visit?</b> {plan?.reason ?? option.rationale}</p></div>
         <div className="shortlist-owner"><small>Decision owner</small><span>{option.owner ?? "Unassigned"}{option.revisitOn && <> · Review <time dateTime={option.revisitOn}>{option.revisitOn}</time></>}</span>
         </div></div>
+      {row.pendingDrop && <p><b>Drop proposal awaiting approval.</b> Review the proposal before arranging a visit.</p>}
+      {row.financeVisible && <dl className="shortlist-figures">
+        <div><dt>Asking price</dt><dd>{row.asking || "Price needs confirmation"}</dd></div>
+        <div><dt>Charging spaces</dt><dd>{row.chargingSpace?.value || row.option || "Needs measurement"}{row.chargingSpace?.basis && <small>{row.chargingSpace.basis}</small>}</dd></div>
+        <div><dt>Site cost per charge</dt><dd>{charging
+          ? <ChargingLink site={row.id} revision={charging.selected} returnTo={origin}>{cost.value}</ChargingLink>
+          : cost.value}<small>{cost.basis}</small></dd></div>
+      </dl>}
       <p className="shortlist-next"><b>Next check</b> {option.next}</p>
       {plan && <VisitActions plan={plan} charging={charging}/>}
     </div>
+    {review.coverage && <SiteCoverageReview evidence={review.coverage}/>}
     <details className="disclosure shortlist-evidence"><summary className="disclosure">Site evidence and economics</summary>
       <p>{option.route} · {row.stage} · {row.id}</p>
       <Evidence option={option}/>
@@ -42,7 +54,7 @@ export default function ShortlistCard({ row, review, option, origin }:Props) {
       {row.financeVisible && <p>{row.readiness} · Workbook base savings {row.amount == null ? "unmodeled" : (100*row.amount).toFixed(1)+"%"}</p>}
       {charging && <><h4>Charging case · {charging.name}</h4><p><b>{charging.merit.action === "Suggest drop" ? "Set this charging case aside" : charging.merit.action}</b></p><p>{charging.merit.next}</p>
         <p>{charging.result.siteCost == null ? "Cost pending" : "$"+charging.result.siteCost.toFixed(2)+"/charge"} · {charging.merit.netValue == null ? "Investment rank pending" : "Standalone downside network value "+amounts(charging.merit.netValue)}</p>
-        {!charging.selected && <p>{filedScreenLabel(charging.screen)}</p>}<ChargingLink site={row.id} revision={charging.selected}/></>}
+        {!charging.selected && <p>{filedScreenLabel(charging.screen)}</p>}<ChargingLink site={row.id} revision={charging.selected} returnTo={origin}/></>}
       {row.research && <SelectionResearch row={row.research}/>}
     </details>
   </article>;

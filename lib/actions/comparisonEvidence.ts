@@ -7,7 +7,7 @@ export const evidenceMeasures = {
   on_site_service: "On-site service", frontage_hosting: "Street-frontage hosting",
   business_price: "Implied business price", business_multiple: "Business-only multiple",
   asking_multiple: "Asking / earnings", hub_savings: "Savings versus hub",
-  open_land: "Open land", bays: "Bays that fit", power: "Power", zoning: "Zoning",
+  open_land: "Open land", bays: "Earlier workbook stalls", power: "Power", zoning: "Zoning",
   asking: "Asking", revenue: "Revenue", ebitda: "EBITDA", cash_flow: "Cash flow",
   land_estimate: "Land estimate", reporting_period: "Reporting period",
   figure_basis: "Figure basis", financial_source: "Financial source",

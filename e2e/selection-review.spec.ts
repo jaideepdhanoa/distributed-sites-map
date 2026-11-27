@@ -140,8 +140,14 @@ test("shortlisted visit shows the charging decision and its parallel diligence w
     commercial:"Reconcile the operating receipts.", power:"Scope a utility discovery request.",
     beforeVisit:"Confirm access to the yard.", fieldwork:"Measure the turn with a queue present.",
     scenario:"Compare both footprints.", basis:"Illustrative network reference.", beforeLoi:"Verify rights and retained income."};
+  const coverage = {reviewedOn:"2026-01-01", countyStatus:"Address matched", county:"The example parcel matches the street address.",
+    countySource:"https://example.org/parcel", spaceStatus:"Candidate outline", space:"The marked yard needs a measured aisle.",
+    layoutSource:"/space-review",financeStatus:"Price or rights needed",finance:"The sale scope is open.",next:"Confirm the demised area.",
+    source:"https://example.org/record",cases:[{stalls:4,kind:"Illustrative threshold only",price:null,cash:0,base:null,downside:null,ceiling:-1,replicas:10}]};
   const row = {id:"PIPE-LAS-9001",city:"LAS",name:"Example service yard",stage:"Desk screen",mapped:false,
-    priority:"Check space",section:"Operating",financeVisible:true,review:{name:"Example service yard",primary,alternatives:[],visitPlan},
+    priority:"Check space",section:"Operating",financeVisible:true,asking:"$120,000 · Example offer",pendingDrop:true,
+    chargingSpace:{value:"0 spaces",basis:"Up to three with the shared aisle",count:0},
+    review:{name:"Example service yard",primary,alternatives:[],visitPlan,coverage},
     charging:{merit:{action:"Review for closure",next:"Review the original outdoor layout.",netValue:null},
       name:"Screen",result:{siteCost:null},screen:[],selected:null}};
   await page.route("**/api/data/selection-review",route=>route.fulfill({json:{rows:[row],hasInputs:true,mismatches:0}}));
@@ -149,11 +155,28 @@ test("shortlisted visit shows the charging decision and its parallel diligence w
   await expect(page.getByRole("heading",{name:"Acquisition shortlist"})).toBeVisible();
   await expect(page.getByRole("link",{name:/needing my approval/})).toHaveAttribute("href",/qapprove=1/);
   await expect(page.getByText("Site evidence and economics")).toBeVisible();
+  const overview = page.locator(".shortlist-figures");
+  await expect(overview).toContainText("$120,000");
+  await expect(overview).toContainText("Up to three with the shared aisle");
+  await expect(page.getByText("Drop proposal awaiting approval.")).toBeVisible();
+  const costLink = overview.getByRole("link");
+  const dest = new URL(await costLink.getAttribute("href") || "", page.url());
+  expect(dest.searchParams.get("returnTo")).toBe("/selection-review?disposition=Shortlist#PIPE-LAS-9001");
+  await costLink.click();
+  await page.getByRole("link",{name:"← Selection review"}).click();
+  await expect(page).toHaveURL(/disposition=Shortlist#PIPE-LAS-9001$/);
+  await expect(page.locator(".shortlist-figures")).toBeVisible();
   await mkdir("review-shots",{recursive:true});
   await page.screenshot({path:"review-shots/"+info.project.name+"-acquisition-shortlist.png",animations:"disabled"});
   await page.getByRole("button",{name:"Filter shortlist"}).click();
   await expect(page.getByLabel("Commercial decision")).toBeVisible();
   await page.getByRole("button",{name:"Hide filters"}).click();
+  await page.getByText("Parcel, space and charging evidence").click();
+  await expect(page.getByText(coverage.county)).toBeVisible();
+  await expect(page.getByText("No positive price")).toBeVisible();
+  expect(await page.locator(".site-coverage").evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  await page.locator(".site-coverage").screenshot({path:"review-shots/"+info.project.name+"-site-evidence.png",animations:"disabled"});
+  await page.getByText("Parcel, space and charging evidence").click();
   const card = page.locator(".visit-decision");
   await expect(card.getByText(visitPlan.reason)).toBeVisible();
   const evidence = page.getByText("Site evidence and economics");

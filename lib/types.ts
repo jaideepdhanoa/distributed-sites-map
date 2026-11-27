@@ -192,6 +192,7 @@ export type DealProps = {
   stage_pending?: string;
   /** Knock-out rationale. Present only while Stage is not Dropped. */
   suggested_drop?: string;
+  pendingDrop?: boolean;
   /** Accepted drop. Reason, proposer, approver, and the exact decision time. */
   decision_reason?: string;
   decision_proposer?: string;

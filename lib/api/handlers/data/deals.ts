@@ -46,7 +46,16 @@ export async function loadMapDeals(role: ActionRole, includePurchase = true) {
   const features = omitProtectedDeals(attachPackageHrefs(chipped.features || [], packageHrefMap(), canReadFinancials(role)).map((feature) => withPricing(feature)));
   const purchase = includePurchase && canReadFinancials(role) ? purchaseFile() : null;
   const allowed = includePurchase && canReadFinancials(role);
-  const saved = allowed ? await selectedCases() : null;
+  const [saved, pendingDrops] = await Promise.all([
+    allowed ? selectedCases() : null,
+    allowed && actionsEnabled() ? withSql(async sql => {
+      const {rows} = await sql.query<{target_kind:string; target_id:string}>(
+        `SELECT DISTINCT target_kind, target_id FROM suggestions
+         WHERE field_name = 'proposed_next_step' AND detail = 'knock_off'
+           AND status = 'open' AND done_at IS NULL`);
+      return new Set(rows.map(r => r.target_kind + ":" + r.target_id));
+    }).catch(() => undefined) : undefined,
+  ]);
   const reviews = allowed ? opportunityRegister()?.sites : undefined;
   const research = allowed ? selectionResearch() : null;
   const captured = allowed && actionsEnabled() ? await withSql(async sql => {
@@ -78,7 +87,9 @@ export async function loadMapDeals(role: ActionRole, includePurchase = true) {
     if (!allowed) return {...feature, properties:{...d,screening}};
     const statementCoverage = !captured ? "unavailable" : captured.has(d.deal_id) || captured.has(d.universe_id || "") ? "present" : "empty";
     const chargingSpace = pipelineFit(current, row, outlines.reviewsAvailable, inputs?.fit ?? d.bays_that_fit);
-    const record:DealProps={...d,chargingSpace,chargingHold:chargingHold(selection?.[d.deal_id]),screening,statementCoverage,opportunityReview:reviewAtStage(reviews?.[d.deal_id], d.stage, d.decision_reason || d.chips?.find(c => c.family === "drop_reason")?.label),selectionResearch:research?.get(d.deal_id),...(inputs && purchase ? {purchase:{inputs,assumptions:purchase.assumptions,
+    const pendingDrop = active && pendingDrops
+      ? pendingDrops.has("deal:" + d.deal_id) || Boolean(d.universe_id && pendingDrops.has("site:" + d.universe_id)) : undefined;
+    const record:DealProps={...d,pendingDrop,chargingSpace,chargingHold:chargingHold(selection?.[d.deal_id]),screening,statementCoverage,opportunityReview:reviewAtStage(reviews?.[d.deal_id], d.stage, d.decision_reason || d.chips?.find(c => c.family === "drop_reason")?.label),selectionResearch:research?.get(d.deal_id),...(inputs && purchase ? {purchase:{inputs,assumptions:purchase.assumptions,
       layout:layouts.get(d.deal_id)}} : {})};
     if (active && !/^dropped/i.test(d.stage || "") && record.opportunityReview?.primary.disposition === "Suggest drop") {
       record.suggested_drop = record.opportunityReview.primary.rationale;

@@ -13,6 +13,20 @@ const compare = (a: DealProps, b: DealProps, signedIn = true) => new Map(compari
   id: record.deal_id, title: record.address, rows: dealRows(record, [], signedIn),
 }))).map(row => [row.label, row]));
 
+test("the commercial action and conditional layout lead a reviewed comparison", () => {
+  const example = deal({bays_that_fit:12, chargingSpace:{value:"0 spaces",basis:"Up to three with a shared aisle",count:0},
+    opportunityReview:{name:"Example repair",primary:{route:"Operating acquisition",disposition:"Hold",rank:null,
+      next:"Request the lease exhibit",rationale:"Confirm parking control",reviewedOn:"2026-01-01",owner:null,revisitOn:null,
+      evidence:"https://example.org/docs",offering:null},alternatives:[]}});
+  const rows = compare(example,example);
+  assert.equal(rows.get("Next check")?.values[0],"Request the lease exhibit");
+  assert.equal(rows.get("Charging spaces")?.section,"Decision overview");
+  assert.match(rows.get("Charging spaces")!.values[0],/Up to three/);
+  assert.equal(rows.get("Earlier workbook stalls")?.section,"Site fit");
+  assert.equal(rows.get("Offered transaction")?.values[0],"Operating acquisition");
+  assert.equal(compare(example,example,false).has("Offered transaction"),false);
+});
+
 test("comparison uses decision values and exposes provenance without counting different wording", () => {
   const rows = compare(deal(), deal({ address: "Example Road", asking_price_source: "Another source", next_step: "Request the survey" }));
   assert.equal(rows.get("Address")?.kind, "detail");

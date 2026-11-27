@@ -1,7 +1,7 @@
 "use client";
 
 import { compareAttention, matchingOption } from "@/lib/selection/opportunity";
-import { recommendation, recommendationNote } from "@/lib/selection/opportunityDisplay";
+import { recommendation, nextDecision } from "@/lib/selection/opportunityDisplay";
 import { pipelineCost } from "@/lib/charging/pipelineCost";
 import { ChargingLink } from "./ChargingLink";
 import { dropReasons } from "@/lib/selection/dropReasons";
@@ -123,7 +123,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
     return fact ? [fact.value, fact.basis].filter(Boolean).join(" · ") : "No layout estimate";
   }
   if (id === "merit") return signedIn ? deal.charging?.merit.action ?? deal.screening?.priority ?? "—" : "";
-  if (id === "county") return row.countyLabel || "—";
+  if (id === "county") return (signedIn && deal.opportunityReview?.coverage?.countyStatus) || row.countyLabel || "—";
   if (id === "score") {
     const view = storedScoreView({
       score: deal.score,
@@ -146,7 +146,12 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   }
   if (id === "acres") return acresText(deal.land_acres) || "—";
   if (id === "perAcre") return signedIn ? (deal.price_per_acre_display || "—") : "—";
-  if (id === "openLand") return openLandLabel(deal.open_land_sqft, deal.open_land_basis);
+  if (id === "openLand") {
+    if (!openLandMeasured(deal.open_land_sqft, deal.open_land_basis) && signedIn && deal.opportunityReview?.coverage) {
+      return deal.opportunityReview.coverage.spaceStatus;
+    }
+    return openLandLabel(deal.open_land_sqft, deal.open_land_basis);
+  }
   if (id === "capacity") return powerSummary(factsForDeal(deal)) || "—";
   if (id === "traffic") return vehiclesPerDay(deal.trade_aadt) || "—";
   if (id === "cashFlow") {
@@ -614,6 +619,7 @@ export default function PipelineList({
               actionLabel: signedIn && row.deal.opportunityReview ? "Review priority" : undefined,
               action: signedIn ? (row.deal.opportunityReview ? recommendation(row.deal.opportunityReview.primary) : plainNextStep(row.deal.next_step || "").line || undefined) : undefined,
               measures: signedIn && row.deal.kind === "pipeline" ? [
+                ...(row.deal.opportunityReview ? [["Next decision", nextDecision(row.deal.opportunityReview)] as [string, string]] : []),
                 ["Charging spaces", cell(row, "spaces", true)], ["Cost per charge", cell(row, "chargeCost", true)],
               ] : undefined,
               chips: (() => {
@@ -651,7 +657,7 @@ export default function PipelineList({
         ) : null}
         renderCell={(row, column) => {
           const id = row.deal.deal_id;
-          if (column === "priority" && row.deal.opportunityReview) return <span title={recommendationNote(row.deal.opportunityReview.primary)}>{recommendation(row.deal.opportunityReview.primary)}</span>;
+          if (column === "priority" && row.deal.opportunityReview) return <span className="pipeline-measure"><strong>{recommendation(row.deal.opportunityReview.primary)}</strong><small>{nextDecision(row.deal.opportunityReview)}</small></span>;
           if (column === "spaces" || column === "chargeCost") {
             if (!signedIn || row.deal.kind === "land") return "—";
             const cost = column === "chargeCost";
@@ -687,6 +693,10 @@ export default function PipelineList({
             if (column !== "nda") return "—";
           }
           if (column === "score") return <ScoreCell input={scoreInput(row)} />;
+          if (column === "county" && signedIn && row.deal.opportunityReview?.coverage) {
+            const coverage = row.deal.opportunityReview.coverage;
+            return <CountyChip label={coverage.countyStatus} note={coverage.county} />;
+          }
           if (column === "county") return row.countyLabel ? <CountyChip label={row.countyLabel} note={row.countyNote || ""} /> : "—";
           if (column === "type") return <span className="stage-cell"><TypeChip value={typeLabel(row.deal)} />{row.deal.kind === "land" ? <LandPausedChip /> : null}</span>;
           if (column === "stage") {

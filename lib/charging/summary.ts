@@ -1,3 +1,4 @@
+import { pipelineCost } from "./pipelineCost";
 import { siteMerit,type Merit } from "./merit";
 import { paidScreen } from "./reference";
 import type { DealProps } from "../types";
@@ -24,11 +25,13 @@ export function chargingRows(d:DealProps) {
   const c=d.charging;
   if(!c)return [];
   const r=c.result;
+  const cost=pipelineCost(c);
   const values=[
-    ["Dispatch pool",c.merit.network?.pool??"Unknown"],["Charging decision",c.merit.action],["Working gap per charge",amounts(r.difference,2)],["Downside gap per charge",amounts(c.merit.downsideGap,2)],["Downside network value",amounts(c.merit.netValue)],["Downside offer ceiling",amounts(c.merit.downsideCeiling)+(c.term==="lease"?" / month":"")],["First-year cash",amounts(r.yearOne)],["Opening window",r.opening||"Unknown"],["Site cost per charge",amounts(r.siteCost,2)],
+    ["Dispatch pool",c.merit.network?.pool??"Unknown"],["Charging decision",c.merit.action],["Working gap per charge",amounts(r.difference,2)],["Downside gap per charge",amounts(c.merit.downsideGap,2)],["Downside network value",amounts(c.merit.netValue)],["Downside offer ceiling",amounts(c.merit.downsideCeiling)+(c.term==="lease"?" / month":"")],["First-year cash",amounts(r.yearOne)],["Opening window",r.opening||"Unknown"],
     ["Depot cost per charge",amounts(r.depot,2)],["Peak charges per shift",r.peakSessions?.toString()??"Unknown"],
     ["Parity offer ceiling",amounts(r.offer)+(c.term==="lease"?" / month":"")],["Charging next check",c.merit.next],
   ];
-  return values.map(([label,value])=>({label,value,key:value,basis:c.name+" · "+(c.comparator==="workbook"?"Workbook proxy":"Local depot")}));
+  const basis=c.name+" · "+(c.comparator==="workbook"?"Workbook proxy":"Local depot");
+  return [{label:"Site cost per charge",value:cost.value,key:cost.amount,basis:cost.basis}, ...values.map(([label,value])=>({label,value,key:value,basis}))];
 }
 export const chargingLabels=["Charging decision","Working gap per charge","Dispatch pool","Marginal value in comparison","Downside gap per charge","Downside network value","Downside offer ceiling","First-year cash","Opening window","Site cost per charge","Depot cost per charge","Peak charges per shift","Parity offer ceiling","Charging next check"];

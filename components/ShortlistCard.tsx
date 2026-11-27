@@ -1,3 +1,4 @@
+import SiteCoverageReview from "./SiteCoverageReview";
 import type { SelectionRow } from "@/lib/selection/screen";
 import type { Opportunity, OpportunitySite } from "@/lib/selection/opportunity";
 import { reviewLink } from "@/lib/reviewNavigation";
@@ -31,6 +32,7 @@ export default function ShortlistCard({ row, review, option, origin }:Props) {
       <p className="shortlist-next"><b>Next check</b> {option.next}</p>
       {plan && <VisitActions plan={plan} charging={charging}/>}
     </div>
+    {review.coverage && <SiteCoverageReview evidence={review.coverage}/>}
     <details className="disclosure shortlist-evidence"><summary className="disclosure">Site evidence and economics</summary>
       <p>{option.route} · {row.stage} · {row.id}</p>
       <Evidence option={option}/>

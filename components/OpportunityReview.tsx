@@ -1,3 +1,4 @@
+import SiteCoverageReview from "./SiteCoverageReview";
 import "./opportunity-review.css";
 import type { Opportunity, OpportunitySite } from "@/lib/selection/opportunity";
 import type { ChargingSummary } from "@/lib/charging/summary";
@@ -43,6 +44,7 @@ export default function OpportunityReview({review, matched, active, charging, re
       <VisitDecision option={primary} plan={review.visitPlan} charging={charging}/>}
     {primary.dropReason && <p><b>Drop reason</b> · {primary.dropReason}</p>}
     <p><b>{["Dropped","Archive listing","Outside mandate","Watch availability","Off-market prospect"].includes(primary.disposition) ? "Reopen when" : "Next check"}</b> · {primary.next}</p>
+    {review.coverage && <SiteCoverageReview evidence={review.coverage}/>}
     <details className="disclosure"><summary className="disclosure">Decision evidence{others.length > 0 && " and alternative routes"}</summary>
       <Evidence option={primary}/>
       {others.map(option=><div key={option.route}><h4>{option.route} · {option.disposition}</h4>

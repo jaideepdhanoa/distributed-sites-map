@@ -51,14 +51,17 @@ function SelectionList() {
   const hasReviews = Boolean(data?.registerUrl || data?.filed?.length || rows.some(r=>r.review));
   const route = params.get("route") || "";
   const reason = decision === "Dropped" ? params.get("reason") || "" : "";
+  const evidenceFilter = params.get("evidence") || "";
+  const coverageOptions = [...new Set(rows.flatMap(r => r.review?.coverage ? [r.review.coverage.countyStatus, r.review.coverage.spaceStatus, r.review.coverage.financeStatus] : []))].sort();
+  const evidenceMatches = (review?: OpportunitySite) => !evidenceFilter || Boolean(review?.coverage && [review.coverage.countyStatus,review.coverage.spaceStatus,review.coverage.financeStatus].includes(evidenceFilter));
   const match = (review?:OpportunitySite) => matchingOption(review,decision,route,reason);
   const matchesDecision = (review?:OpportunitySite) => review ? Boolean(match(review)) : !route && (!decision || decision === "Unreviewed");
   const matchesPlace = (r:{id:string;city:string}, name:string) => (!scope || scope.has(r.id)) && (!market || r.city === market) && [name,r.city,r.id].join(" ").toLowerCase().includes(query.trim().toLowerCase());
-  const filed = (data?.filed || []).filter(r => matchesPlace(r,r.review.name) && matchesDecision(r.review));
+  const filed = (data?.filed || []).filter(r => evidenceMatches(r.review) && matchesPlace(r,r.review.name) && matchesDecision(r.review));
   const showFiled = !check && !params.get("stalls") && !params.get("charging") && !investment;
   const shortlist = decision === "Shortlist";
   const droppedView = decision === "Dropped";
-  const scoped = rows.filter(r => (!investment || sequence.has(r.id)) && matchesPlace(r,r.name + " " + (r.review?.name || "")) && matchesDecision(r.review) && (!check || r.priority === check) &&
+  const scoped = rows.filter(r => evidenceMatches(r.review) && (!investment || sequence.has(r.id)) && matchesPlace(r,r.name + " " + (r.review?.name || "")) && matchesDecision(r.review) && (!check || r.priority === check) &&
     (!params.get("stalls") || r.charging?.screen.some(c=>c.stalls===Number(params.get("stalls")) && c.downside>=0)) &&
     (!params.get("charging") || r.charging?.merit.action===params.get("charging"))).sort((a,b)=>{
       if(investment)return a.city.localeCompare(b.city) || sequence.get(a.id)!.rank-sequence.get(b.id)!.rank;
@@ -99,6 +102,8 @@ function SelectionList() {
       {droppedView && <label>Drop reason<select aria-label="Drop reason" className="secondary" value={reason} onChange={e=>setReviewFilter("reason",e.target.value)}>
         <option value="">All drop reasons</option>{dropReasons.map(r=><option key={r.code}>{r.label}</option>)}</select></label>}
       <label>Market<select aria-label="Market" className="secondary" value={market} onChange={e=>setReviewFilter("market",e.target.value)}><option value="">All markets</option>{[...new Set([...rows, ...(data?.filed || [])].map(r=>r.city))].sort().map(c=><option key={c}>{c}</option>)}</select></label>
+      {coverageOptions.length > 0 && <label>Evidence status<select className="secondary" value={evidenceFilter} onChange={e=>setReviewFilter("evidence",e.target.value)}>
+        <option value="">All evidence</option>{coverageOptions.map(value=><option key={value}>{value}</option>)}</select></label>}
       <label>Find a site<input className="field" value={query} onChange={e=>setReviewFilter("q",e.target.value)} placeholder="Name or site ID" /></label>
     </div>
     <details className="disclosure" open={(!hasReviews || Boolean(check || route || params.get("stalls") || params.get("charging") || params.get("sort"))) || undefined}>

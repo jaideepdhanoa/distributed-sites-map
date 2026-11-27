@@ -4661,11 +4661,11 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .panel-grip-row .panel-grip:hover, .space-map-inspector .panel-grip:hover { background: var(--cream); }
 .space-map-inspector .panel-grip { float: right; }
 .panel-position-menu {
-  position: fixed; inset: auto; margin: 0; padding: 12px; width: 200px; border: 1px solid var(--line);
+  position: fixed; inset: auto; margin: 0; padding: 12px; width: 248px; max-width: calc(100vw - 16px); border: 1px solid var(--line);
   border-radius: 12px; background: var(--paper-card); color: var(--ink); box-shadow: var(--shadow-3);
 }
-.panel-position-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 8px 0; }
-.panel-position-menu .paper-btn { white-space: nowrap; }
+.panel-position-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; margin: 8px 0; }
+.panel-position-menu .paper-btn { min-width: 0; padding-inline: 6px; white-space: nowrap; }
 .space-inspector-toggle { display: none; }
 @media (min-width: 768px) {
   .shell .map-stage [data-map-panel][data-placed] {
@@ -4688,4 +4688,5 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   .space-inspector-toggle { display: block; float: right; min-height: 44px; }
   .space-map-inspector[data-compact=true] { width: auto; left: auto; padding: 0 12px; }
   .space-map-inspector[data-compact=true] #space-inspector-content { display: none; }
+  .space-map-open:has(.space-map-inspector[data-compact=true]) .space-map-source { padding-bottom: 64px; }
 }

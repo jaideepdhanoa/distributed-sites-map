@@ -472,6 +472,7 @@ test("move the map key without panning and restore its position", async ({ page 
   await grip.press("Enter");
   const choices = key.getByRole("group", { name: "Map key position" });
   await expect(choices).toBeVisible();
+  expect(await choices.evaluate(menu => menu.scrollWidth <= menu.clientWidth)).toBe(true);
   if (!process.env.MAP_PRODUCTION_CHECK) {
     await mkdir("review-shots", { recursive: true });
     await choices.screenshot({ path: "review-shots/desktop-panel-positions.png" });

@@ -4009,6 +4009,17 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .brief-decision span, .record-brief dt { color: var(--ink-3); font-size: var(--type-cap); }
 .brief-decision strong { color: var(--green); text-align: right; }
 .drawer .record-brief p { margin: 4px 0 8px; font-size: 14px; }
+.drawer .acquisition-brief h3 {
+  margin: .2rem 0 .4rem;
+  color: var(--ink);
+  font: 600 1.15rem/1.25 var(--font-sans, sans-serif);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.acquisition-brief > p > b { display: block; }
+.acquisition-brief > small { line-height: 1.45; }
+.acquisition-brief > details { margin-top: .6rem; }
+
 .record-brief dl { display: grid; gap: 5px; margin: 0; border-top: 1px solid var(--line); padding-top: 7px; }
 .record-brief dl > div { display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 8px; align-items: baseline; }
 .record-brief dd { margin: 0; font-size: 14px; line-height: 1.4; }

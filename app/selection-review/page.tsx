@@ -23,6 +23,7 @@ export default function SelectionReview() {
 function SelectionList() {
   const [data,setData] = useState<Result | null>(null);
   const [error,setError] = useState(false);
+  const [showFilters,setShowFilters] = useState(false);
   const [attempt,setAttempt] = useState(0);
   const params=useSearchParams();
   const market=params.get("market") || "", check=params.get("check") || "", query=params.get("q") || "";
@@ -66,13 +67,7 @@ function SelectionList() {
       return priority || (scope && order !== "market" ? scope.get(a.id)! - scope.get(b.id)! : 0) || (order === "attention" ? diligenceOrder(a.charging?.merit,b.charging?.merit) : 0) || a.city.localeCompare(b.city) || a.name.localeCompare(b.name);
     });
   const droppedCount = scoped.length + (showFiled ? filed.length : 0);
-  return <main ref={pane} className={shortlist ? "space-review-page shortlist-page" : "space-review-page"}>
-    <a className="text-link" href={back}>← Pipeline list</a>
-    {shortlist ? <header className="shortlist-intro"><h1>Acquisition shortlist</h1>
-      <p>Choose the next visit by the question it can settle.</p>
-      <a className="text-link" href="/?review=1&qmarket=all&qstage=any&qapprove=1">Open items needing my approval →</a>
-      <small>The Review inbox also includes changes and requests across the wider pipeline.</small>
-    </header> : <><h1>Selection review</h1><p>Choose the next diligence check. Investment approval requires verified site rights, usable space, power, retained cash flow and network benefit.</p></>}
+  const guidance = <>
     {data?.registerUrl && <p><a className="text-link" href={data.registerUrl} target="_blank" rel="noreferrer">Open the team’s review register</a> to file new evidence, assign the next check or revise a decision.</p>}
     {scoped.some(r => r.review && match(r.review)?.disposition === "Shortlist") &&
       <details className="disclosure"><summary className="disclosure">How to decide on visits, utility studies and offers</summary>
@@ -84,6 +79,20 @@ function SelectionList() {
           <li><b>Approve firm terms.</b> Compare base and joint downside to the local cost for the same service. Include peak demand, opening delay, peak funding and independent property support. Submit the supported price and open conditions to the investment approver.</li>
         </ol>
       </details>}
+  </>;
+  const dataDetails = data?.hasInputs && <details className="disclosure"><summary className="disclosure">Data details{data.mismatches > 0 && " · Stage differences"}</summary><p>{data.mismatches} stage differences across the joined records. The application stage is shown when available.</p></details>;
+  return <main ref={pane} className={shortlist ? "space-review-page shortlist-page" : "space-review-page"}>
+    <a className="text-link" href={back}>← Pipeline list</a>
+    {shortlist ? <header className="shortlist-intro"><h1>Acquisition shortlist</h1>
+      <p>Choose the next visit by the question it can settle.</p>
+      <a className="text-link" href="/?review=1&qmarket=all&qstage=any&qapprove=1">Open items needing my approval →</a>
+      <small>The Review inbox also includes changes and requests across the wider pipeline.</small>
+    </header> : <><h1>Selection review</h1><p>Choose the next diligence check. Investment approval requires verified site rights, usable space, power, retained cash flow and network benefit.</p></>}
+    {!shortlist && guidance}
+    {shortlist && <button type="button" className="paper-btn shortlist-filter-toggle" aria-controls="selection-filters" aria-expanded={showFilters} onClick={()=>setShowFilters(!showFilters)}>
+      {showFilters ? "Hide filters" : "Filter shortlist"}{market && " · "+market}{query && " · "+query}
+    </button>}
+    <div id="selection-filters" hidden={shortlist && !showFilters}>
     <div className="space-review-filters">
       {hasReviews && <label>Commercial decision<select className="secondary" value={decision} onChange={e=>setReviewFilter("disposition",e.target.value)}>
         <option value="">Current opportunities</option>{[...dispositions,"Unreviewed"].map(d=><option key={d}>{d}</option>)}</select></label>}
@@ -104,14 +113,15 @@ function SelectionList() {
       <label>Order<select aria-label="Order" className="secondary" value={params.get("sort")||""} onChange={e=>setReviewFilter("sort",e.target.value)}><option value="">Diligence priority</option>{rows.some(r=>r.financeVisible) && <option value="investment">Investment sequence by market</option>}<option value="market">Market and site</option><option value="earlier">Earlier usable charges</option></select></label>
       </div>
     </details>
+    </div>
     {investment && <p>Each market starts with fleet demand after existing commitments. Each ranked site uses part of its dispatch pool. Values and peak charges show the contribution remaining at that position.</p>}
     {investment && incompatible.length>0 && <p role="status">Align the valuation date, horizon, discount rate and energy per charge before ranking {incompatible.join(", ")}.</p>}
     {scope && <button type="button" className="text-link" onClick={()=>setReviewFilter("scope","")}>Show all active sites</button>}
     {!data && !error && <p role="status">Loading pipeline…</p>}
     {error && <p role="alert">Pipeline could not be loaded. <button className="text-link" onClick={()=>setAttempt(a=>a+1)}>Retry</button></p>}
-    {data && <><p aria-live="polite">{droppedView ? `${droppedCount} ${droppedCount === 1 ? "site" : "sites"} with a dropped opportunity` : `${scoped.length} of ${rows.length} active sites`}</p>
+    {data && <><p aria-live="polite">{droppedView ? `${droppedCount} ${droppedCount === 1 ? "site" : "sites"} with a dropped opportunity` : shortlist ? scoped.length+" shortlisted · "+rows.length+" active pipeline sites" : `${scoped.length} of ${rows.length} active sites`}</p>
       {!data.hasInputs && <p>Workbook screen pending. Some unlocated sites use their dated assessment cohort.</p>}
-      {data.hasInputs && <details className="disclosure"><summary className="disclosure">Data details{data.mismatches > 0 && " · Stage differences"}</summary><p>{data.mismatches} stage differences across the joined records. The application stage is shown when available.</p></details>}
+      {!shortlist && dataDetails}
       {!scoped.length && !(droppedView && showFiled && filed.length) && <p>{investment?"No current site case qualifies for investment ranking in this view.":"No sites match these filters."}</p>}
       <ul className={shortlist ? "shortlist-results" : "space-review-results"}>{scoped.map(r=>{
         const selected = match(r.review);
@@ -136,6 +146,7 @@ function SelectionList() {
       {filed.length > 0 && showFiled && <details className="disclosure" key={decision} open={droppedView || undefined}>
         <summary className="disclosure">{droppedView ? "Outside the active pipeline" : "Filed reviews outside the active list"} ({filed.length})</summary>
         <ul className="space-review-results">{filed.map(r=><li key={r.id}><div><small>{r.city} · {r.stage} · {r.id}</small><h2>{r.review.name}</h2><OpportunityReview review={r.review} matched={match(r.review)}/>{r.hasRecord && <a href={reviewLink("/",{site:r.id,city:r.city,funnel:"pipeline",sheet:"full"},origin+"#"+r.id)}>Open site record</a>}</div></li>)}</ul>
-      </details>}</>}
+      </details>}
+      {shortlist && <footer className="shortlist-guide">{guidance}{dataDetails}</footer>}</>}
   </main>;
 }

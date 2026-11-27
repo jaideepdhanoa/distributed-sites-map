@@ -25,3 +25,6 @@
   .shortlist-card header .paper-btn { justify-self:start; }
   .shortlist-owner { margin-top:6px; border:0; border-top:1px solid #c5d2c6; padding:10px 0 0; }
 }
+.shortlist-intro h1 { line-height:1.12; }
+.shortlist-filter-toggle { min-height:44px; margin-bottom:7px; }
+.shortlist-guide { margin:22px 0; padding:14px 0; border-top:1px solid #cec9bb; }

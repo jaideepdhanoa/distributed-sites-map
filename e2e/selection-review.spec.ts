@@ -151,6 +151,9 @@ test("shortlisted visit shows the charging decision and its parallel diligence w
   await expect(page.getByText("Site evidence and economics")).toBeVisible();
   await mkdir("review-shots",{recursive:true});
   await page.screenshot({path:"review-shots/"+info.project.name+"-acquisition-shortlist.png",animations:"disabled"});
+  await page.getByRole("button",{name:"Filter shortlist"}).click();
+  await expect(page.getByLabel("Commercial decision")).toBeVisible();
+  await page.getByRole("button",{name:"Hide filters"}).click();
   const card = page.locator(".visit-decision");
   await expect(card.getByText(visitPlan.reason)).toBeVisible();
   await expect(card.getByText(/Review for closure/)).toBeVisible();

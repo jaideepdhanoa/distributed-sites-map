@@ -27,7 +27,7 @@ export function mapZones(site: string, row: Assessment, notes: OutlineNote[]): M
     if (!review || review.frame !== row.image?.id) continue;
     const key = "outline:" + review.option + ":" + review.area;
     if (!validations.has(key) && review.revision===row.revision && review.useRight)
-      validations.set(key,{right:review.useRight,points:review.points});
+      validations.set(key,{right:{status:review.useRight.status,detail:"See the recorded area review for evidence."},points:review.points});
     if (review.points && !edits.has(key)) edits.set(key,review.points);
   }
   return row.zones.map(zone => {

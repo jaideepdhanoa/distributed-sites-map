@@ -1,6 +1,7 @@
 import SiteCoverageReview from "./SiteCoverageReview";
 import type { SelectionRow } from "@/lib/selection/screen";
 import type { Opportunity, OpportunitySite } from "@/lib/selection/opportunity";
+import { offeredTransaction } from "@/lib/selection/opportunityDisplay";
 import { reviewLink } from "@/lib/reviewNavigation";
 import { pipelineCost } from "@/lib/charging/pipelineCost";
 import { amounts } from "@/lib/charging/model";
@@ -23,6 +24,7 @@ export default function ShortlistCard({ row, review, option, origin }:Props) {
       <div><span className="shortlist-kicker">{option.rank != null && <>Acquisition #{option.rank} · </>}{marketNames[row.city] ?? row.city}</span>
         <h2 id={"title-"+row.id}>{row.name}</h2>
         {review.name !== row.name && <p>{review.name}</p>}
+        <p>{offeredTransaction(option, option.route === review.primary.route ? row.research?.scope : undefined)}</p>
       </div>
       {(row.hasRecord || row.mapped) && <a className="paper-btn" href={reviewLink("/",{site:row.id,city:row.city,funnel:"pipeline",sheet:"full"},origin)}>Open site record →</a>}
     </header>
@@ -53,7 +55,7 @@ export default function ShortlistCard({ row, review, option, origin }:Props) {
       {row.mirrorStage && row.stage !== row.mirrorStage && <p>Workbook stage · {row.mirrorStage}</p>}
       {row.financeVisible && <p>{row.readiness} · Workbook base savings {row.amount == null ? "unmodeled" : (100*row.amount).toFixed(1)+"%"}</p>}
       {charging && <><h4>Charging case · {charging.name}</h4><p><b>{charging.merit.action === "Suggest drop" ? "Set this charging case aside" : charging.merit.action}</b></p><p>{charging.merit.next}</p>
-        <p>{charging.result.siteCost == null ? "Cost pending" : "$"+charging.result.siteCost.toFixed(2)+"/charge"} · {charging.merit.netValue == null ? "Investment rank pending" : "Standalone downside network value "+amounts(charging.merit.netValue)}</p>
+        <p>{cost.value}{cost.amount != null && "/charge"} · {cost.basis}{!charging.stale && charging.merit.netValue != null && " · Standalone downside network value "+amounts(charging.merit.netValue)}</p>
         {!charging.selected && <p>{filedScreenLabel(charging.screen)}</p>}<ChargingLink site={row.id} revision={charging.selected} returnTo={origin}/></>}
       {row.research && <SelectionResearch row={row.research}/>}
     </details>

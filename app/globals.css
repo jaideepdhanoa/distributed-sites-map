@@ -4201,6 +4201,13 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   border-bottom:1px solid var(--line);
 }
 
+@media (max-width: 767px) {
+  .drawer.snap-peek .drawer-scroll > .panel-tabs {
+    flex-wrap: nowrap; overflow-x: auto; scroll-padding-inline: 4px; scrollbar-width: thin;
+  }
+  .drawer.snap-peek .panel-tabs > button { flex: 0 0 auto; white-space: nowrap; }
+}
+
 .compare-evidence-sheet { position:fixed; inset:0 0 0 auto; margin:auto 0; width:min(26rem,100%); max-height:calc(100dvh - 2rem); overflow:auto; padding:1.25rem; background:var(--paper,#fffdf8); color:var(--ink,#1c1914); border:1px solid #d6cebe; border-radius:12px; }
 .compare-evidence-sheet::backdrop { background:rgb(28 25 20 / 30%); }
 .compare-evidence-sheet header { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; }

@@ -1,4 +1,4 @@
-import { nextDecision, recommendation } from "./selection/opportunityDisplay";
+import { nextDecision, offeredTransaction, recommendation } from "./selection/opportunityDisplay";
 import { currentScreen } from "./selection/screen";
 import { comparisonPower } from "./mapPower";
 import { chargingLabels,chargingRows } from "./charging/summary";
@@ -17,7 +17,7 @@ export const MISSING = "—";
 type CompareRow = { label: string; value: string; key?: string | number | null; basis?: string; source?: string };
 export type ComparisonColumn = { id: string; title: string; rows: CompareRow[] };
 
-export const overviewLabels = ["Offered transaction", "Asking", "Charging spaces", "Site cost per charge", "Acquisition priority", "Next check", "Drop proposal"];
+export const overviewLabels = ["Offered transaction", "Asking", "Charging spaces", "Site cost per charge", "Review priority", "Next check", "Drop proposal"];
 export const compareSections = ["Decision overview", "Power evidence", "Market context", "Acquisition economics", "Financials", "Site fit", "Evidence quality", "Diligence", "Record details"] as const;
 export const acquisitionCriteria = [...overviewLabels,...chargingLabels,...purchaseLabels, "Assessed layout", "Traffic", "Washes within 1 mile", "Open land", "On-site service", "Street-frontage hosting", "Implied business price", "Business-only multiple", "Savings versus hub", "Service area", "Zoning", "Asking", "Revenue", "EBITDA", "Cash flow", "Asking / earnings", "Land estimate", "Reporting period", "Figure basis", "Financial source", "NDA", "Open follow-up tasks", "Blocker", "Next check"];
 
@@ -177,8 +177,8 @@ function decisionRows(deal: DealProps | undefined, signedIn: boolean): CompareRo
   return [
     ...(deal.pendingDrop ? [{label:"Drop proposal", value:"Awaiting approval"}] : []),
     ...(review ? [
-      {label:"Offered transaction", value:review.primary.route},
-      {label:"Acquisition priority", value:recommendation(review.primary)},
+      {label:"Offered transaction", value:offeredTransaction(review.primary, deal.selectionResearch?.scope)},
+      {label:"Review priority", value:recommendation(review.primary)},
     ] : []),
     ...(fit ? [{label:"Charging spaces", value:withEvidence(fit.value,fit.basis), key:fit.count, basis:fit.basis}] : []),
     { label: "Financial source", value: applicable ? shown(deal.figures_source) : "Not applicable" },

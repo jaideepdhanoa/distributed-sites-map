@@ -21,6 +21,11 @@ export function recommendation(option: Opportunity) {
   return labels[option.disposition];
 }
 
+export function offeredTransaction(option: Opportunity, scope?: string) {
+  return scope && option.route.toLowerCase().includes("acquisition") && scope !== option.route
+    ? option.route + " · " + scope : option.route;
+}
+
 export function nextDecision(review: OpportunitySite, option = review.primary) {
   if (option.route === review.primary.route && option.disposition === "Shortlist" && review.visitPlan) {
     return review.visitPlan.decision;

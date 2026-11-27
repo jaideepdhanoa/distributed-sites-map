@@ -27,6 +27,7 @@ import SpaceTools, { spaceIdAt } from "./spaces/SpaceTools";
 import type { SpaceShape } from "./spaces/SpacePopover";
 
 type Props = {
+  spaceEstimate?: import("@/lib/charging/preliminary").PreliminaryCost;
   spaceSiteIds: ReadonlySet<string>; spaceSelectedId?: string;
   signedIn?: boolean; spacesMarket?: string; spacesOpen?: boolean;
   onDrawAt?: (site: string, center: [number,number]) => void;
@@ -2286,7 +2287,7 @@ export default function MapView(props: Props) {
       ) : null}
       {props.signedIn && <MainMapSpaces map={mapRef.current} failed={Boolean(mapFailed)} market={props.spacesMarket||"all"}
         previewSite={props.layoutOverlay?.site} enabled={props.showSpaces!==false} blocked={Boolean(props.spaceDrawing||measure)}
-        selectedSite={props.spaceSelectedId} mapSiteIds={props.spaceSiteIds} onDraw={props.canDrawLots?props.onDrawLots:undefined} onDrawAt={props.onDrawAt}/>}
+        estimate={props.spaceEstimate} selectedSite={props.spaceSelectedId} mapSiteIds={props.spaceSiteIds} onDraw={props.canDrawLots?props.onDrawLots:undefined} onDrawAt={props.onDrawAt}/>}
       {mapFailed ? (
         <div className="map-empty" role="status" data-testid="map-error">
           <p>{mapFailed}</p>

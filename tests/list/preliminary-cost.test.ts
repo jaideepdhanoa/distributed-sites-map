@@ -163,4 +163,7 @@ test("combined cases retain equal utilization and remove unverified income from 
   assert.equal(parking.ledger.inputs.cash,5000);
   assert.equal(conversion.ledger.inputs.price,parking.ledger.inputs.price);
   assert.equal(conversion.ledger.conversionRecorded,false);
+  const reduced=screenLedger(conversion.ledger,{stalls:4});
+  assert.ok(reduced.perCharge!=null && costRange(conversion,4).startsWith("$"+reduced.perCharge.toFixed(2)));
+  assert.equal(costRange(parking,parking.stalls),costRange(parking));
 });

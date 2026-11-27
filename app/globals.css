@@ -4700,6 +4700,11 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .assessed-mix small { color:var(--ink-3); margin-top:.3rem; }
 .assessed-mix .text-link { justify-self:start; }
 @media(max-width:700px) { .parcel-sketch .assessed-mix label { min-height:44px; } }
+.mix-price b { color:var(--pine,#1e4636); }
+.mix-price-table { width:100%; border-collapse:collapse; margin:.75rem 0; font-variant-numeric:tabular-nums; }
+.mix-price-table caption { text-align:left; font-weight:650; }
+.mix-price-table th,.mix-price-table td { text-align:right; padding:.45rem .25rem; border-bottom:1px solid #e7dfd2; }
+.mix-price-table th:first-child { text-align:left; }
 .parcel-sketch p { margin:.45rem 0; }
 .parcel-inventory dl { margin:.5rem 0; }
 .parcel-inventory dt { font-weight:650; }

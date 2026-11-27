@@ -18,6 +18,8 @@ import {
   type Assessment,
   type Point,
 } from "@/lib/spaces/options";
+import { costRange } from "@/lib/charging/pipelineCost";
+import type { PreliminaryCost } from "@/lib/charging/preliminary";
 import { navigateSpaces } from "@/lib/spaces/navigation";
 import { reviewLabel, reviewReturn } from "@/lib/reviewNavigation";
 import { outlineId } from "@/lib/spaces/outlineAnchor";
@@ -57,6 +59,7 @@ export default function MainMapSpaces({
   market,
   selectedSite,
   previewSite,
+  estimate,
   mapSiteIds,
   onDraw,
   onDrawAt,
@@ -68,6 +71,7 @@ export default function MainMapSpaces({
   market: string;
   selectedSite?: string;
   previewSite?: string;
+  estimate?:PreliminaryCost;
   mapSiteIds: ReadonlySet<string>;
   onDraw?: () => void;
   onDrawAt?: (site: string, center: Point) => void;
@@ -147,6 +151,9 @@ export default function MainMapSpaces({
     if (rowTrial && active) return sketchRow(active,site.frame,edge,angle,100,site.zones.filter(z=>z.kind==="clear").map(z=>z.points));
     return null;
   },[active,angle,draft,edge,rowTrial,filtered,site]);
+  const costCase=matchingCase || selectedCase;
+  const price=costCase && estimate && "layouts" in estimate ? estimate.layouts.find(l=>
+    l.condition===costCase.name+". "+costCase.condition && l.stalls===costCase.rows.reduce((n,r)=>n+r.count,0)) : undefined;
   const prior = history.reviews.find(
     (x) =>
       x.review?.option === layout &&
@@ -590,6 +597,8 @@ export default function MainMapSpaces({
               </div>}
               {(selectedCase || rowTrial) && <p aria-live="polite"><strong>{sketch ? sketch.stalls.length+" stalls sketched" : selectedCase && !filtered?.rows.length ? "0 stalls selected" : "Layout needs measurement"}</strong>
                 {sketch && " · Blue stalls and amber drive aisle."} {sketch?.approach && "Dashed line shows the proposed entry route."} {selectedCase?.condition || (rowTrial && (angle===90 ? "Verify the two-way approach and peak availability." : "Verify one-way entry, exit and peak availability."))} {rowTrial && active?.kind === "ground" && "Development scenario. Verify buildable limits, drainage and paving cost."}</p>}
+              {selectedCase && sketch && price && <p className="mix-price"><b>{costRange(price,sketch.stalls.length)}</b> per completed charge
+                <small>Base to downside · excludes electricity{price.operatingConversion && !price.ledger.conversionRecorded ? " and unquoted conversion works" : ""}.</small></p>}
               {selectedCase && sketch && <a className="text-link" href={"/charging?"+new URLSearchParams([
                 ["site",site.id],["view","explain"],["basis","screen"],["layout",matchingCase?.name || selectedCase.name],
                 ...(matchingCase ? [] : omitted).map(p=>["omit",p]),["returnTo","/?"+params.toString()]])}>See cost per charge</a>}

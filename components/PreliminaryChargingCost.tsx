@@ -3,7 +3,6 @@ import {useState} from "react";
 import type {PreliminaryCost,ListAssumptions} from "@/lib/charging/preliminary";
 import {costRange} from "@/lib/charging/pipelineCost";
 import { amounts } from "@/lib/charging/model";
-import { screenLedger } from "@/lib/charging/screenLedger";
 import type {SavedScreen} from "@/lib/charging/screenLedger";
 import {ScreeningLedger} from "./ScreeningLedger";
 
@@ -20,11 +19,16 @@ export function PreliminaryChargingCost({estimate,hypothetical=false,saveContext
   if (!initial && layoutName && !layouts.some(l=>l.condition.startsWith(layoutName+". "))) return <p role="status">This combination changed. Reopen Spaces for the current assessment.</p>;
   if (!initial && linked && omitted.length && !subset?.length) return <p role="status">These selected areas are unavailable. Reopen Spaces to choose a current combination.</p>;
   const stalls=subset?.reduce((n,p)=>n+p.stalls,0);
-  const range=stalls && basis ? [0,3].map(i=>screenLedger(basis,{stalls},i).perCharge!).sort((a,b)=>a-b).map(n=>amounts(n,2)).join("–") : layout && costRange(layout);
+  const range=layout && costRange(layout,stalls);
+  const recommendations=layouts.filter(l=>l.system);
   return <section className="preliminary-cost" aria-label="Preliminary site cost">
     <h3>{initial?initial.name:hypothetical?"What if this footprint fits?":"Preliminary site cost per completed charge"}</h3>
     {initial && <p>Screening alternative · {initial.author} · {new Date(initial.at).toLocaleDateString()}</p>}
     {!initial && layout && <p><b>{range}</b> · Base and combined downside</p>}
+    {!initial && recommendations.length>1 && <table className="mix-price-table"><caption>System combinations at equal utilization</caption>
+      <thead><tr><th>Operating assumption</th><th>Stalls</th><th>Base</th><th>Downside</th></tr></thead>
+      <tbody>{recommendations.map(l=><tr key={l.condition}><th scope="row">{l.condition.split(". ")[0]}</th>
+        <td>{l.stalls}</td><td>{amounts(l.base.perCharge,2)}</td><td>{amounts(l.downside.perCharge,2)}</td></tr>)}</tbody></table>}
     {!initial && layouts.length>1 && <label>Assessed layout<select className="secondary screen-layouts" value={index} onChange={e=>setIndex(Number(e.target.value))}>
       {layouts.map((l,i)=><option key={i} value={i}>{l.stalls} stalls · {l.condition}</option>)}</select></label>}
     {!initial && layout?.system && <p>Same utilization per stall across combinations. {subset ? "Your areas" : "Included areas"} · {(subset||layout.parts||[]).map(p=>p.area+" ("+p.stalls+")").join(" + ")}</p>}

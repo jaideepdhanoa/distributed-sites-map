@@ -1,3 +1,4 @@
+import { screenLedger } from "./screenLedger";
 import { amounts } from "./model";
 import type { LayoutCost } from "./preliminary";
 import type { ChargingSummary } from "./summary";
@@ -12,9 +13,11 @@ export function displayedPriceDelta(price:number,reference:number){
   return (printedCents(price)-printedCents(reference))/100 || 0;
 }
 
-export function costRange(layout: LayoutCost) {
-  const low = Math.min(layout.base.perCharge, layout.downside.perCharge);
-  const high = Math.max(layout.base.perCharge, layout.downside.perCharge);
+export function costRange(layout: LayoutCost, stalls?:number) {
+  const values=stalls!=null && stalls>0 && stalls!==layout.stalls ?
+    [0,3].map(i=>screenLedger(layout.ledger,{stalls},i).perCharge!) : [layout.base.perCharge,layout.downside.perCharge];
+  const low = Math.min(...values);
+  const high = Math.max(...values);
   return amounts(low, 2) + "–" + amounts(high, 2);
 }
 

@@ -81,6 +81,9 @@ test("open a scoped Spaces catalog and restore the original map camera",async({p
   await expect(page.getByText("1 space across 1 site")).toBeVisible();
   await page.getByRole("button",{name:"Browse all analyzed sites"}).click();
   await expect(page.getByText("2 spaces across 2 sites")).toBeVisible();
+  await page.getByRole("button",{name:/^Example repair shop/}).click();
+  await page.getByRole("button",{name:"Browse spaces"}).click();
+  await expect(page.getByText("2 spaces across 2 sites")).toBeVisible();
   await page.getByRole("button",{name:"Main map"}).click();
   await mapReady();
   await expect.poll(camera).toEqual(before);

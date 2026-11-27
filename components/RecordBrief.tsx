@@ -2,10 +2,13 @@ import type { PowerRecords } from "@/lib/powerLinkIndex";
 import { PowerFollowUp } from "./PowerEvidence";
 import { useRouter } from "next/navigation";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
+import { pipelineCost } from "@/lib/charging/pipelineCost";
+import { ChargingLink } from "./ChargingLink";
 import OpportunityReview from "./OpportunityReview";
 import FinancialsEntry from "./FinancialsEntry";
 import { screeningEvidence } from "@/lib/screeningEvidence";
 import { financialsCard } from "@/lib/pnl/cue";
+import { stageTone } from "@/lib/labels";
 import { cashTile } from "@/lib/keyNumbers";
 import type { PnlStatement } from "@/lib/pnl/statement";
 import RecordFinding from "./actions/RecordFinding";
@@ -26,6 +29,8 @@ function FigureRow({ fact }: { fact: Figure }) {
 export default function RecordBrief({ target, pnl, power, ...input }: BriefProps) {
   const router = useRouter();
   const { status, reason, origin, review, evidence, check, missing, figures } = screeningEvidence(input);
+  const opportunity = input.signedIn && input.deal?.opportunityReview;
+  const cost = pipelineCost(input.deal?.charging);
   const financial = check === "financials" && input.signedIn;
   const coverage = financial && pnl?.statement ? financialsCard(pnl.statement, pnl.sample)?.coverage : "";
   const land = check === "space";
@@ -42,12 +47,13 @@ export default function RecordBrief({ target, pnl, power, ...input }: BriefProps
   const source = evidence?.kind === "county" ? evidence.href : financial && coverage ? `Financial statement · ${coverage}` : land && first?.label === "Open land" ? first.source : "";
   return (
     <section className="record-brief" aria-label="Screening decision">
-      <div className="brief-decision"><span>{input.deal ? "Pipeline stage" : "Screening status"}</span><h3>{status}</h3></div>
-      {input.signedIn && input.deal?.opportunityReview && <OpportunityReview review={input.deal.opportunityReview}
+      {opportunity && input.deal && <OpportunityReview record review={opportunity}
         charging={input.deal.charging} active={Boolean(input.deal.stage) && !/dropped|off[ -]?market/i.test(input.deal.stage!) && input.deal.stage_group !== "dropped"}/>}
-      {reason && reason !== status && <p>{reason}</p>}
+      {opportunity ? <p><b>Deal stage</b> <span className={`stage-pill tone-${stageTone(input.deal!)}`}>{status === "Desk screen" ? "Initial review" : status}</span></p>
+        : <div className="brief-decision"><span>{input.deal ? "Deal stage" : "Screening status"}</span><h3 className={input.deal ? `stage-pill tone-${stageTone(input.deal)}` : undefined}>{status}</h3></div>}
+      {!opportunity && reason && reason !== status && <p>{reason}</p>}
       <dl>
-        <div><dt>{origin}</dt><dd>{evidence?.kind === "county"
+        <div><dt>{opportunity ? "Recorded site check" : origin}</dt><dd>{evidence?.kind === "county"
           ? <a href={evidence.href} target="_blank" rel="noopener noreferrer">{review} <span aria-hidden="true">↗</span><span className="sr"> (opens in a new tab)</span></a>
           : evidence?.kind === "space" || evidence?.kind === "layout" ? <button type="button" className="text-link" onClick={() => {
             const query = new URLSearchParams(currentSearch());
@@ -55,6 +61,11 @@ export default function RecordBrief({ target, pnl, power, ...input }: BriefProps
             const href = `/?${query}`;
             rememberSearch(href); router.replace(href, { scroll: false });
           }}>{review}</button> : review}{input.signedIn && /power|utility|electrical/i.test(review) && !evidence && <PowerFollowUp {...(power || {deal:input.deal,site:input.site})} />}{missing && !land && <small>{missing}</small>}</dd></div>
+        {input.signedIn && input.deal?.kind === "pipeline" && <>
+          <div><dt>Charging spaces</dt><dd>{input.deal.chargingSpace?.value ?? "No layout estimate"}<small>{input.deal.chargingSpace?.basis}</small></dd></div>
+          <div><dt>Cost per charge</dt><dd>{input.deal.charging
+            ? <ChargingLink site={input.deal.deal_id} revision={input.deal.charging.selected}>{cost.value}</ChargingLink> : cost.value}<small>{cost.basis}</small></dd></div>
+        </>}
         <div><dt>Site fit</dt><dd>{fit?.label === "Assessed layout" ? fit.value : input.site?.verdict || (fit ? fit.label + " · " + fit.value : "Fit requires verification")}</dd></div>
         {financial ? <div><dt>Statement coverage</dt><dd>{coverage || (pnl?.settled ? "No statement coverage on file." : "Checking statement coverage…")}{coverage && evidence?.kind === "financials" && <FinancialsEntry dealId={evidence.id} loaded={pnl} compact="link" />}</dd></div>
           : land && missing ? <div><dt>Open land</dt><dd>{missing}</dd></div>

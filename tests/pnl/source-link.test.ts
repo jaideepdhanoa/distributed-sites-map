@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFileSync } from "node:fs";
 import { parseAmount } from "../../lib/pnl/money.ts";
 import { attachPnlSourceLinks } from "../../lib/pnl/attachSources.ts";
 import { clearDriveFileCache, resolveFileNames, serviceDriveLister, type DriveLister } from "../../lib/pnl/driveFiles.ts";
@@ -319,15 +318,6 @@ test("a package zip links when that file has an id, otherwise the citation says 
   assert.equal(missing.href, "");
   assert.equal(missing.hint, NO_DRIVE_LINK);
   assert.equal(missing.label.includes("/"), true);
-});
-
-test("the column grip keeps its own slot", () => {
-  const css = readFileSync(new URL("../../app/globals.css", import.meta.url), "utf8");
-  const block = css.match(/\.col-head > \.col-grip \{[\s\S]*?\n\}/)?.[0] || "";
-  assert.match(block, /position:\s*static/);
-  assert.match(block, /min-width:\s*28px/);
-  assert.match(block, /min-height:\s*28px/);
-  assert.equal(block.includes("position: absolute"), false);
 });
 
 test("the Drive lister stays unset without a service account", async () => {

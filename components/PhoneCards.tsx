@@ -11,6 +11,7 @@ export type PhoneCard = {
   action?: string;
   actionLabel?: string;
   facts: string[];
+  measures?: [string, string][];
   chips?: ReactNode;
   selected?: boolean;
   check?: ReactNode;
@@ -34,6 +35,7 @@ export function PhoneCards({ rows, commonStage }: { rows: PhoneCard[]; commonSta
                 {row.chips}
               </span>}
               {row.action && <span className="mobile-next-action"><b>{row.actionLabel || "Next"}</b> {row.action}</span>}
+              {row.measures?.map(([label, value]) => <span className="phone-measure" key={label}><b>{label}</b> {value}</span>)}
               {facts.length ? (
                 <span className="phone-card-meta">
                   {facts.map((fact, index) => (

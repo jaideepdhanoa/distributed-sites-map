@@ -38,8 +38,11 @@ function shortRoad(value?: unknown) {
 
 export const PIPELINE_COLUMNS = [
   { id: "site", label: "Site" },
+  { id: "priority", label: "Review priority" },
+  { id: "spaces", label: "Charging spaces" },
+  { id: "chargeCost", label: "Cost per charge" },
   { id: "stage", label: "Stage" },
-  { id: "county", label: "County check" },
+  { id: "county", label: "County check", optional: true },
   { id: "chip_waiting", label: "Waiting on", optional: true },
   { id: "chip_drop", label: "Drop reason", optional: true },
   { id: "chip_advance", label: "Advance reason", optional: true },
@@ -57,12 +60,12 @@ export const PIPELINE_COLUMNS = [
   { id: "chip_zoning", label: "Zoning check", optional: true },
   { id: "chip_title", label: "Title check", optional: true },
   { id: "chip_environmental", label: "Environmental check", optional: true },
-  { id: "merit", label: "Site action" },
+  { id: "merit", label: "Charging review", optional: true },
   { id: "score", label: "Historical score", optional: true },
   { id: "asking", label: "Asking · source" },
   { id: "acres", label: "Acres", optional: true },
   { id: "perAcre", label: "Per acre", optional: true },
-  { id: "openLand", label: "Open land" },
+  { id: "openLand", label: "Open land", optional: true },
   { id: "capacity", label: "Power" },
   { id: "traffic", label: "Traffic" },
   { id: "cashFlow", label: "Cash flow" },
@@ -91,7 +94,10 @@ export const PIPELINE_COLUMNS = [
  * Header chrome is the grip, the gaps, and the cell padding, about 66px.
  */
 export const COLUMN_MINIMUMS: Record<string, number> = {
-  site: 320,
+  site: 294,
+  spaces: 194,
+  chargeCost: 192,
+  priority: 188,
   stage: 156,
   county: 172,
   merit: 176,
@@ -163,7 +169,7 @@ const RANGE_KEYS = ["amin", "amax", "cmin", "cmax", "pmin", "pmax", "omin", "oma
 export function publicDeal<T extends Record<string, unknown>>(props: T): T {
   const copy = { ...props };
   for (const key of Object.keys(copy)) {
-    if (key === "charging" || key === "selectionResearch" || key === "statementCoverage" || key === "purchase" || key === "site_capacity" || key === "photos" || key.startsWith("cap_")) delete copy[key];
+    if (key === "charging" || key === "chargingSpace" || key === "opportunityReview" || key === "selectionResearch" || key === "statementCoverage" || key === "purchase" || key === "site_capacity" || key === "photos" || key.startsWith("cap_")) delete copy[key];
     if (key === "stated_revenue" || key === "stated_revenue_display" || key === "stated_cash_flow" || key === "stated_cash_flow_display") delete copy[key];
     if (key === "county_value" || key === "county_value_display" || key === "land_estimate" || key === "land_estimate_display") delete copy[key];
     if (key === "business_value" || key === "business_value_display" || key.endsWith("_multiple") || key.endsWith("_multiple_display")) delete copy[key];

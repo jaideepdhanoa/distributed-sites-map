@@ -27,7 +27,9 @@ export function ChipRow({ chips, testId, titled = false }: { chips: TagView[]; t
     <div className="card-chips" data-testid={testId}>
       {chips.map((chip) => {
         const title = titled ? tagFamily(chip.family)?.title.replace(/ check$/, "") : "";
-        return <TagChip key={chip.family} chip={chip} caption={title || ""} />;
+        if (!title) return <TagChip key={chip.family} chip={chip} />;
+        const status = chip.code === "unknown" ? "No evidence recorded" : chip.code === "claimed" ? "Reported, unverified" : chip.label;
+        return <span className="evidence-item" key={chip.family}><b>{title}</b><TagChip chip={{...chip, label:status}} compact={false}/></span>;
       })}
     </div>
   );

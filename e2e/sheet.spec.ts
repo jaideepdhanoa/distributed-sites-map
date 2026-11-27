@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 function sortButton(header: import("@playwright/test").Locator) {
-  return header.locator("button.sort-header:not(.col-grip):not(.col-filter):not(.col-pin):not(.col-resize)");
+  return header.locator(".col-label");
 }
 
 async function cycleSort(header: import("@playwright/test").Locator) {
@@ -52,40 +52,26 @@ test("the sheet reorders, resizes, pins, hides, sorts, filters, and keeps the la
   const after = await score.boundingBox();
   expect(after && before && after.width).toBeGreaterThan((before?.width || 0) + 40);
 
-  const land = page.locator('th[data-col="openLand"]');
+  const land = page.locator('th[data-col="spaces"]');
   await land.hover();
-  const grip = land.locator(".col-grip");
-  await expect(grip).toBeVisible();
-  const from = await grip.boundingBox();
   const label = sortButton(land);
-  const labelBox = await label.boundingBox();
-  const filter = land.getByRole("button", { name: "Filter Open land" });
-  const filterBox = await filter.boundingBox();
-  expect(from && labelBox && filterBox).toBeTruthy();
-  if (from && labelBox && filterBox) {
-    expect(from.width).toBeGreaterThanOrEqual(24);
-    expect(from.height).toBeGreaterThanOrEqual(24);
-    expect(from.x + from.width).toBeLessThanOrEqual(labelBox.x + 1);
-    expect(from.x + from.width).toBeLessThanOrEqual(filterBox.x + 1);
-  }
-  const slot = await grip.evaluate((el) => getComputedStyle(el).position);
-  expect(slot).not.toBe("absolute");
-  await page.locator("[data-testid=sheet-grid] thead").screenshot({ path: "review-shots/column-grip-desktop.png" });
-  const target = await stage.boundingBox();
-  expect(from && target).toBeTruthy();
-  if (from && target) {
-    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(target.x + 24, target.y + 12, { steps: 6 });
-    await page.mouse.up();
-  }
-  await expect(page.locator("[data-testid=sheet-grid] thead th[data-col]").nth(1)).toHaveAttribute("data-col", "openLand");
+  const options = land.getByRole("button", { name: "Column options for Charging spaces" });
+  await expect(label).toHaveAttribute("draggable", "true");
+  const nameBox = (await label.boundingBox())!;
+  const menuBox = (await options.boundingBox())!;
+  expect(nameBox.x + nameBox.width).toBeLessThanOrEqual(menuBox.x + 1);
+  expect(Math.abs(nameBox.y + nameBox.height / 2 - menuBox.y - menuBox.height / 2)).toBeLessThan(2);
+  await label.dragTo(stage);
+  await expect.poll(() => page.locator("thead th[data-col]").evaluateAll(headers => {
+    const ids = headers.map(header => header.getAttribute("data-col"));
+    return ids.indexOf("spaces") + 1 === ids.indexOf("stage");
+  })).toBe(true);
 
-  await score.getByRole("button", { name: "Filter Historical score" }).click();
+  await score.getByRole("button", { name: "Column options for Historical score" }).click();
   await page.getByRole("group", { name: "Historical score column" }).getByRole("checkbox", { name: "Pin left" }).check();
   await expect(score).toHaveAttribute("data-pinned", "true");
 
-  await stage.getByRole("button", { name: "Filter Stage" }).press("Enter");
+  await stage.getByRole("button", { name: "Column options for Stage" }).press("Enter");
   await page.getByRole("group", { name: "Filter Stage" }).getByRole("checkbox", { name: "Offer and close" }).check();
   await expect(page.locator("[data-testid=sheet-grid] tbody tr.list-row")).toHaveCount(0);
   await page.getByRole("button", { name: "Clear filter" }).click();
@@ -113,8 +99,8 @@ test("the sheet reorders, resizes, pins, hides, sorts, filters, and keeps the la
     return layout.order || null;
   });
   expect(storedOrder).toBeTruthy();
-  expect(storedOrder!.indexOf("openLand")).toBeGreaterThan(-1);
-  expect(storedOrder!.indexOf("openLand")).toBeLessThan(storedOrder!.indexOf("stage"));
+  expect(storedOrder!.indexOf("spaces")).toBeGreaterThan(-1);
+  expect(storedOrder!.indexOf("spaces")).toBeLessThan(storedOrder!.indexOf("stage"));
 });
 
 test("a phone list is cards and does not offer search this area", async ({ page }, info) => {

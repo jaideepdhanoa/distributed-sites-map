@@ -3,7 +3,7 @@ import { paidScreen } from "./reference";
 import type { DealProps } from "../types";
 import { amounts,calculate,initialCase,modelVersion,type Result,type SavedCase } from "./model";
 
-export type ChargingSummary = {merit:Merit;screen:ReturnType<typeof paidScreen>;screenDepot:number|null;name:string;sourceRevision:string;stale:boolean;result:Result;selected:string|null;term:"purchase"|"lease";comparator:"workbook"|"local"};
+export type ChargingSummary = {energyScope?:ReturnType<typeof initialCase>["energyScope"];merit:Merit;screen:ReturnType<typeof paidScreen>;screenDepot:number|null;name:string;sourceRevision:string;stale:boolean;result:Result;selected:string|null;term:"purchase"|"lease";comparator:"workbook"|"local"};
 export function summarize(deal:DealProps,sourceRevision:string,active?:SavedCase):ChargingSummary {
   const inputs=active?.inputs ?? initialCase(deal);
   const a=deal.purchase?.assumptions;
@@ -12,7 +12,7 @@ export function summarize(deal:DealProps,sourceRevision:string,active?:SavedCase
   const supported=screen.filter(s=>fit!=null && s.stalls<=fit).sort((a,b)=>b.stalls-a.stalls)[0];
   const stale=!!active && (active.sourceRevision!==sourceRevision || active.model!==modelVersion);
   const merit=siteMerit(deal,inputs,!!active,stale,!!supported && supported.downside>=0);
-  return {merit,screen,screenDepot:a?.hub && a.charging?.charges?a.hub/a.charging.charges:null,name:active?.name??"Moove staffed · planning",sourceRevision,selected:active?active.id+":"+active.revision:null,
+  return {energyScope:inputs.energyScope,merit,screen,screenDepot:a?.hub && a.charging?.charges?a.hub/a.charging.charges:null,name:active?.name??"Moove staffed · planning",sourceRevision,selected:active?active.id+":"+active.revision:null,
     stale,result:active?.result??calculate(inputs),term:inputs.terms,comparator:inputs.comparator};
 }
 export function filedScreenLabel(screen:ReturnType<typeof paidScreen>) {

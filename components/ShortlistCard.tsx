@@ -38,7 +38,7 @@ export default function ShortlistCard({ row, review, option, origin }:Props) {
         <div><dt>Asking price</dt><dd>{row.asking || "Price needs confirmation"}</dd></div>
         <div><dt>Charging spaces</dt><dd>{row.chargingSpace?.value || row.option || "Needs measurement"}{row.chargingSpace?.basis && <small>{row.chargingSpace.basis}</small>}</dd></div>
         <div><dt>Site cost per charge</dt><dd>{charging
-          ? <ChargingLink site={row.id} revision={charging.selected} returnTo={origin}>{cost.value}</ChargingLink>
+          ? <ChargingLink site={row.id} basis={charging.preliminary && "layouts" in charging.preliminary && charging.result.siteCost==null && !charging.stale?"screen":undefined} revision={charging.selected} returnTo={origin}>{cost.value}</ChargingLink>
           : cost.value}<small>{cost.basis}</small></dd></div>
       </dl>}
       <p className="shortlist-next"><b>Next check</b> {option.next}</p>

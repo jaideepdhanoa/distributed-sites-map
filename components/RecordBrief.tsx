@@ -49,7 +49,7 @@ export default function RecordBrief({ target, pnl, power, ...input }: BriefProps
   const metrics = input.signedIn && input.deal?.kind === "pipeline" && <>
           <div><dt>Charging spaces</dt><dd>{input.deal.chargingSpace?.value ?? "No layout estimate"}<small>{input.deal.chargingSpace?.basis}</small></dd></div>
           <div><dt>Cost per charge</dt><dd>{input.deal.charging
-            ? <ChargingLink site={input.deal.deal_id} revision={input.deal.charging.selected}>{cost.value}</ChargingLink> : cost.value}<small>{cost.basis}</small></dd></div>
+            ? <ChargingLink site={input.deal.deal_id} basis={input.deal.charging.preliminary && "layouts" in input.deal.charging.preliminary && input.deal.charging.result.siteCost==null && !input.deal.charging.stale?"screen":undefined} revision={input.deal.charging.selected}>{cost.value}</ChargingLink> : cost.value}<small>{cost.basis}</small></dd></div>
         </>;
   const supporting = <>
       {!opportunity && reason && reason !== status && <p>{reason}</p>}

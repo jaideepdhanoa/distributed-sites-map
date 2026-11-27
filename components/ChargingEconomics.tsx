@@ -14,7 +14,11 @@ import {ChargingLink} from "./ChargingLink";
 import {ChargingExplanation} from "./ChargingExplanation";
 import {changeValue,explanationUrl,planning,reviseSource,sourceValue,trialValue} from "@/lib/charging/evidence";
 
-type Payload={reviewer?:string;site:DealProps;source:string;history:SavedCase[]|null;canWrite:boolean};
+import {listScreen} from "@/lib/charging/listScreen";
+import {readListTrial} from "@/lib/charging/listTrial";
+import type {SavedScreen} from "@/lib/charging/screenLedger";
+
+type Payload={screens?:SavedScreen[];reviewer?:string;site:DealProps;source:string;history:SavedCase[]|null;canWrite:boolean};
 const quick:Key[]=["ask","rent","stalls","hostWeek","hostEnd","ownWeek","ownEnd","hostFee","conversion","interruption","loss"];
 const keyOf=(r:SavedCase)=>r.id+":"+r.revision;
 export function ChargingSiteSection({deal}:{deal:DealProps}) {
@@ -26,7 +30,7 @@ export function ChargingSiteSection({deal}:{deal:DealProps}) {
     <p>{cost.value}{cost.amount!=null && " per charge"} · {amounts(c.result.depot,2)} {c.comparator==="workbook"?"depot proxy":"depot"}</p>
     <small>{cost.basis}</small><p>{c.merit.next}</p>{!c.selected && <p className="layer-meta">{filedScreenLabel(c.screen)}</p>}<ChargingLink site={deal.deal_id} revision={c.selected}/></section>;
 }
-export function ChargingEditor({site,revision,explain=false}:{site:string;revision?:string|null;explain?:boolean}) {
+export function ChargingEditor({site,revision,explain=false,screenId,basis}:{site:string;revision?:string|null;explain?:boolean;screenId?:string|null;basis?:string|null}) {
   const [payload,setPayload]=useState<Payload|null>(null),[failed,setFailed]=useState(false),[attempt,retry]=useState(0);
   useEffect(()=>{
     const ac=new AbortController();
@@ -38,6 +42,23 @@ export function ChargingEditor({site,revision,explain=false}:{site:string;revisi
   },[site,attempt]);
   if(!payload)return <p role="status">{failed?<><span>Charging case unavailable. </span><button className="text-link" onClick={()=>retry(attempt+1)}>Retry</button></>:"Loading charging assumptions…"}</p>;
   if(revision && revision!=="new" && !payload.history?.some(row=>keyOf(row)===revision))return <p role="status">This saved revision is unavailable. <a className="text-link" href={explanationUrl(site)}>Open the current site case</a></p>;
+  const saved=screenId?payload.screens?.find(row=>row.id===screenId):undefined;
+  if(screenId && !saved)return <p role="status">This screening alternative is unavailable. <a className="text-link" href={explanationUrl(site)}>Current site calculation</a></p>;
+  const c=payload.site.charging;
+  const listTrial=basis==="list"?readListTrial(window.location.hash):undefined;
+  if(listTrial===null)return <p role="status">These list assumptions are unavailable. <a className="text-link" href={explanationUrl(site)}>Open current estimate</a></p>;
+  const estimate=listTrial?listScreen(payload.site,listTrial).estimate:c?.preliminary;
+  const showScreen=!!saved || (explain && basis!=="detail" && (basis==="screen" || basis==="list" || !revision) && c && !c.stale && c.result?.siteCost==null && estimate && "layouts" in estimate);
+  if(basis==="list" && !showScreen)return <p role="status">The pipeline inputs have changed. <a className="text-link" href={explanationUrl(site)}>Open the current calculation</a></p>;
+  if(showScreen){
+    const href=new URLSearchParams(window.location.search);href.delete("screen");href.set("basis","detail");if(!href.has("case") && c?.selected)href.set("case",c.selected);
+    return <section className="charging-editor" aria-label="Charging economics editor"><p className="eyebrow">Charging economics</p><h2 className="charging-title">{payload.site.name??site}</h2>
+      <PreliminaryChargingCost estimate={estimate??{reason:"Current site estimate unavailable"}} initial={saved}
+        hypothetical={!!(estimate && "layouts" in estimate && estimate.layouts[0]?.ledger?.hypothetical)} saveContext={{site,source:payload.source,canWrite:payload.canWrite && !saved,listTrial}}/>
+      {!!payload.screens?.length && <section><h3>Saved screening alternatives</h3>{payload.screens.map(row=>{
+        const params=new URLSearchParams(window.location.search);params.set("screen",row.id);return <p key={row.id}><a className="text-link" href={"?"+params}>{row.name}</a> · {new Date(row.at).toLocaleDateString()}</p>;})}</section>}
+      <a className="text-link" href={"?"+href}>Open detailed operating case</a></section>;
+  }
   return <Editor key={site+":"+attempt} data={payload} revision={revision} explain={explain} updateHistory={history=>setPayload({...payload,history})} reload={()=>retry(attempt+1)}/>;
 }
 
@@ -171,8 +192,9 @@ function Editor({data,reload,revision,explain,updateHistory}:{updateHistory:(row
     <div className="segmented cost-modes" role="group" aria-label="Charging view">
       <button type="button" className={explaining?"segmented on":"segmented"} aria-pressed={explaining} onClick={()=>setExplaining(true)}>Explanation</button>
       <button type="button" className={explaining?"segmented":"segmented on"} aria-pressed={!explaining} onClick={()=>setExplaining(false)}>Case editor</button></div>
-    {explaining && !trial && (!parent || (parent.selected && !stale && current.siteCost == null)) && site.charging?.preliminary &&
-      <PreliminaryChargingCost estimate={site.charging.preliminary} />}
+    {explaining && site.charging?.preliminary && ("reason" in site.charging.preliminary
+      ? <p className="purchase-check">Pipeline estimate · {site.charging.preliminary.reason}</p>
+      : <a className="text-link" href={explanationUrl(site.deal_id)+"&basis=screen"}>Open current screening ledger</a>)}
     <div className="charging-controls">
       <label>Work on a case<select className="secondary" value={parent?keyOf(parent):""} onChange={e=>{const row=history.find(r=>keyOf(r)===e.target.value);load(row);pin(row);}}>
         <option value="">New planning case</option>{history.map(r=><option key={keyOf(r)} value={keyOf(r)}>{r.name} · v{r.revision}{r.selected?" · on site card":""}</option>)}</select></label>

@@ -1,3 +1,6 @@
+import {preliminaryCost} from "../lib/charging/preliminary";
+import type {DealProps} from "../lib/types";
+import type {PurchaseAssumptions} from "../lib/purchaseReview";
 import {pipelineCost} from "../lib/charging/pipelineCost";
 import {test,expect} from "@playwright/test";
 import {mkdir} from "node:fs/promises";
@@ -30,7 +33,7 @@ test("edit, save, reopen and compare a charging case",async({page},info)=>{
   await page.goto(url+"&view=explain&case="+original.id+"%3A1");
   const explanation=page.getByRole("region",{name:"Cost per charge explanation"});
   await expect(explanation).toBeVisible();
-  await explanation.getByText("Annual costs and retained cash",{exact:true}).click();
+  await expect(explanation.getByText("Annual costs and retained cash",{exact:true})).toBeVisible();
   await explanation.getByText("Construction and interruption",{exact:true}).click();
   await explanation.getByRole("button",{name:"Additional conversion works ($ once)",exact:true}).click();
   await expect(explanation).toContainText("Synthetic contractor quote");
@@ -53,7 +56,7 @@ test("edit, save, reopen and compare a charging case",async({page},info)=>{
   await explanation.getByRole("button",{name:"Review source and date"}).click();
   await expect(page.getByLabel("Recorded source value")).toHaveValue("18000");
   await page.getByRole("button",{name:"Explanation",exact:true}).click();
-  await explanation.getByText("What limits completed charges?",{exact:true}).click();
+  await expect(explanation.getByText("What limits completed charges?",{exact:true})).toBeVisible();
   const overflowing=await explanation.evaluate(el=>{
     const right=el.getBoundingClientRect().right+1;
     return Array.from(el.querySelectorAll("*")).filter(node=>node.getBoundingClientRect().right>right).map(node=>node.tagName+"."+node.className).slice(0,8);
@@ -123,28 +126,44 @@ test("open released charging assumptions from the portfolio",async({page})=>{
   if(record!.charging?.selected)params.set("case",record!.charging.selected);
   await page.goto("/charging?"+params);
   if(record!.charging?.selected)await expect(page.getByLabel("Work on a case")).toHaveValue(record!.charging.selected);
-  await expect(page.getByRole("region",{name:"Cost per charge explanation"})).toBeVisible();
+  await expect(page.getByRole("region",{name:/^(Cost per charge explanation|Preliminary site cost)$/}).first()).toBeVisible();
   await expect(page.getByRole("region",{name:"Charging economics editor"})).toBeVisible();
 });
 
 test("explain a preliminary range with a conditional aisle on desktop and phone", async ({page}, info) => {
-  const site = {deal_id:"PIPE-PHX-9997",name:"Example service lot",charging:{preliminary:{
-    layouts:[{stalls:4,condition:"Parking with shared aisle access",build:40000,staffing:24000,upkeep:4000,
-      base:{sessions:4000,upgrade:20000,annualCost:40600,perCharge:10.15},
-      downside:{sessions:3000,upgrade:30000,annualCost:41700,perCharge:13.90}}],
-    space:"0 spaces",price:100000,terms:"purchase",priceBasis:"Workbook property ask",cash:5000,
-    cashBasis:"Workbook retained annual cash",years:10,closing:.1,capital:0,tax:.01}}};
-  await page.route("**/api/actions/charging?site=*",route=>route.fulfill({json:{site,history:[],source:"sample",canWrite:false}}));
+  const a={horizon:10,demand:10,hub:1000000,capital:0,closing:.1,charging:{charges:100000,perPost:3,ports:2,
+    unitBuild:10000,upgrade:20000,attendant:12000,fixed:2000,insurance:1000,perCharger:500,tax:.01}} as PurchaseAssumptions;
+  const site={deal_id:"PIPE-PHX-9997",name:"Example service lot",kind:"pipeline",asking_price:100000,
+    purchase:{inputs:{cash:5000,ownership:"Yes"},assumptions:a},chargingSpace:{count:0,value:"0 spaces",layouts:[{stalls:4,condition:"Parking with shared aisle access"}]}} as DealProps;
+  site.charging={preliminary:preliminaryCost(site,a),result:{siteCost:null},stale:false} as NonNullable<DealProps["charging"]>;
+  let saved:unknown;
+  await page.route("**/api/actions/charging?site=*",route=>{
+    if(route.request().method()==="POST"){
+      const d=route.request().postDataJSON();saved={...d,inputs:{basis:d.basis,changes:d.changes,scenario:d.scenario},author:"Reviewer",at:"2026-11-01"};
+      return route.fulfill({json:{saved}});
+    }
+    return route.fulfill({json:{site,history:[],screens:saved?[saved]:[],source:"aaaaaaaaaaaaaaaaaaaaaaaa",canWrite:true}});
+  });
   await page.goto("/charging?site="+site.deal_id+"&view=explain");
   const panel=page.getByRole("region",{name:"Preliminary site cost"});
   await expect(panel).toContainText("$10.15–$13.90");
   await expect(panel).toContainText("shared aisle access");
-  await panel.getByText("How this range was calculated").click();
+  await expect(page.getByText("Parity comparison pending")).toHaveCount(0);
   await expect(panel).toContainText("4,000 annual charges");
-  await expect(panel).toContainText("25% fewer");
+  await panel.getByRole("button",{name:/Both changes/}).click();
+  await expect(panel.locator(".screen-result")).toContainText("$13.90");
+  await panel.getByRole("button",{name:/^Base /}).click();
+  await panel.getByRole("button",{name:/Try 3 stalls/}).click();
+  await expect(panel.locator(".screen-result")).toContainText("$9.17");
+  await panel.getByLabel("Alternative name").fill("Three-stall trial");
+  await panel.getByRole("button",{name:"Save screening alternative"}).click();
+  await panel.getByRole("link",{name:"Reopen saved ledger"}).click();
+  await expect(panel.locator(".screen-result")).toContainText("$9.17");
+  await page.goto("/charging?site="+site.deal_id+"&view=explain");
+  await expect(panel.locator(".screen-result")).toContainText("$10.15");
   expect(await panel.evaluate(el=>el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   await mkdir("review-shots",{recursive:true});
-  await panel.screenshot({path:"review-shots/"+info.project.name+"-preliminary-charging.png"});
+  await page.screenshot({path:"review-shots/"+info.project.name+"-preliminary-charging.png",animations:"disabled"});
 });
 
 test("open released charging ranges from the Phoenix list",async({page},info)=>{

@@ -161,6 +161,7 @@ test("shortlisted visit shows the charging decision and its parallel diligence w
   await page.getByText("Parcel, space and charging evidence").click();
   await expect(page.getByText(coverage.county)).toBeVisible();
   await expect(page.getByText("No positive price")).toBeVisible();
+  expect(await page.locator(".site-coverage").evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   await page.locator(".site-coverage").screenshot({path:"review-shots/"+info.project.name+"-site-evidence.png",animations:"disabled"});
   await page.getByText("Parcel, space and charging evidence").click();
   const card = page.locator(".visit-decision");

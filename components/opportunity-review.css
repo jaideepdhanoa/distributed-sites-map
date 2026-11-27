@@ -17,3 +17,10 @@
 .site-coverage caption { text-align: left; margin-block: .65rem .3rem; }
 .site-coverage th, .site-coverage td { padding: .4rem .25rem; border-bottom: 1px solid var(--line, #d6cebe); text-align: right; }
 .site-coverage th:first-child { text-align: left; }
+.site-coverage th, .site-coverage td { white-space: normal; cursor: default; }
+.site-coverage th { position: static; }
+@media (max-width: 600px) {
+  .site-coverage table { table-layout: fixed; }
+  .site-coverage th:first-child { width: 14%; }
+  .site-coverage th:last-child { width: 32%; }
+}

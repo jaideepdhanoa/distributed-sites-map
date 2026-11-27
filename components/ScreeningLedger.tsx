@@ -77,7 +77,10 @@ export function ScreeningLedger({basis,saveContext,initial}:{
   function source(line:Line){
     if(line.fields.some(k=>basis.workbookDefaults?.[k]!=null && basis.workbookDefaults[k]!==basis.inputs[k]))return "Pipeline trial assumption";
     if(line.key==="property")return basis.priceBasis+(basis.date?" · "+basis.date:"");
-    if(line.key==="conversion" || line.key==="displaced")return basis.inputs[line.key]?"Layout estimate":"No allowance in starting estimate";
+    if(line.key==="conversion" || line.key==="displaced"){
+      const recorded=line.key==="conversion"?basis.conversionRecorded:basis.displacedRecorded;
+      return recorded || basis.inputs[line.key]?"Filed layout assumption":"Unpriced · $0 allowance in this estimate";
+    }
     if(line.key==="cash")return "Income credit";
     return "Workbook assumption";
   }
@@ -87,6 +90,15 @@ export function ScreeningLedger({basis,saveContext,initial}:{
     return "?"+query.toString();
   }
   const fewer=v.stalls>1?screenLedger(basis,{...changes,stalls:v.stalls-1},scenario):null;
+  const sensitivities=lines.map(line=>{
+    const tested=screenLedger(basis,{...changes,...line.test},scenario);
+    return {label:line.label,test:line.testLabel,impact:tested.perCharge!=null && r.perCharge!=null?tested.perCharge-r.perCharge:0};
+  });
+  if(fewer?.perCharge!=null && r.perCharge!=null)sensitivities.push({label:"Operating layout",test:"One fewer stall",impact:fewer.perCharge-r.perCharge});
+  const lowerVolume=screenLedger(basis,{...changes,volume:v.volume*.75},scenario);
+  if(lowerVolume.perCharge!=null && r.perCharge!=null)sensitivities.push({label:"Charge volume",test:"25% fewer completions",impact:lowerVolume.perCharge-r.perCharge});
+  const noIncome=basis.parcel && !lease && basis.creditCash!==false && v.cash>v.displaced?screenLedger({...basis,creditCash:false},changes,scenario):null;
+  const ranked=sensitivities.filter(s=>Math.abs(s.impact)>=.005).sort((a,b)=>Math.abs(b.impact)-Math.abs(a.impact)).slice(0,3);
   return <div className="screen-ledger">
     <div className="screen-result" aria-live="polite"><div><span>{initial?"Saved screening alternative":custom?"Screening trial":basis.hypothetical?"Hypothetical layout":"Preliminary site estimate"} · {stress.label}</span>
       <strong>{priced?amounts(r.perCharge,2):"No completed charges"}</strong></div>
@@ -99,7 +111,7 @@ export function ScreeningLedger({basis,saveContext,initial}:{
     {cases[0].perCharge!=null && cases[1].perCharge!=null && cases[2].perCharge!=null && Math.abs(Math.abs(cases[1].perCharge-cases[0].perCharge)-Math.abs(cases[2].perCharge-cases[0].perCharge))>=.005 &&
       <p className="screen-insight"><b>{Math.abs(cases[1].perCharge-cases[0].perCharge)>=Math.abs(cases[2].perCharge-cases[0].perCharge)?"Volume has the larger effect in these tests.":"The utility upgrade has the larger effect in these tests."}</b> Verify the layout and access before relying on either case.</p>}
     <h3>Completed charges</h3>
-    <p><b>{v.stalls} operating stalls</b> · {basis.condition}{v.stalls!==basis.inputs.stalls?" · trial layout":""}. {basis.hypothetical?"Recorded layout":"Assessed footprint"} · {basis.space}.</p>
+    <p><b>{v.stalls} operating stalls</b> · {basis.condition}{v.stalls!==basis.inputs.stalls?" · trial layout":""}. {basis.hypothetical?"Recorded layout":basis.parcel?"Filed layouts":"Assessed footprint"} · {basis.space}.</p>
     <p>{v.stalls} × {num(r.perStall)} charges/stall/year × {num(v.volume*stress.volume)}% = <b>{count(r.sessions)} per year</b> · {count(r.sessions/365)} per day.</p>
     <small>Workbook benchmark · {count(v.benchmark)} completions over {v.referenceYears} years across {v.referenceStalls} stalls. Fleet demand and power need site confirmation.</small>
     <div className="screen-tools">{editButton("volume","Test layout and volume")}
@@ -115,7 +127,11 @@ export function ScreeningLedger({basis,saveContext,initial}:{
           {priced && trial.perCharge!=null && <span>{line.testLabel} · <b>{delta(trial.perCharge-r.perCharge!)}/charge</b></span>}</div>
           {editor(line.key,line.fields)}</div>;})}
       <div className="screen-line screen-total"><b>Net site cost</b><b>{amounts(r.annualCost)}</b><b>{priced?amounts(r.perCharge,2):"—"}</b></div></div>
+    {noIncome?.perCharge!=null && <p>Without credit for positive business income · <b>{amounts(noIncome.perCharge,2)}/charge</b> in this scenario.</p>}
     <p className="layer-meta">Rows round separately. Shared management overhead and one-time business interruption are outside this screen.</p>
+    {ranked.length>0 && <section><h3>Largest changes in the tested assumptions</h3>
+      <ol className="screen-checks">{ranked.map(s=><li key={s.label}><b>{s.label}</b> · {s.test} · <b>{delta(s.impact)}/charge</b></li>)}</ol>
+      <small>Each change is measured on its own against the scenario shown above.</small></section>}
     <h3>What needs to be true?</h3><ol className="screen-checks">
       <li><b>Layout and access.</b> Confirm the stall count, circulation and written operating rights for {basis.condition.toLowerCase()}.</li>
       <li><b>Charge volume.</b> Confirm fleet arrivals and available utility power can sustain {count(r.sessions/365)} completions per day, including the peak shift.

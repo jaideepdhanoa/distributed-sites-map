@@ -163,7 +163,10 @@ test("explain a preliminary range with a conditional aisle on desktop and phone"
   await expect(panel.locator(".screen-result")).toContainText("$10.15");
   expect(await panel.evaluate(el=>el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   await mkdir("review-shots",{recursive:true});
+  await expect(panel.getByRole("heading",{name:"Largest changes in the tested assumptions"})).toBeVisible();
   await page.screenshot({path:"review-shots/"+info.project.name+"-preliminary-charging.png",animations:"disabled"});
+  await panel.getByRole("heading",{name:"Annual cost ledger"}).evaluate(el=>el.scrollIntoView({block:"start"}));
+  await page.screenshot({path:"review-shots/"+info.project.name+"-charging-ledger-rows.png",animations:"disabled"});
 });
 
 test("open released charging ranges from the Phoenix list",async({page},info)=>{

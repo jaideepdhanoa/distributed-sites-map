@@ -38,11 +38,17 @@ export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?
   const wholeProperty = research ? research.basis === "Public whole-property ask" ||
     (research.basis === "Workbook asking price" && /real estate included/i.test(research.scope)) : /^yes$/i.test(w?.ownership ?? "");
   // A filed sensitivity can have explicit test terms while the actual offer still needs confirmation.
+  const matchedCases = d.chargingSpace?.layouts?.filter(l=>l.parcel).map(l=>
+    d.opportunityReview?.coverage?.cases.find(c=>c.stalls===l.stalls && c.price!=null && c.base!=null));
+  const sharedTerms = matchedCases?.[0];
+  const parcelTerms = !lease && option?.disposition==="Shortlist" && !trial?.hypothetical && sharedTerms &&
+    matchedCases?.every(c=>c?.price===sharedTerms.price && c?.cash===sharedTerms.cash) ? sharedTerms : undefined;
   const filed = trial?.hypothetical && !lease && option?.disposition === "Shortlist"
     ? d.opportunityReview?.coverage?.cases.find(c => c.stalls === trial.assumptions.stalls && c.price != null && c.base != null)
-    : undefined;
+    : parcelTerms;
   const price = filed?.price ?? (lease ? selected?.terms === "lease" && selected.rights === "controlled" ? selected.values.rent : null
     : wholeProperty ? (research ? research.quote : d.asking_price ?? w?.ask) : null);
+  if (parcelTerms && wholeProperty && research?.quote != null && Math.abs(research.quote - parcelTerms.price!) > 1) return {reason:"Reconcile the filed test price and current property terms"};
   if (!lease && research?.quote != null && d.asking_price != null && d.asking_price > 0 && Math.abs(research.quote - d.asking_price) > 1) {
     return {reason:"Reconcile the two asking prices and confirm which assets are included"};
   }
@@ -72,6 +78,7 @@ export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?
   for (const layout of layouts) {
     const ledger:LedgerBasis = {
       terms, creditCash:trial?.assumptions.creditCash, condition:layout.condition, space, priceBasis, cashBasis, hypothetical:trial?.hypothetical??false,
+      parcel:layout.parcel, conversionRecorded:layout.conversionCost!=null, displacedRecorded:layout.lostAnnualCash!=null,
       workbookDefaults:trial ? {volume:100,unitBuild:c.unitBuild,postCost:c.attendant,upgrade:c.upgrade,cash:credited??0} : undefined,
       source:lease || filed ? null : research?.source, date:lease || filed ? null : research?.reviewedOn,
       proxy:a.hub!=null ? a.hub/c.charges : null,

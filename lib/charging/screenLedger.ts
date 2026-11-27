@@ -20,6 +20,7 @@ export type LedgerBasis = {
   priceBasis:string; cashBasis:string; source?:string|null; date?:string|null; proxy?:number|null;
   // The layout may be a conditional screen rather than a proven fit.
   hypothetical?:boolean; creditCash?:boolean; workbookDefaults?:Changes;
+  parcel?:boolean; conversionRecorded?:boolean; displacedRecorded?:boolean;
 };
 export type SavedScreen = {id:string; name:string; author:string; at:string;
   inputs:{basis:LedgerBasis; changes:Changes; scenario:number}};

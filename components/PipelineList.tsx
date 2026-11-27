@@ -63,7 +63,7 @@ import { useNarrowList } from "./useNarrowList";
 import { StagePending } from "./StagePending";
 
 const coverageLabels = {positive:"with potential spaces", zero:"zero in assessed layout", unmeasured:"need measurement",
-  priced:"site estimates", scenario:"what-if only", pending:"awaiting inputs"} as const;
+  priced:"site estimates", scenario:"what-if only", pending:"without a cost"} as const;
 type Coverage = keyof typeof coverageLabels;
 export type PipelineRow = {
   screen?:ReturnType<typeof listScreen>;
@@ -559,7 +559,7 @@ export default function PipelineList({
           const column = ["positive","zero","unmeasured"].includes(key) ? "spaces" : "chargeCost";
           if (activeLayout.hidden.includes(column)) toggleColumn(column);
           setReviewFilter("chargeCoverage", coverage === key ? "" : key);
-        }}>{count} {coverageLabels[key]}</button>;
+        }}>{count} {count === 1 && key === "priced" ? "site estimate" : coverageLabels[key]}</button>;
     });
   }
   const summaryBar = (

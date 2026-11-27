@@ -104,5 +104,11 @@ test("filter layouts and reprice the pipeline from the list", async ({page}, inf
   await list.getByRole("button",{name:"Cost assumptions · edited"}).click();
   await dialog.getByRole("button",{name:"Restore defaults"}).click();
   await expect(rows.first()).toContainText("$7.22");
+  if (phone) {
+    const card = rows.first(), actions = card.getByRole("button",{name:"View calculation"});
+    const body = await card.locator("button.list-row").boundingBox(), action = await actions.boundingBox();
+    expect(action!.y).toBeGreaterThanOrEqual(body!.y + body!.height - 1);
+    expect(action!.x + action!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  }
   await page.screenshot({path:`review-shots/${info.project.name}-pipeline-charging.png`,animations:"disabled"});
 });

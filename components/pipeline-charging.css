@@ -16,5 +16,7 @@
 .pipeline-list .pipeline-measure .proxy-reading { color: var(--green); }
 @media (max-width: 767px) {
   .pipeline-cost-dialog .field, .pipeline-list .pipeline-coverage { min-height: 44px; }
-  .pipeline-list .list-cards .pipeline-dialog-actions { grid-column: 2 / -1; }
+  .pipeline-list .list-cards > li { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 0 8px; }
+  .pipeline-list .list-cards .pipeline-dialog-actions { grid-column: 2; gap: 0 14px; }
+  .pipeline-list .list-cards .pipeline-dialog-actions .text-link { display: inline-flex; align-items: center; min-height: 44px; }
 }

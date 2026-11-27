@@ -23,15 +23,15 @@ export function pipelineFit(site: MapSpaceSite | undefined, assessment: Assessme
         || (b.fit.adjacent?.[1] ?? 0) - (a.fit.adjacent?.[1] ?? 0));
     const best = layouts[0];
     if (best?.fit.inside) {
-      const { inside, adjacent, check } = best.fit;
+      const { inside, adjacent } = best.fit;
       const basis = [kinds[best.zone.kind].label + " outline estimate"];
-      if (check === "adjacent" && adjacent) basis.push("up to " + adjacent[1] + " with a shared aisle");
+      if (adjacent && adjacent[1] > inside[1]) basis.push("up to " + adjacent[1] + " with a shared aisle");
       if (best.zone.fitHold === "aisle") basis.push("check aisle access");
       const label = kinds[best.zone.kind].label;
       const layouts: ChargingFootprint[] = [];
       if (inside[0] > 0) layouts.push({ stalls: inside[0], condition: label + (best.zone.fitHold === "aisle" ? " if aisle access is confirmed" : " inside the outline") });
       if (inside[1] > inside[0]) layouts.push({ stalls: inside[1], condition: label + " if clearance and aisle access are confirmed" });
-      if (check === "adjacent" && adjacent && adjacent[1] > inside[1]) {
+      if (adjacent && adjacent[1] > inside[1]) {
         layouts.push({ stalls: adjacent[1], condition: label + " with shared aisle access" });
       }
       return { value: rangeText(inside), basis: basis.join(" · "), count: inside[0], layouts };

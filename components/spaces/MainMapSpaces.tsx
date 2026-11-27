@@ -538,7 +538,7 @@ export default function MainMapSpaces({
             )}
             {site && filter==="all" && !draft && <ParcelInventory inventory={assessment?.inventory} zones={site.zones}/>}
             {site && !draft && (filter==="all" && !area && cases?.length || rowTrial || active && !["bay","clear","ground"].includes(active.kind) && !active.fitHold) ? <div className="parcel-sketch">
-              <label>Charging layout<select className="secondary" value={selectedCase ? String(caseIndex) : rowTrial ? "row" : "none"} onChange={event=>{
+              <label>Charging layout<select aria-label="Charging layout" className="secondary" value={selectedCase ? String(caseIndex) : rowTrial ? "row" : "none"} onChange={event=>{
                 const value=event.target.value;
                 if(value==="row" && active) {
                   const best=bestRow(active,site.frame,site.zones.filter(z=>z.kind==="clear").map(z=>z.points));
@@ -550,9 +550,9 @@ export default function MainMapSpaces({
                 {filter==="all" && !area && cases?.map((c,i)=><option value={i} key={c.name}>{c.name}</option>)}
                 {active && !["bay","clear","ground"].includes(active.kind) && !active.fitHold && <option value="row">Test a row in this area</option>}
               </select></label>
-              {rowTrial && active && <div className="space-map-filters"><label>Curb edge<select className="secondary" value={edge} onChange={e=>setEdge(Number(e.target.value))}>
+              {rowTrial && active && <div className="space-map-filters"><label>Curb edge<select aria-label="Curb edge" className="secondary" value={edge} onChange={e=>setEdge(Number(e.target.value))}>
                 {active.points.map((_,i)=><option key={i} value={i}>Corners {i+1}–{(i+1)%active.points.length+1}</option>)}</select></label>
-                <label>Stall angle<select className="secondary" value={angle} onChange={e=>setAngle(Number(e.target.value) as Angle)}>{[90,60,45].map(a=><option key={a} value={a}>{a}°</option>)}</select></label></div>}
+                <label>Stall angle<select aria-label="Stall angle" className="secondary" value={angle} onChange={e=>setAngle(Number(e.target.value) as Angle)}>{[90,60,45].map(a=><option key={a} value={a}>{a}°</option>)}</select></label></div>}
               {(selectedCase || rowTrial) && <p aria-live="polite"><strong>{sketch ? sketch.stalls.length+" stalls sketched" : "Layout needs measurement"}</strong>
                 {sketch && " · Blue stalls and amber drive aisle."} {sketch?.approach && "Dashed line shows the proposed entry route."} {selectedCase?.condition || (rowTrial && (angle===90 ? "Verify the two-way approach and peak availability." : "Verify one-way entry, exit and peak availability."))}</p>}
               {selectedCase && <a className="text-link" href={"/charging?site="+site.id+"&view=explain"}>See cost per charge</a>}

@@ -28,6 +28,7 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
   const { row, reviewedOn } = data;
   const linked = findOutline(row, useSearchParams().get("outline") || "");
   const initialOption = (linked && kinds[linked.kind].option) || firstOption(row);
+  const [allAreas,setAllAreas]=useState(!linked);
   const [option, setOption] = useState<Option>(initialOption);
   const [which, setWhich] = useState(linked ? optionZones(row, initialOption).indexOf(linked) : 0);
   const [discussion, setDiscussion] = useState(Boolean(linked));
@@ -53,7 +54,11 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
     return { ...candidate, points: geometry };
   });
   const clear = row.status === "reviewed" ? row.zones.filter(z => z.kind === "clear") : [];
-  const painted = [...visible, ...clear];
+  const other = allAreas && row.status==="reviewed" ? row.zones.filter(z=>z.kind!=="clear" && kinds[z.kind].option!==option).map(z=>{
+    const updated=history.reviews.find(({review})=>review?.option===kinds[z.kind].option && review.area===z.label && review.frame===row.image?.id && review.points)?.review?.points;
+    return updated ? {...z,points:updated} : z;
+  }) : [];
+  const painted = [...other,...visible, ...clear];
   const overlayKey = JSON.stringify({ zones: painted, reviewed });
   useEffect(() => {
     if (editing && onOverlay && row.image?.bounds) onOverlay({ site, frame: row.image.bounds, ...JSON.parse(overlayKey) });
@@ -97,10 +102,14 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
   const selectArea = (index: number) => { setWhich(index); setDiscussion(false); reset(); };
   return <div className="space-workspace">
     <ParcelInventory inventory={row.inventory} zones={row.zones}/>
-    <div className="space-tabs" role="group" aria-label="Operating layout">{(Object.keys(options) as Option[]).map(key =>
-      <button type="button" className={key === option ? "segmented on" : "segmented"} aria-pressed={key === option} disabled={saving} key={key}
-        onClick={() => { setOption(key); selectArea(0); }}>{options[key]}</button>)}</div>
-    {row.image && <OptionAerial image={row.image} zones={painted} active={zone?.label} reviewed={reviewed} onSelect={!editing && zones.length > 1 ? label => selectArea(zones.findIndex(z => z.label === label)) : undefined} onPoint={editing && !saving ? changePoint : undefined} corner={editing ? corner : undefined} onCorner={setCorner} />}
+    <div className="space-tabs" role="group" aria-label="Operating layout"><button type="button" className={allAreas ? "segmented on":"segmented"} aria-pressed={allAreas} disabled={saving} onClick={()=>{setAllAreas(true);selectArea(0);}}>All areas</button>{(Object.keys(options) as Option[]).map(key =>
+      <button type="button" className={!allAreas && key === option ? "segmented on" : "segmented"} aria-pressed={!allAreas && key === option} disabled={saving} key={key}
+        onClick={() => { setAllAreas(false); setOption(key); selectArea(0); }}>{options[key]}</button>)}</div>
+    {row.image && <OptionAerial image={row.image} zones={painted} active={zone?.label} reviewed={reviewed} onSelect={!editing ? label=>{
+      const target=painted.find(z=>z.label===label);
+      const tab=target && kinds[target.kind].option;
+      if(tab){setOption(tab);setAllAreas(false);selectArea(optionZones(row,tab).findIndex(z=>z.label===label));}
+    } : undefined} onPoint={editing && !saving ? changePoint : undefined} corner={editing ? corner : undefined} onCorner={setCorner} />}
     {painted.length > 0 && <div className="space-legend">{visible.some(z => !reviewed.includes(z.label)) && <span><i className="draft-key" />Proposed area</span>}{reviewed.length > 0 && <span><i className="review-key" />Team outline</span>}{clear.length > 0 && <span><i className="clear-key" />Keep clear</span>}</div>}
     {zones.length > 1 && <label>Candidate area<select className="secondary" value={which} disabled={saving} onChange={e => selectArea(Number(e.target.value))}>{zones.map((z,i) => <option key={z.label} value={i}>{z.label}</option>)}</select></label>}
     {zone && <div className="space-actions" aria-label={zone.label}>
@@ -193,6 +202,6 @@ export default function SpaceOptions({ site, photos, compact, onOpen, onOverlay 
     {draftError && <p role="alert">{draftError}</p>}
     {error && <button type="button" className="text-link" onClick={() => setRetry(n=>n+1)}>Retry</button>}
     {row && <button type="button" className="text-link" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? "Close layout comparison" : "Compare space options"}</button>}
-    {open && !compact && loaded && <Workspace data={loaded} site={site} photos={photos} onOverlay={onOverlay} />}
+    {open && !compact && loaded && <Workspace key={site} data={loaded} site={site} photos={photos} onOverlay={onOverlay} />}
   </section>;
 }

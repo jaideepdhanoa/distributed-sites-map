@@ -23,7 +23,7 @@ export const kinds = {
 export type Zone = { kind: keyof typeof kinds; label: string; points: Point[]; check?: string; fitHold?: "footprint" | "aisle" };
 export type Aerial = { kind?: "site-plan" | "site-photo"; metersPerPixel?: number; documentUrl?: string; id: string; src: string; source: string; date: string; width: number; height: number; bounds?: Bounds };
 export type Assessment = {
-  inventory?: import("./parcelLayout").Inventory; parcelCases?: import("./parcelLayout").ParcelCase[];
+  reviewedOn?:string; inventory?: import("./parcelLayout").Inventory; parcelCases?: import("./parcelLayout").ParcelCase[];
   status: "reviewed" | "hold" | "needs-image"; summary: string; recorded: number | null;
   baseline: "recorded" | "unconfirmed" | "conflict"; zones: Zone[]; segment: string;
   cohort: "active" | "off-market" | "dropped"; evidence?: { label:string; url:string; option:Option }[]; revision: string; image?: Aerial;

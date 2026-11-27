@@ -22,7 +22,7 @@ export async function verifySpaceLayouts(origin, file, credentials) {
     const reply = await read("/api/data/space-options?" + new URLSearchParams({ site }));
     if (!reply.ok) return false;
     const { assessment } = await reply.json();
-    if (assessment?.reviewedOn !== file.reviewedOn || !isDeepStrictEqual(assessment.row, row)) return false;
+    if (assessment?.reviewedOn !== (row.reviewedOn ?? file.reviewedOn) || !isDeepStrictEqual(assessment.row, row)) return false;
     const src = row.image?.src;
     if (!src || src.startsWith("data:image/webp;base64,")) return true;
     if (!/^\/api\/data\/photos\/[a-f0-9]{20}\.(jpeg|jpg|png|webp)$/.test(src)) return false;

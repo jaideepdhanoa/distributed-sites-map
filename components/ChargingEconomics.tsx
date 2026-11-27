@@ -28,9 +28,7 @@ export function ChargingSiteSection({deal}:{deal:DealProps}) {
   return <section className="charging-preview" aria-label="Charging economics"><strong>Charging economics</strong>
     <p>{c.merit.action} · {c.name}</p>
     <p>{cost.value}{cost.amount!=null && " per charge"} · {amounts(c.result.depot,2)} {c.comparator==="workbook"?"depot proxy":"depot"}</p>
-    <small>{cost.basis}</small><p>{c.merit.next}</p>
-    {c.merit.netValue != null && <small>{amounts(c.merit.netValue)} downside network value · {c.merit.servedPeak} peak charges</small>}
-    {!c.selected && <p className="layer-meta">{filedScreenLabel(c.screen)}</p>}<ChargingLink site={deal.deal_id} basis={screenBasis(c)} revision={c.selected}/></section>;
+    <small>{cost.basis}</small><p>{c.merit.next}</p>{!c.selected && <p className="layer-meta">{filedScreenLabel(c.screen)}</p>}<ChargingLink site={deal.deal_id} basis={screenBasis(c)} revision={c.selected}/></section>;
 }
 export function ChargingEditor({site,revision,explain=false,screenId,basis}:{site:string;revision?:string|null;explain?:boolean;screenId?:string|null;basis?:string|null}) {
   const [payload,setPayload]=useState<Payload|null>(null),[failed,setFailed]=useState(false),[attempt,retry]=useState(0);

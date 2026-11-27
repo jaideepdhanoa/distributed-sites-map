@@ -167,11 +167,16 @@ export default function SheetGrid<Row>({
       setMenu(null);
       trigger?.focus();
     }
+    function onFocus(event: FocusEvent) {
+      if (event.target instanceof Element && !event.target.closest(".col-menu, .col-filter")) setMenu(null);
+    }
     window.addEventListener("pointerdown", onPointer);
+    window.addEventListener("focusin", onFocus);
     window.addEventListener("keydown", onEscape, true);
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("pointerdown", onPointer);
+      window.removeEventListener("focusin", onFocus);
       window.removeEventListener("keydown", onEscape, true);
     };
   }, [menu]);

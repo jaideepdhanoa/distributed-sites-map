@@ -110,3 +110,14 @@ test("read the action and open the bounded site-fit thumbnail",async({page},info
   await drawer.getByRole("button",{name:"Open annotated layout"}).click();
   await expect(drawer.getByRole("button",{name:"Convert outdoor space",exact:true})).toBeVisible();
 });
+
+test("open the scoped inventory if a map style is unavailable",async({page})=>{
+  await fixtures(page);
+  await page.route("https://tiles.openfreemap.org/styles/positron",route=>route.abort());
+  await page.goto("/?city=PHX&funnel=pipeline");
+  const fallback=page.getByRole("status").filter({hasText:"Map unavailable"});
+  await fallback.getByRole("button",{name:"Spaces"}).click();
+  await expect(page.getByText("1 space across 1 site")).toBeVisible();
+  await page.getByRole("button",{name:"Main map"}).click();
+  await expect(fallback.getByRole("button",{name:"Retry map"})).toBeVisible();
+});

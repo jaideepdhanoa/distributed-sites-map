@@ -19,7 +19,8 @@ import type { DealFeature, GeoFeature, SiteFeature, UnscreenedFeature } from "@/
 import type { GroundBox } from "@/lib/spaces/measure";
 import type { MapOutline } from "./spaces/SpaceOptions";
 import { worldPoint } from "@/lib/spaces/options";
-import MainMapSpaces, { navigateSpaces } from "./spaces/MainMapSpaces";
+import { navigateSpaces } from "@/lib/spaces/navigation";
+import MainMapSpaces from "./spaces/MainMapSpaces";
 import SpaceTools, { spaceIdAt } from "./spaces/SpaceTools";
 import type { SpaceShape } from "./spaces/SpacePopover";
 
@@ -2300,7 +2301,7 @@ export default function MapView(props: Props) {
         <div className={`measure-row${props.previewName ? " parcel-selected" : ""}${parcelTools ? " parcel-tools-open" : ""}`} role="group" aria-label="Map tools">
           {props.previewName && !props.spaceDrawing && !measure && <button type="button" className="tool parcel-toggle" aria-expanded={parcelTools} onClick={() => setParcelTools(open => !open)}>Parcel tools</button>}
           {!props.spaceDrawing && !measure && <span className="map-tools-label" aria-hidden="true">Map tools</span>}
-          {props.signedIn && !props.spaceDrawing && !measure && <button type="button" className="tool" data-testid="open-map-spaces" onClick={() => navigateSpaces(true, props.spaceSelectedId)}><Layers3 size={16} aria-hidden="true" />Spaces</button>}
+          {props.signedIn && !mapFailed && !props.spaceDrawing && !measure && <button type="button" className="tool" data-testid="open-map-spaces" onClick={() => navigateSpaces(true, props.spaceSelectedId)}><Layers3 size={16} aria-hidden="true" />Spaces</button>}
           {props.spaceDrawing ? (
             <div className="measure-bar" data-testid="space-draw-bar" role="toolbar" aria-label="Draw a lot">
               <button type="button" className="paper-btn" data-testid="space-undo" onClick={() => sendDraw("undo")} disabled={draftPoints < 1}>Undo point</button>

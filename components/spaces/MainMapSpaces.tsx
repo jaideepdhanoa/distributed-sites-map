@@ -17,6 +17,7 @@ import {
   type Assessment,
   type Point,
 } from "@/lib/spaces/options";
+import { navigateSpaces } from "@/lib/spaces/navigation";
 import { reviewLabel, reviewReturn } from "@/lib/reviewNavigation";
 import { outlineId } from "@/lib/spaces/outlineAnchor";
 import { reviewBody } from "@/lib/spaces/optionReview";
@@ -39,22 +40,6 @@ async function readCatalog(signal?: AbortSignal): Promise<SpaceCatalog> {
   const catalog = await response.json();
   if (!Array.isArray(catalog.sites)) throw Error("The space inventory is unavailable.");
   return catalog;
-}
-export function navigateSpaces(open: boolean, site?: string, area?: string, layout?: Option) {
-  const url = new URL(window.location.href);
-  const enteringFromMap = open && !url.searchParams.has("spaces");
-  for (const key of ["spaces", "spaceSite", "spaceArea", "spaceLayout", "discussion", "note"])
-    url.searchParams.delete(key);
-  if (!open) url.searchParams.delete("spaceScope");
-  if (enteringFromMap) url.searchParams.set("spaceScope", "map");
-  if (open) {
-    url.searchParams.set("spaces", "1");
-    url.searchParams.delete("view");
-  }
-  if (site) url.searchParams.set("spaceSite", site);
-  if (area) url.searchParams.set("spaceArea", area);
-  if (layout) url.searchParams.set("spaceLayout", layout);
-  window.history.pushState(null, "", url);
 }
 function candidates(site: MapSpaceSite) {
   return site.zones.filter((zone) => zone.kind !== "clear");

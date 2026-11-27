@@ -59,6 +59,7 @@ import { inCountedMarket, labeledCount, reviewBadge, shownMarketCounts } from "@
 import { actionColors } from "@/lib/charging/merit";
 import { scoreIssue } from "@/lib/scoreDisplay";
 import type { SpaceShape } from "./spaces/SpacePopover";
+import { navigateSpaces } from "@/lib/spaces/navigation";
 import { siteSpaceChange } from "@/lib/spaces/change";
 import CommentGridHost from "./comments/CommentGridHost";
 import { COMMENT_CHANGED, COMMENT_OPEN, readCommentAnchor } from "@/lib/comments/nav";
@@ -1442,6 +1443,7 @@ export default function Explorer() {
       ?? catalog?.find((feature) => feature.properties.site_id === selected)?.properties
       ?? null;
   const selectedDeal = dealRows.find((deal) => deal.deal_id === selected) ?? null;
+  const spaceSelectedId = selectedDeal?.deal_id || (selectedSite && dealForSite(selectedSite)?.deal_id) || selected || undefined;
   const showingPreview = Boolean(selected && previewId === selected && !listView && !reviewing && !ndaVisible && !loopsVisible);
   const pinPowerDeal = selectedDeal || (selectedSite ? powerDealForSite(selectedSite) : null);
   const linkedPowerSite = selectedDeal ? powerSiteForDeal(selectedDeal) : null;
@@ -2399,7 +2401,8 @@ export default function Explorer() {
         })}
       />
       <header className="bar">
-        {recoveringMap && <div className="map-retry" role="status"><span>Map unavailable. Showing your shortlist.</span>
+        {recoveringMap && <div className="map-retry" role="status"><span>Map unavailable. Showing your site list.</span>
+          {me && <button type="button" className="paper-btn" data-testid="open-map-spaces" onClick={()=>navigateSpaces(true,spaceSelectedId)}>Spaces</button>}
           <button className="text-link" type="button" onClick={retryMap}>Retry map</button>
         </div>}
         <ActionsQuietNotice />
@@ -2953,7 +2956,7 @@ export default function Explorer() {
         <MapView key={mapAttempt} signedIn={Boolean(me)} spacesMarket={allCities?"all":city} spacesOpen={params.get("spaces")==="1"} spaceSiteIds={new Set(locationRows.map(row => {
             const mapped = siteById.get(row.id);
             return (mapped && dealForSite(mapped)?.deal_id) || row.id;
-          }))} spaceSelectedId={selectedDeal?.deal_id || (selectedSite && dealForSite(selectedSite)?.deal_id) || selected || undefined}
+          }))} spaceSelectedId={spaceSelectedId}
           onDrawAt={me ? (siteId, center) => {
             setShowSpaces(true); setPickedSpace(""); setMarking({siteId,lng:center[0],lat:center[1],nonce:Date.now()});
             if (dealRows.some(deal=>deal.deal_id===siteId)) { setSelected(siteId); setPreviewId(siteId); setSheetSnap("peek"); }

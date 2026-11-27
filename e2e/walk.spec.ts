@@ -23,6 +23,11 @@ test("unknown or zero open land says it is not on file", async ({ page }, info) 
   test.skip(info.project.name !== "desktop", "desktop card");
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/?funnel=pipeline&pstage=desk&view=list", { waitUntil: "domcontentloaded" });
+  const columnsButton = page.getByRole("button", { name: "Columns", exact: true });
+  await columnsButton.click();
+  const openLand = page.getByRole("group", { name: "Columns", exact: true }).getByRole("checkbox", { name: "Open land", exact: true });
+  await openLand.check();
+  await columnsButton.click();
   await page.waitForSelector("[data-testid=sheet-grid] td[data-col=openLand]");
   const zeros = await page.locator("[data-testid=sheet-grid] td[data-col=openLand]").evaluateAll((nodes) => nodes.some((node) => /^0 sq ft/i.test((node.textContent || "").trim())));
   expect(zeros).toBe(false);

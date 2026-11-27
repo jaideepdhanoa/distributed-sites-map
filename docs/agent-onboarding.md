@@ -12,6 +12,25 @@ Package name is `sites-map`. The app is Next.js 16 (`next` in `package.json`) on
 
 Market codes in the API are `PHX`, `LAS`, `MIA`, and `SNA`. The universe gate covers located deals in LAS, PHX, and MIA. README records that on 5 Nov 2026 Jaideep kept the Newport Beach row outside that gate. A new site still needs a market of PHX, LAS, or MIA.
 
+## Site decisions
+
+Start in **Selection Review**. Join on the stable site ID and confirm the address or parcel. A site can have several offers. Read the route under review, the selected charging case and the current site stage separately.
+
+| Question | Where to read and maintain it |
+| --- | --- |
+| Which transaction deserves staff time? | Selection Review shows the private commercial register. Maintain one primary opportunity per site and one alternative per distinct transaction in the existing Opportunities tab. Acquisition shortlist order spans markets. Fleet-service diligence has its own order. |
+| What would a visit settle? | The shortlist and site brief show the Visit decisions entry for the site. Record why a peak-hour visit matters, the booking condition, seller and utility work, what to measure, and the condition for considering an LOI. Distinguish proposed owners and dates from confirmed arrangements. |
+| What does the operating case support? | Financials, the charging explanation and Compare expose the selected revision. State the source, date, units, case assumptions, joint downside and next evidence needed. The Charging cases worksheet mirrors the result. Historical Scorecard points describe the earlier screen. |
+| Has the site changed stage? | Read the signed-in site record. A route disposition or model action can prompt review. A contributor proposes a site-wide change, and an authorized human decides. The package-receipt exception below is narrowly scoped. |
+
+For physical fit, inspect each candidate in Spaces, including conversion of surplus parking, vacuums or bays. Record aisle and access rights, peak use and displaced operating cash. Keep an aerial estimate, a measured layout and written control distinct. For power, distinguish nearby infrastructure and utility forecasts from measured existing service, available headroom and a dated utility response on cost and delivery. Traffic and competition provide business context. Use source-period statement lines and retained cash after conversion to test purchase support.
+
+Use comparable local costs per completed charge for the selected site and the next feasible depot addition. Label a network reference or proxy. Keep unknown values distinct from verified zeroes, and a saved trial distinct from the team selection. An investment sequence requires qualifying base and downside cases and incremental value after allocating shared market demand. A diligence or visit priority can have an unresolved charging case.
+
+When a transaction ends, record its reason, dated evidence and reopening condition. Check for duplicate pending proposals before suggesting a site-wide drop. The authorized reviewer’s acceptance records the stage and reason. Reload the site and check the stage, reason and history. After a register publication, compare the affected route, next check and visit plan with signed-in Selection Review. Keep live counts, terms and case details on authorized private surfaces.
+
+For future workflow changes, update the affected shared manual, rule and playbook passages at the point an agent uses them. Update this guide and relevant in-app instructions when their behavior changes. Include the source revision and next decision-changing check in handoffs. Give unresolved discrepancies an owner or record that ownership is open.
+
 ## Architecture
 
 ```

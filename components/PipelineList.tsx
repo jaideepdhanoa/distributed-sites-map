@@ -25,6 +25,7 @@ import {
   compactMoney,
   depotLine,
   fullMoney,
+  sheetMoney,
   capacitySummary,
   listScoreText,
   factsForDeal,
@@ -140,15 +141,15 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   }
   if (id === "asking") {
     if (!signedIn) return "—";
-    if (!deal.asking_price_display) return "—";
+    if (deal.asking_price == null && !deal.asking_price_display) return "—";
     const source = shownPriceSource(deal);
-    return [deal.asking_price_display, priceQualifier(deal) === "last advertised" ? "Last advertised" : "", source].filter(Boolean).join(" · ");
+    return [sheetMoney(deal.asking_price, deal.asking_price_display), priceQualifier(deal) === "last advertised" ? "Last advertised" : "", source].filter(Boolean).join(" · ");
   }
   if (id === "acres") return acresText(deal.land_acres) || "—";
   if (id === "perAcre") return signedIn ? (deal.price_per_acre_display || "—") : "—";
   if (id === "openLand") {
     if (!openLandMeasured(deal.open_land_sqft, deal.open_land_basis) && signedIn && deal.opportunityReview?.coverage) {
-      return deal.opportunityReview.coverage.spaceStatus;
+      return "Open area unmeasured · Charging layout: " + deal.opportunityReview.coverage.spaceStatus;
     }
     return openLandLabel(deal.open_land_sqft, deal.open_land_basis);
   }
@@ -878,8 +879,8 @@ function NumberCell({
 
 function AskingCell({ deal, stats, onBroker, signedIn }: { deal: DealProps; stats: StripStats | null; onBroker?: (name: string) => void; signedIn: boolean }) {
   if (!signedIn) return <span>—</span>;
-  const price = deal.asking_price_display;
-  if (!price) return <span title="Not on file">—</span>;
+  if (deal.asking_price == null && !deal.asking_price_display) return <span title="Price needs confirmation">—</span>;
+  const price = sheetMoney(deal.asking_price, deal.asking_price_display);
   const source = shownPriceSource(deal);
   const listing = listingHref(deal.listing_url);
   const party = shownBroker(deal) || shownFirm(deal);

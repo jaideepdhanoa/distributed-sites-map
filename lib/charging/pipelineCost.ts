@@ -2,6 +2,16 @@ import { amounts } from "./model";
 import type { LayoutCost } from "./preliminary";
 import type { ChargingSummary } from "./summary";
 
+const priceFormat=new Intl.NumberFormat("en-US",{useGrouping:false,minimumFractionDigits:2,maximumFractionDigits:2});
+function printedCents(price:number){
+  return Number(priceFormat.format(price).replace(".",""));
+}
+
+/** Compare the two prices shown to a reviewer. The model keeps its full precision. */
+export function displayedPriceDelta(price:number,reference:number){
+  return (printedCents(price)-printedCents(reference))/100 || 0;
+}
+
 export function costRange(layout: LayoutCost) {
   const low = Math.min(layout.base.perCharge, layout.downside.perCharge);
   const high = Math.max(layout.base.perCharge, layout.downside.perCharge);

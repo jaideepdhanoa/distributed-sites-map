@@ -1,4 +1,4 @@
-import { nextDecision, recommendation } from "@/lib/selection/opportunityDisplay";
+import { nextDecision, offeredTransaction, recommendation } from "@/lib/selection/opportunityDisplay";
 import { pipelineCost } from "@/lib/charging/pipelineCost";
 import {ChargingLink} from "@/components/ChargingLink";
 import { filedScreenLabel } from "@/lib/charging/summary";
@@ -52,6 +52,7 @@ export default function MapSitePreview(props: PreviewProps) {
   const fact = previewFitFigure(figures);
   const powerDeal = deal || props.linkedDeal;
   const commercial = props.signedIn && !listing ? powerDeal?.opportunityReview : undefined;
+  const asking = commercial && figures.find(figure => figure.label === "Asking price");
   const fit = props.signedIn && !listing ? powerDeal?.chargingSpace : undefined;
   const cost = pipelineCost(powerDeal?.charging);
   const power = props.signedIn && !listing && access.enabled && !evidence && /power|utility|electrical/i.test(review) && powerDeal?.kind !== "land" && !site?.land_only && powerDeal?.stage_group !== "dropped";
@@ -72,13 +73,15 @@ export default function MapSitePreview(props: PreviewProps) {
       </div>}
       {!showingPower && props.marketMode && !listing && <MarketEvidence metric={props.marketMode} deal={powerDeal} site={site} inspection={props.washInspection} expanded={Boolean(props.washInspection?.radius)} />}
       {showingPower ? <MapPowerCard deal={props.powerDeal} site={props.powerSite} grid={props.grid} onGrid={props.onGrid}/> : <dl className="preview-facts">
-        {commercial && <div><dt>{commercial.primary.route}</dt><dd>{recommendation(commercial.primary)}</dd></div>}
+        {commercial && <div><dt>Team recommendation</dt><dd>{recommendation(commercial.primary)}<small className="preview-missing">{offeredTransaction(commercial.primary, powerDeal?.selectionResearch?.scope)}</small></dd></div>}
+        {commercial && powerDeal?.pendingDrop && <div><dt>Drop proposal</dt><dd>Awaiting approval</dd></div>}
+        {asking && <div><dt>Asking price</dt><dd>{asking.value}{asking.source && <small className="preview-missing">{asking.source}</small>}</dd></div>}
         {fit ? <div><dt>Charging spaces</dt><dd>{fit.value}<small className="preview-missing">{fit.basis}</small></dd></div> : fact ? <div><dt>{fact.label}</dt><dd>{fact.value}{fact.date && ` · ${fact.date}`}{fact.source && <small className="preview-missing">{fact.source}</small>}</dd></div> : <div><dt>Site fit</dt><dd>{props.loading ? "Checking…" : "No site-fit figure on file"}</dd></div>}
-        <div><dt>Next check</dt><dd>{commercial ? nextDecision(commercial) : powerDeal?.charging?.merit.next ?? review}<small className="preview-missing">{commercial ? [commercial.primary.owner, commercial.primary.revisitOn].filter(Boolean).join(" · ") : powerDeal?.charging ? "Charging case" : origin}</small>{!commercial && missing && !props.loading && <small className="preview-missing">{missing}</small>}</dd></div>
+        <div><dt>Next check</dt><dd>{commercial ? nextDecision(commercial) : powerDeal?.charging?.merit.next ?? review}<small className="preview-missing">{commercial ? [commercial.primary.owner || "Decision owner unassigned", commercial.primary.revisitOn].filter(Boolean).join(" · ") : powerDeal?.charging ? "Charging case" : origin}</small>{!commercial && missing && !props.loading && <small className="preview-missing">{missing}</small>}</dd></div>
       </dl>}
       {!showingPower && evidence?.kind !== "layout" && props.signedIn && !listing && !site?.land_only && powerDeal?.kind === "pipeline" && <SpaceOptions key={powerDeal.deal_id} site={powerDeal.deal_id} compact onOpen={() => onOpen("space-options")} />}
       {!showingPower && props.signedIn && powerDeal?.charging && !site?.land_only && <section className="charging-preview">
-        <strong>Charging economics</strong><span>{powerDeal.charging.merit.action}</span>
+        <strong>Charging economics</strong><span>{powerDeal.charging.merit.action === "Suggest drop" ? "Set this charging case aside" : powerDeal.charging.merit.action}</span>
         <p>{cost.amount == null ? cost.value : cost.value + " / charge"}
           {powerDeal.charging.result.depot!=null && " · $"+powerDeal.charging.result.depot.toFixed(2)+" depot"+(powerDeal.charging.comparator==="workbook"?" proxy":"")}</p>
         {powerDeal.charging.merit.downsideGap!=null && <small>Downside gap ${powerDeal.charging.merit.downsideGap.toFixed(2)} per charge</small>}

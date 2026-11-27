@@ -3272,7 +3272,7 @@ export default function Explorer() {
           )}
         </aside>
         {!listView ? (
-          <div className="map-corner">
+          <div className={'map-corner' + (!activeMetric && !selected && !inReview && !ringsOutside ? ' map-summary' : '')}>
             {activeMetric && !selected && !stepsOpen && !filtersOpen && !unplacedOpen && !layersOpen && !ndaVisible && !loopsVisible && compareIds.length < 2 &&
               <MarketMapPanel metric={activeMetric} choose={chooseMarketMetric} clustered={mapZoom < PIN_SPLIT_ZOOM} missingLocations={unplacedInView.length}
                 showMissing={()=>{closeMenus();setUnplacedOpen(true);}} rows={marketRows} area={liveArea} spot={highlightNearby} pick={id=>nearbyPicker.current?.(id)} />}

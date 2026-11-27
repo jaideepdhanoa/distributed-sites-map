@@ -156,7 +156,12 @@ test("shortlisted visit shows the charging decision and its parallel diligence w
   await page.getByRole("button",{name:"Hide filters"}).click();
   const card = page.locator(".visit-decision");
   await expect(card.getByText(visitPlan.reason)).toBeVisible();
-  await expect(card.getByText(/Review for closure/)).toBeVisible();
+  const evidence = page.getByText("Site evidence and economics");
+  await evidence.click();
+  const details = page.locator(".shortlist-evidence");
+  await expect(details.getByRole("heading", {name:"Charging case · Screen"})).toBeVisible();
+  await expect(details.getByText("Review for closure")).toBeVisible();
+  await evidence.click();
   await expect(card.getByText(/Reviewer.*2026-01-12/)).toBeVisible();
   await card.getByText("Actions and offer conditions").click();
   await expect(card.getByText(visitPlan.power,{exact:false})).toBeVisible();

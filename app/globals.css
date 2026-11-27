@@ -4290,6 +4290,17 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
   .nearby-sites { width: auto; }
   .nearby-sites:has([aria-expanded=true]) { width: min(320px, calc(100vw - 24px)); }
   #nearby-results { max-height: min(26vh, 200px); }
+  .map-corner.map-summary {
+    flex-flow: row wrap; align-items: center; gap: 0;
+    max-width: calc(100% - 16px); max-height: 44dvh; overflow: auto;
+    background: var(--paper-card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-1);
+  }
+  .map-summary .nearby-sites, .map-summary .map-key, .map-summary .key-toggle {
+    border: 0; box-shadow: none; background: transparent;
+  }
+  .map-summary .nearby-sites:has([aria-expanded=true]), .map-summary .key-expanded { flex-basis: 100%; }
+  .map-summary .shortlist-map-coverage { padding-inline: 8px; background: transparent; }
+
 }
 
 .nearby-map-ring { pointer-events: none; width: 29px; height: 29px; border-radius: 50%; border: 3px solid var(--green); box-shadow: 0 0 0 3px #fffdf8; }

@@ -120,7 +120,8 @@ export function buildQueue(input: {
     const reviewedAt = input.reviewedAt[site.id] || "";
     const stageDropped = site.stageGroup === "dropped";
     const reasons = (input.reasons[site.id] || []).filter((reason) => {
-      if (reviewedAt && reason.at <= reviewedAt) return false;
+      // A refresh can rediscover a permanent site ID after its first review.
+      if (reviewedAt && (reason.type === "new_site" || reason.at <= reviewedAt)) return false;
       if (stageDropped && (reason.type === "drop" || reason.type === "drop_suggested")) return false;
       return true;
     });

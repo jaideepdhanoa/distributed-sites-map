@@ -8,6 +8,11 @@ export function costRange(layout: LayoutCost) {
   return amounts(low, 2) + "–" + amounts(high, 2);
 }
 
+/** Pin the number being explained even when the selected detailed case is incomplete. */
+export function screenBasis(c?:ChargingSummary) {
+  return c && !c.stale && c.result.siteCost==null && c.preliminary && "layouts" in c.preliminary ? "screen" : undefined;
+}
+
 export function pipelineCost(charging?: ChargingSummary) {
   if (!charging) return { value: "No charging case", basis: "", amount: null };
   if (charging.stale) return { value: "Needs recalculation", basis: "Site inputs have changed", amount: null };

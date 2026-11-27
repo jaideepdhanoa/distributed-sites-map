@@ -212,6 +212,9 @@ test("review a whole parcel, switch parking geometry and inspect its aisles", as
   const workspace=page.getByTestId("map-spaces-workspace");
   await expect(workspace.getByRole("button",{name:"All areas",exact:true})).toHaveAttribute("aria-pressed","true");
   await expect(workspace.getByText("6 stalls sketched")).toBeVisible();
+  const ledgerLink = new URL((await workspace.getByRole("link", { name:"See cost per charge" }).getAttribute("href"))!, page.url());
+  expect(ledgerLink.searchParams.get("basis")).toBe("screen");
+  expect(ledgerLink.searchParams.get("layout")).toBe("North row");
   await workspace.getByText("Whole-parcel review",{exact:true}).click();
   await expect(workspace.getByText("Undeveloped ground",{exact:true})).toBeVisible();
   await workspace.getByText("Whole-parcel review",{exact:true}).click();

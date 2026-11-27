@@ -1,11 +1,12 @@
 import type { DealProps } from "../types";
 import type { PurchaseAssumptions } from "../purchaseReview";
 import type { ChargingFootprint } from "../spaces/pipelineFit";
-import { annualRecovery, type Inputs } from "./model";
+import { screenLedger,type LedgerBasis } from "./screenLedger";
+import { type Inputs } from "./model";
 
 export type RangeCase = { sessions: number; upgrade: number; annualCost: number; perCharge: number };
 export type LayoutCost = ChargingFootprint & {
-  base: RangeCase; downside: RangeCase; build: number; layoutCash?:number; staffing: number; upkeep: number;
+  ledger: LedgerBasis; base: RangeCase; downside: RangeCase; build: number; layoutCash?:number; staffing: number; upkeep: number;
 };
 export type PreliminaryCost = { reason: string } | {
   layouts: LayoutCost[]; space: string; price: number; terms: "purchase" | "lease"; priceBasis: string;
@@ -63,31 +64,36 @@ export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?
     c.attendant == null || c.unitBuild == null || c.upgrade == null || c.fixed == null || c.insurance == null ||
     c.perCharger == null || c.tax == null) return {reason:"The workbook charging and cost assumptions are incomplete"};
 
-  const chargesPerStall = c.charges / a.horizon / a.demand * ((trial?.assumptions.volume ?? 100) / 100);
-  const recovery = annualRecovery(a.capital, a.horizon);
-  const annualProperty = lease ? price * 12 : price * (1 + a.closing) * recovery;
   // Use retained business cash only for an operating purchase. A missing figure earns no credit.
   const retained = !lease && option?.route !== "Property only" && !/^no$/i.test(w?.open ?? "") ? w?.cash : null;
   const credited = filed && option?.route !== "Property only" && !/^no$/i.test(w?.open ?? "") ? filed.cash : retained;
   // Removing credit for positive earnings must preserve any operating loss.
   const cash = trial?.assumptions.creditCash === false ? Math.min(0, credited ?? 0) : credited ?? 0;
   const upgrade = trial?.assumptions.upgrade ?? c.upgrade;
+  const terms=lease ? "lease" : "purchase";
+  const priceBasis=filed ? "Filed test price · confirm the offering" : lease ? "Selected charging lease" : research?.basis || "Workbook property ask";
+  const cashBasis=trial?.assumptions.creditCash===false && (credited??0)>0 ? "Credit removed in list trial" : credited==null ? "No business income credited" : filed ? "Retained cash in filed test" : "Workbook retained annual cash";
+  const space=fit?.value ?? "unmeasured";
   const costed: LayoutCost[] = [];
   for (const layout of layouts) {
-    const build = layout.stalls * (trial?.assumptions.unitBuild ?? c.unitBuild) + (layout.conversionCost ?? 0);
-    const retainedForLayout = (credited ?? 0) - (lease ? 0 : layout.lostAnnualCash ?? 0);
-    const layoutCash = trial?.assumptions.creditCash === false ? Math.min(0,retainedForLayout) : retainedForLayout;
-    const staffing = Math.ceil(layout.stalls / c.perPost) * (trial?.assumptions.attendant ?? c.attendant);
-    const upkeep = c.fixed + c.insurance + Math.ceil(layout.stalls / c.ports) * c.perCharger;
-    const scenario = (volume: number, upgrade: number): RangeCase => {
-      const sessions = layout.stalls * chargesPerStall * volume;
-      const annualCost = annualProperty + (build + upgrade) * (recovery + c.tax!) + staffing + upkeep - layoutCash;
-      return {sessions, upgrade, annualCost, perCharge:annualCost / sessions};
+    const ledger:LedgerBasis = {
+      terms, creditCash:trial?.assumptions.creditCash, condition:layout.condition, space, priceBasis, cashBasis, hypothetical:trial?.hypothetical??false,
+      parcel:layout.parcel, conversionRecorded:layout.conversionCost!=null, displacedRecorded:layout.lostAnnualCash!=null,
+      workbookDefaults:trial ? {volume:100,unitBuild:c.unitBuild,postCost:c.attendant,upgrade:c.upgrade,cash:credited??0} : undefined,
+      source:lease || filed ? null : research?.source, date:lease || filed ? null : research?.reviewedOn,
+      proxy:a.hub!=null ? a.hub/c.charges : null,
+      inputs:{stalls:layout.stalls, volume:trial?.assumptions.volume??100, benchmark:c.charges, referenceYears:a.horizon, referenceStalls:a.demand,
+        price, years:a.horizon, rate:a.capital*100, closing:a.closing*100, unitBuild:trial?.assumptions.unitBuild??c.unitBuild, upgrade,
+        tax:c.tax*100, postCost:trial?.assumptions.attendant??c.attendant, perPost:c.perPost, fixed:c.fixed, insurance:c.insurance,
+        ports:c.ports, perCharger:c.perCharger, cash:credited??0, conversion:layout.conversionCost??0, displaced:lease?0:layout.lostAnnualCash??0},
     };
-    costed.push({...layout, ...(layout.parcel ? {layoutCash} : {}), build, staffing, upkeep, base:scenario(1, upgrade), downside:scenario(0.75, upgrade * 1.5)});
+    const base=screenLedger(ledger), downside=screenLedger(ledger,{},3);
+    if(base.perCharge==null || downside.perCharge==null) continue;
+    const range=(r:typeof base):RangeCase=>({sessions:r.sessions,upgrade:r.upgrade,annualCost:r.annualCost,perCharge:r.perCharge!});
+    costed.push({...layout, ...(layout.parcel?{layoutCash:-base.costs.cash-base.costs.displaced}:{}), ledger, build:base.build, staffing:base.costs.staffing, upkeep:base.costs.upkeep,
+      base:range(base), downside:range(downside)});
   }
-  return {layouts:costed, space:fit?.value ?? "unmeasured", price, terms:lease ? "lease" : "purchase",
-    priceBasis:filed ? "Filed test price · confirm the offering" : lease ? "Selected charging lease" : research?.basis || "Workbook property ask",
-    cash, cashBasis:cash === 0 || credited == null ? "No business income credited" : filed ? "Retained cash in filed test" : "Workbook retained annual cash",
+  if (!costed.length) return {reason:"No completed charges in this layout"};
+  return {layouts:costed, space, price, terms, priceBasis, cash, cashBasis,
     years:a.horizon, capital:a.capital, closing:a.closing, tax:c.tax};
 }

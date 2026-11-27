@@ -556,7 +556,7 @@ export default function MainMapSpaces({
                 <label>Stall angle<select aria-label="Stall angle" className="secondary" value={angle} onChange={e=>setAngle(Number(e.target.value) as Angle)}>{[90,60,45].map(a=><option key={a} value={a}>{a}°</option>)}</select></label></div>}
               {(selectedCase || rowTrial) && <p aria-live="polite"><strong>{sketch ? sketch.stalls.length+" stalls sketched" : "Layout needs measurement"}</strong>
                 {sketch && " · Blue stalls and amber drive aisle."} {sketch?.approach && "Dashed line shows the proposed entry route."} {selectedCase?.condition || (rowTrial && (angle===90 ? "Verify the two-way approach and peak availability." : "Verify one-way entry, exit and peak availability."))} {rowTrial && active?.kind === "ground" && "Development scenario. Verify buildable limits, drainage and paving cost."}</p>}
-              {selectedCase && <a className="text-link" href={"/charging?site="+site.id+"&view=explain"}>See cost per charge</a>}
+              {selectedCase && <a className="text-link" href={"/charging?"+new URLSearchParams({site:site.id,view:"explain",basis:"screen",layout:selectedCase.name,returnTo:"/?"+new URLSearchParams({spaces:"1",spaceSite:site.id})})}>See cost per charge</a>}
             </div> : null}
             {site && !active && (
               <>

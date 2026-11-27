@@ -18,6 +18,7 @@ import FinancialPortfolio from "./FinancialPortfolio";
 import { PurchaseScenarios } from "./PurchaseScenarios";
 import { purchaseLabels, financialEvidence } from "@/lib/purchaseReview";
 import { acquisitionShortlist, reviewLabel, reviewReturn } from "@/lib/reviewNavigation";
+import MapPanelGrip from "./MapPanelGrip";
 import MapSitePreview from "./MapSitePreview";
 import Detail, { DealDetail, UnscreenedDetail } from "./Detail";
 import { PanelBoundary } from "./PanelBoundary";
@@ -67,7 +68,7 @@ import type { GroundBox } from "@/lib/spaces/measure";
 import type { SpaceLayout, SpaceType } from "@/lib/spaces/vocab";
 import { patchLiveStage, preservePendingStage, STAGE_REFRESH_EVENT, type StageRefresh } from "@/lib/stageOverlay";
 import { linkedPnlIds, linksFromRecords } from "@/lib/pnl/ids";
-import { placeReadableTip } from "@/lib/tipPlace";
+import { mapChromeBoxes, placeReadableTip } from "@/lib/tipPlace";
 import { droppedDealsShown, parsePipeView } from "@/lib/pipeStage";
 import AlertSettings from "./alerts/AlertSettings";
 import CommandSearch from "./CommandSearch";
@@ -260,17 +261,10 @@ export default function Explorer() {
     const bounds = map
       ? { left: map.left, top: map.top, right: map.right, bottom: map.bottom }
       : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
-    const obstacles = ["aside.drawer", "aside.layers.open", ".map-float"].flatMap((selector) => {
-      const node = document.querySelector(selector);
-      if (!node) return [];
-      const rect = node.getBoundingClientRect();
-      if (rect.width < 8 || rect.height < 8) return [];
-      return [{ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }];
-    });
     const placed = placeReadableTip({
       cursor: ringCursor,
       bounds,
-      obstacles,
+      obstacles: mapChromeBoxes(),
       widths: [248, 200],
       measure: (width) => {
         note.style.width = `${width}px`;
@@ -3186,11 +3180,11 @@ export default function Explorer() {
           />
         ) : null}
         </PanelBoundary>
-        <aside className={`layers ${layersOpen ? "open" : ""}`} data-testid="layers-panel">
+        <aside data-map-panel="layers" className={`layers ${layersOpen ? "open" : ""}`} data-testid="layers-panel">
           {layersOpen ? (
             <>
               <div className="layers-bar">
-                <p className="eyebrow">Layers</p>
+                <div className="panel-grip-row"><MapPanelGrip label="Layers" /><p className="eyebrow">Layers</p></div>
                 <button type="button" className="close" aria-label="Close layers" onClick={() => chooseLayers(false)}><span aria-hidden="true">×</span></button>
               </div>
               <div className="layers-body">
@@ -3268,6 +3262,7 @@ export default function Explorer() {
             </>
           ) : (
             <div className="market-layer-tools">
+              <MapPanelGrip label="Layers" />
               {!inReview && !listView && !marking && <button type="button" className={activeMetric ? "tool on" : "tool"} aria-pressed={Boolean(activeMetric)}
                 onClick={()=>chooseMarketMetric(activeMetric ? null : "traffic")}>Market context</button>}
               <button type="button" className="paper-btn" aria-expanded={false} onClick={() => { chooseLayers(true); setFiltersOpen(false); setMenuOpen(false); }}>{powerMode ? "Layers · Power" : "Layers"}</button>
@@ -3298,10 +3293,12 @@ export default function Explorer() {
             ) : null}
 
             {!selected && !inReview && <div className="only-mobile">{mapCoverage}</div>}
-            <aside className={`map-key ${keyOpen ? "key-expanded" : ""}`} aria-label="Key">
+            <aside data-map-panel="key" className={`map-key ${keyOpen ? "key-expanded" : ""}`} aria-label="Key">
+              <div className="panel-grip-row key-grip-row"><MapPanelGrip label="Map key" />
               <button type="button" className="paper-btn key-toggle" aria-expanded={keyOpen} aria-controls="map-key-items" onClick={() => setKeyOpen(open => !open)}>
                 <span className="key-symbols" aria-hidden="true">● ◇</span> Map key
               </button>
+              </div>
               <ul id="map-key-items" hidden={!keyOpen}>
                 {funnel === "pipeline" ? <>
                   {Object.entries(actionColors).filter(([action])=>listDeals.some(d=>d.charging?.merit.action===action)).map(([action,color])=><li key={action}><i className="swatch pipeline-pin" style={{backgroundColor:color}}/>{action}</li>)}

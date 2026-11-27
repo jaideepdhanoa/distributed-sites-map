@@ -137,6 +137,7 @@ test("pipeline list shows unpinned Phoenix deals and the key-number strip", asyn
   await page.goto("/?funnel=pipeline&pstage=desk&view=list&site=PIPE-PHX-0067");
   await expect(page.getByTestId("overview-cash")).toBeVisible();
   await page.getByTestId("panel-tab-numbers").click();
+  await page.getByText("Supporting market and financial figures", {exact:true}).click();
   await expect(page.getByTestId("cash-flow-tile")).toBeVisible();
   await expect(page.getByTestId("key-strip")).toContainText("Broker-stated");
   await expect(page.getByTestId("key-strip")).not.toContainText("Package figures not shown");

@@ -172,3 +172,18 @@ test("the record keeps its identity while each section shows its own evidence", 
   await expect(overview.getByText("No layout estimate")).toBeVisible();
   await expect(overview.getByText("No charging case")).toBeVisible();
 });
+
+test("open the released map record and switch evidence sections", async ({page}) => {
+  test.skip(process.env.MAP_PRODUCTION_CHECK !== "1", "Runs on the signed-in release.");
+  await page.goto("/?city=MIA&funnel=pipeline&site=PIPE-MIA-0080&sheet=full");
+  const card = page.locator("aside.site-record");
+  // Only check structure and navigation. Keep production site content out of test output.
+  await expect(card.getByRole("heading", {level:2}).first()).toBeInViewport();
+  const overview = card.getByRole("tabpanel", {name:"Overview"});
+  await expect(overview.getByRole("region", {name:"Charging feasibility"})).toBeVisible();
+  for (const name of ["Site fit","Market","Financials","Diligence","Activity","Overview"]) {
+    await card.getByRole("tab", {name,exact:true}).click();
+    await expect(card.getByRole("tabpanel", {name,exact:true})).toBeVisible();
+    expect(await card.getByRole("tabpanel").count()).toBe(1);
+  }
+});

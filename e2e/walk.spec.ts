@@ -42,6 +42,7 @@ test("unknown or zero open land says it is not on file", async ({ page }, info) 
   await missing.click();
   await page.waitForSelector("[data-testid=card-numbers]");
   await page.getByRole("tab", {name:"Site fit",exact:true}).click();
+  await page.getByText("Parcel and source readings", {exact:true}).click();
   const land = page.locator("#panel-numbers [data-evidence=open-land] + div");
   await expect(land).toHaveText(/Not on file|—/);
 });

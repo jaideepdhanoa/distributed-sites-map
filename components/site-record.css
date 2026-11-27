@@ -105,3 +105,6 @@
 @media (min-width: 380px) and (max-width: 767px) {
   .site-record > .panel-tabs { gap: 12px; }
 }
+.site-record .record-snapshot dl > div:has(.figure-hold), .site-record .record-snapshot dl > div:has(dd > strong) {
+  min-height: 72px;
+}

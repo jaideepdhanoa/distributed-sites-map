@@ -54,7 +54,7 @@ test("a deal with a site folder shows it next to the map and listing links", asy
   await expect(figures).toContainText("Earlier stall estimate");
   await expect(figures).toContainText("Space");
   await expect(figures).toContainText("Power");
-  await expect(figures).toContainText("Attractiveness");
+  await expect(figures).toContainText("Supporting market and financial figures");
   if ((page.viewportSize()?.width ?? 1440) < 768) {
     const next = new URL(page.url());
     next.searchParams.set("sheet", "half");

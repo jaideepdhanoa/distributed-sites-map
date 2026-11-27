@@ -219,7 +219,8 @@ function SiteSnapshot({ site, deal, signedIn, tiles, pending }: {
   const cash = deal && cashTile(deal);
   const revenue = deal && revenueTile(deal);
   const showIncome = signedIn && cash && !cash.hidden;
-  const terms = deal?.asking_price_display || deal?.asking_price != null ? deal : site;
+  const hasDealAsk = deal?.asking_price_display || deal?.asking_price != null;
+  const terms = hasDealAsk ? deal : site;
   const ask = sheetMoney(terms?.asking_price, terms?.asking_price_display);
   const statementLabel = tiles?.cash.note.split(" · ")[0];
   const cashLabel = statementLabel || deal?.cash_flow_label || "Cash flow";
@@ -527,7 +528,7 @@ export default function Detail({
     />
   );
   return (
-    <RecordDrawer id={site.site_id} name={site.name} address={site.address} context={[cityLabel(site.city), site.business_type || (site.land_only ? "Land" : "Universe site")].filter(Boolean).join(" · ")}
+    <RecordDrawer key={site.site_id} id={site.site_id} name={site.name} address={site.address} context={[cityLabel(site.city), site.business_type || (site.land_only ? "Land" : "Universe site")].filter(Boolean).join(" · ")}
       status={<DecisionChips deal={linkedDeal} waiting={waitingChip} />} banner={banner} sheet={sheet} onClose={onClose} onSwipe={onSwipe} signedIn={signedIn}
       tools={<>
         {locationFix ? <LocationFix id={site.site_id} mode={locationFix} address={site.address || ""} lat={lat} lng={lng} /> : null}
@@ -685,37 +686,39 @@ export default function Detail({
             {signedIn && <SpaceSummary count={spaceCount} slots={spaceSlots} sqft={spaceSqft} note={spaceNote} onMark={onMarkSpace} />}
             {signedIn && savedLots}
             <SitePacket power={power} site={site} deal={linkedDeal} hasPin={lat != null && lng != null} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} />
-            <div className="kv">
-              <span data-evidence="asking">Asking price</span>
-              <div>
-                {price || "—"}
-                {site.asking_price_source ? ` · ${site.asking_price_source}` : ""}
-              </div>
-              <span data-evidence="land">Lot</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : acres(site.lot_ac)}{site.parcel_acres != null || site.lot_ac_source ? ` · ${site.lot_ac_source || "County assessor"}` : ""}</div>
-              <span data-evidence="open-land">Open land</span><div title={isOpenLandBlank(spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own, linkedDeal?.open_land_basis).value) ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own, linkedDeal?.open_land_basis); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
-              <span data-evidence="power">Power</span>
-              <div><CapacityFacts facts={factsForSite(site, linkedDeal)} /></div>
-              <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
-              <span data-evidence="zoning">Zoning</span><div>{site.zoning || "—"}{site.zoning_source ? ` · ${site.zoning_source}` : ""}</div>
-              <span data-evidence="traffic">Traffic</span><div title={universeTrafficLine(site) ? undefined : "Not on file"}>{universeTrafficLine(site) || "—"}</div>
-              <span>Flood</span><div>{site.flood_zone || "—"}</div>
-              <span>Year built</span><div>{site.year_built || "—"}</div>
-              <span>County assessed value</span><div>{site.assessed_value_display || "—"}</div>
-              <span>County full cash value</span><div>{site.full_cash_value_display || "—"}</div>
-              <span>Last recorded sale</span><div>{[formatRecordedDate(site.last_sale_date), site.last_sale_price_display].filter(Boolean).join(" · ") || "—"}</div>
-            </div>
-            {site.listed && site.in_area && site.apn ? (
-              <>
-                <h3>County record</h3>
-                <span className="badge checked">County record pulled</span>
-                <div className="kv">
-                  <span>Acres</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : site.lot_ac != null ? `${site.lot_ac} ac` : "—"}</div>
-                  <span>Owner</span><div>{site.owner || "—"}</div>
-                  <span>Land use</span><div>{site.land_use || site.zoning || "—"}</div>
-                  <span>County link</span><div>{site.county_url ? <a href={site.county_url} target="_blank" rel="noopener noreferrer">Open county record</a> : "—"}</div>
+            <details className="disclosure record-disclosure"><summary className="disclosure">Parcel and source readings</summary>
+              <div className="kv">
+                <span data-evidence="asking">Asking price</span>
+                <div>
+                  {price || "—"}
+                  {site.asking_price_source ? ` · ${site.asking_price_source}` : ""}
                 </div>
-              </>
-            ) : null}
+                <span data-evidence="land">Lot</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : acres(site.lot_ac)}{site.parcel_acres != null || site.lot_ac_source ? ` · ${site.lot_ac_source || "County assessor"}` : ""}</div>
+                <span data-evidence="open-land">Open land</span><div title={isOpenLandBlank(spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own, linkedDeal?.open_land_basis).value) ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(linkedDeal?.open_land_sqft, site.spare_ac_own, linkedDeal?.open_land_basis); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
+                <span data-evidence="power">Power</span>
+                <div><CapacityFacts facts={factsForSite(site, linkedDeal)} /></div>
+                <span>Adjoining</span><div>{acres(site.spare_ac_adjoining, site.spare_ac_adjoining_text)}</div>
+                <span data-evidence="zoning">Zoning</span><div>{site.zoning || "—"}{site.zoning_source ? ` · ${site.zoning_source}` : ""}</div>
+                <span data-evidence="traffic">Traffic</span><div title={universeTrafficLine(site) ? undefined : "Not on file"}>{universeTrafficLine(site) || "—"}</div>
+                <span>Flood</span><div>{site.flood_zone || "—"}</div>
+                <span>Year built</span><div>{site.year_built || "—"}</div>
+                <span>County assessed value</span><div>{site.assessed_value_display || "—"}</div>
+                <span>County full cash value</span><div>{site.full_cash_value_display || "—"}</div>
+                <span>Last recorded sale</span><div>{[formatRecordedDate(site.last_sale_date), site.last_sale_price_display].filter(Boolean).join(" · ") || "—"}</div>
+              </div>
+              {site.listed && site.in_area && site.apn ? (
+                <>
+                  <h3>County record</h3>
+                  <span className="badge checked">County record pulled</span>
+                  <div className="kv">
+                    <span>Acres</span><div>{site.parcel_acres != null ? `${site.parcel_acres} ac` : site.lot_ac != null ? `${site.lot_ac} ac` : "—"}</div>
+                    <span>Owner</span><div>{site.owner || "—"}</div>
+                    <span>Land use</span><div>{site.land_use || site.zoning || "—"}</div>
+                    <span>County link</span><div>{site.county_url ? <a href={site.county_url} target="_blank" rel="noopener noreferrer">Open county record</a> : "—"}</div>
+                  </div>
+                </>
+              ) : null}
+            </details>
           </>
         ) : <p className="note">Loading figures</p>}
         activity={<>{signedIn && linkedDeal?.opportunityReview && <WorkbookActivity id={linkedDeal.deal_id}/>}<Timeline recordId={site.site_id} relatedId={site.linked_deal_id || ""} ndaId={linkedDeal?.nda_id || ""} onOpenNda={onOpenNda} /></>}
@@ -834,7 +837,7 @@ export function DealDetail({
     />
   );
   return (
-    <RecordDrawer id={deal.deal_id} name={deal.name} address={deal.address} context={[cityLabel(deal.city), deal.business_type || (deal.kind === "land" ? "Land" : "Pipeline site")].filter(Boolean).join(" · ")}
+    <RecordDrawer key={deal.deal_id} id={deal.deal_id} name={deal.name} address={deal.address} context={[cityLabel(deal.city), deal.business_type || (deal.kind === "land" ? "Land" : "Pipeline site")].filter(Boolean).join(" · ")}
       status={<DecisionChips deal={deal} waiting={waiting} extras={gap ? [gap] : []} testId="header-chips" />} banner={banner} sheet={sheet} onClose={onClose} onSwipe={onSwipe} signedIn={signedIn}
       tools={<>
         {locationFix ? <LocationFix id={deal.deal_id} mode={locationFix} address={deal.address || ""} lat={lat} lng={lng} /> : null}
@@ -912,23 +915,25 @@ export function DealDetail({
             {signedIn && savedLots}
             {figuresReady ? <KeyStrip power={power} deal={deal} hasPin={hasPin} peers={peers || []} universeSite={universeSite} signedIn={signedIn} tiles={pnl.tiles} pending={figuresPending} /> : null}
             <ChipRow chips={diligence} testId="diligence-strip" titled />
-            <div className="kv">
-              <span data-evidence="asking">Asking price</span>
-              <div>
-                {signedIn ? (deal.asking_price_display || "—") : "—"}
-                {signedIn && shownPriceSource(deal) ? ` · ${shownPriceSource(deal)}` : ""}
+            <details className="disclosure record-disclosure"><summary className="disclosure">Parcel and source readings</summary>
+              <div className="kv">
+                <span data-evidence="asking">Asking price</span>
+                <div>
+                  {signedIn ? (deal.asking_price_display || "—") : "—"}
+                  {signedIn && shownPriceSource(deal) ? ` · ${shownPriceSource(deal)}` : ""}
+                </div>
+                <span data-evidence="per-acre">Per acre</span>
+                <div>{signedIn && deal.price_per_acre != null ? fullMoney(deal.price_per_acre) : "—"}</div>
+                <span data-evidence="open-land">Open land</span>
+                <div title={isOpenLandBlank(spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own, deal.open_land_basis).value) ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own, deal.open_land_basis); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
+                <span data-evidence="power">Power</span>
+                <div><CapacityFacts facts={factsForDeal(deal)} /></div>
+                {signedIn && !cash.hidden ? <span data-evidence="revenue">Revenue</span> : null}
+                {signedIn && !cash.hidden ? (figuresPending ? <div data-testid="summary-revenue" aria-busy="true"><span className="skeleton figure-line" data-testid="figure-loading" /><span className="sr">Loading figures</span></div> : <div data-testid="summary-revenue" title={(pnl.tiles?.revenue || revenue).title}>{pnl.tiles ? [pnl.tiles.revenue.text, pnl.tiles.revenue.note].filter(Boolean).join(" · ") : [revenue.text, deal.revenue_basis].filter(Boolean).join(" · ")}</div>) : null}
+                {signedIn && !cash.hidden ? <span data-evidence="cash-flow">Cash flow</span> : null}
+                {signedIn && !cash.hidden ? (figuresPending ? <div data-testid="summary-cash" aria-busy="true"><span className="skeleton figure-line" data-testid="figure-loading" /><span className="sr">Loading figures</span></div> : <div data-testid="summary-cash" title={pnl.tiles?.cash.title || (cash.value === "—" ? "Not on file" : cash.value)}>{pnl.tiles ? [pnl.tiles.cash.text, pnl.tiles.cash.note].filter(Boolean).join(" · ") : [cash.value || "—", cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · ")}</div>) : null}
               </div>
-              <span data-evidence="per-acre">Per acre</span>
-              <div>{signedIn && deal.price_per_acre != null ? fullMoney(deal.price_per_acre) : "—"}</div>
-              <span data-evidence="open-land">Open land</span>
-              <div title={isOpenLandBlank(spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own, deal.open_land_basis).value) ? "Not on file" : undefined}>{(() => { const spare = spareLandSqft(deal.open_land_sqft, universeSite?.spare_ac_own, deal.open_land_basis); return spare.note ? `${spare.value} · ${spare.note}` : spare.value; })()}</div>
-              <span data-evidence="power">Power</span>
-              <div><CapacityFacts facts={factsForDeal(deal)} /></div>
-              {signedIn && !cash.hidden ? <span data-evidence="revenue">Revenue</span> : null}
-              {signedIn && !cash.hidden ? (figuresPending ? <div data-testid="summary-revenue" aria-busy="true"><span className="skeleton figure-line" data-testid="figure-loading" /><span className="sr">Loading figures</span></div> : <div data-testid="summary-revenue" title={(pnl.tiles?.revenue || revenue).title}>{pnl.tiles ? [pnl.tiles.revenue.text, pnl.tiles.revenue.note].filter(Boolean).join(" · ") : [revenue.text, deal.revenue_basis].filter(Boolean).join(" · ")}</div>) : null}
-              {signedIn && !cash.hidden ? <span data-evidence="cash-flow">Cash flow</span> : null}
-              {signedIn && !cash.hidden ? (figuresPending ? <div data-testid="summary-cash" aria-busy="true"><span className="skeleton figure-line" data-testid="figure-loading" /><span className="sr">Loading figures</span></div> : <div data-testid="summary-cash" title={pnl.tiles?.cash.title || (cash.value === "—" ? "Not on file" : cash.value)}>{pnl.tiles ? [pnl.tiles.cash.text, pnl.tiles.cash.note].filter(Boolean).join(" · ") : [cash.value || "—", cash.note, basisBadge(deal.earnings_basis) || basisBadge(cash.basis)].filter(Boolean).join(" · ")}</div>) : null}
-            </div>
+            </details>
           </>
         }
         activity={<>{signedIn && deal.opportunityReview && <WorkbookActivity id={deal.deal_id}/>}<Timeline recordId={deal.deal_id} relatedId={deal.universe_id || ""} ndaId={deal.nda_id || ""} onOpenNda={onOpenNda} /></>}
@@ -968,7 +973,7 @@ export function UnscreenedDetail({
   sheet?: SheetControl;
 }) {
   return (
-    <RecordDrawer id={row.listing_id} name={row.name} address={row.address} context={row.kind} navigation={false}
+    <RecordDrawer key={row.listing_id} id={row.listing_id} name={row.name} address={row.address} context={row.kind} navigation={false}
       signedIn={signedIn} sheet={sheet} onClose={onClose}
       status={<div className="card-chips">
         <span className="badge quiet">Listed, not yet screened</span>
@@ -976,27 +981,28 @@ export function UnscreenedDetail({
         {!row.pinned && <span className="badge quiet">Address withheld</span>}
       </div>}>
       <RecordBrief listing={row} signedIn={signedIn} />
-      <details className="disclosure record-disclosure"><summary className="disclosure">Listing details</summary>
-      <p className="note">{row.listing_id}</p>
-      {mapsLinks(lat, lng)}
-      <h3>Listing</h3>
-      <div className="kv">
-        <span>Type</span><div>{row.kind}</div>
-        <span data-evidence="asking">Asking price</span>
-        <div>
-          {row.asking_price_display || "Not published"}
-          {row.asking_price_source ? ` · ${row.asking_price_source}` : ""}
+      <details className="disclosure record-disclosure">
+        <summary className="disclosure">Listing details</summary>
+        <p className="note">{row.listing_id}</p>
+        {mapsLinks(lat, lng)}
+        <h3>Listing</h3>
+        <div className="kv">
+          <span>Type</span><div>{row.kind}</div>
+          <span data-evidence="asking">Asking price</span>
+          <div>
+            {row.asking_price_display || "Not published"}
+            {row.asking_price_source ? ` · ${row.asking_price_source}` : ""}
+          </div>
+          <span>Acres</span><div>{row.acres_text || (row.acres != null ? `${row.acres} ac` : "—")}</div>
+          <span>Listing</span>
+          <div>
+            {row.listing_url ? (
+              <a href={row.listing_url} target="_blank" rel="noopener noreferrer">View listing</a>
+            ) : (
+              "No listing link on file"
+            )}
+          </div>
         </div>
-        <span>Acres</span><div>{row.acres_text || (row.acres != null ? `${row.acres} ac` : "—")}</div>
-        <span>Listing</span>
-        <div>
-          {row.listing_url ? (
-            <a href={row.listing_url} target="_blank" rel="noopener noreferrer">View listing</a>
-          ) : (
-            "No listing link on file"
-          )}
-        </div>
-      </div>
       </details>
     </RecordDrawer>
   );

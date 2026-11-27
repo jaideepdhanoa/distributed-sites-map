@@ -22,14 +22,15 @@ export function RecordRecommendation({review, active}: RecommendationProps) {
   const primary = review.primary;
   const visit = active && primary.disposition === "Shortlist" ? review.visitPlan : undefined;
   return <section className="acquisition-brief" aria-label="Team recommendation">
-    <div className="recommendation-body"><small className="recommendation-label">Team recommendation{primary.rank != null && " · All markets"}</small>
-    <h3>{recommendation(primary)}</h3>
-    {primary.route !== "Site lead" && <small>{primary.route}</small>}
-    {visit && <p>{visit.reason}</p>}
-    {primary.dropReason && <p><b>Reason</b> · {primary.dropReason}</p>}
-    <p className="recommended-next"><b>{visit ? "Visit decision" : ["Dropped","Archive listing","Outside mandate","Watch availability","Off-market prospect"].includes(primary.disposition) ? "Reconsider when" : "Next step"}</b> {nextDecision(review, primary)}</p>
-    <small>{primary.owner ? "Owner · " + primary.owner : "Decision owner unassigned"}{primary.revisitOn && <> · Review <time dateTime={primary.revisitOn}>{primary.revisitOn}</time></>}</small></div>
-
+    <div className="recommendation-body">
+      <small className="recommendation-label">Team recommendation{primary.rank != null && " · All markets"}</small>
+      <h3>{recommendation(primary)}</h3>
+      {primary.route !== "Site lead" && <small>{primary.route}</small>}
+      {visit && <p>{visit.reason}</p>}
+      {primary.dropReason && <p><b>Reason</b> · {primary.dropReason}</p>}
+      <p className="recommended-next"><b>{visit ? "Visit decision" : ["Dropped","Archive listing","Outside mandate","Watch availability","Off-market prospect"].includes(primary.disposition) ? "Reconsider when" : "Next step"}</b> {nextDecision(review, primary)}</p>
+      <small>{primary.owner ? "Owner · " + primary.owner : "Decision owner unassigned"}{primary.revisitOn && <> · Review <time dateTime={primary.revisitOn}>{primary.revisitOn}</time></>}</small>
+    </div>
   </section>;
 }
 

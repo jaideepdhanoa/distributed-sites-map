@@ -111,6 +111,7 @@ jobs:
             sleep 10
           done
           npx playwright test e2e/map-journey.spec.ts
+          npx playwright test e2e/acquisition-navigation.spec.ts --grep "open the released map record"
           npx playwright test e2e/layout-options.spec.ts --grep "open a released outline"
           npx playwright test e2e/selection-review.spec.ts --grep "released selection"
           npx playwright test e2e/purchase-review.spec.ts --grep "open released financials"

@@ -63,9 +63,10 @@ export default function PanelSections({
     let frame = 0;
     const align = () => {
       const evidence = panel === "space-options" ? "space-options" : panel === "market-context" ? "market-context" : panel === "open-land" ? "open-land" : panel === "numbers" ? numberEvidence[measure] : "";
-      const target = evidence ? node.querySelector<HTMLElement>(`[data-evidence="${CSS.escape(evidence)}"]`)
-        : panel === "economics" && measure ? node.querySelector<HTMLElement>(`[data-financial-measure="${CSS.escape(measure)}"]`)
-        : panel === "discussion" && note ? node.querySelector<HTMLElement>(`[data-note-id="${CSS.escape(note)}"]`) : null;
+      const visible = node.querySelector<HTMLElement>('[role="tabpanel"]:not([hidden])');
+      const target = evidence ? visible?.querySelector<HTMLElement>(`[data-evidence="${CSS.escape(evidence)}"]`)
+        : panel === "economics" && measure ? visible?.querySelector<HTMLElement>(`[data-financial-measure="${CSS.escape(measure)}"]`)
+        : panel === "discussion" && note ? visible?.querySelector<HTMLElement>(`[data-note-id="${CSS.escape(note)}"]`) : null;
       if (target) {
         for (let parent: HTMLElement | null = target; parent && parent !== node; parent = parent.parentElement) {
           if (parent instanceof HTMLDetailsElement && !parent.open) parent.open = true;
@@ -112,7 +113,7 @@ export default function PanelSections({
           <p className="layer-meta">No intel is recorded for this site.</p>
         </section>
       ) : null}
-      {TABS.filter(([id]) => id === tab || id === "numbers" || id === "discussion").map(([id]) => (
+      {TABS.filter(([id]) => id === tab || id === "overview" || id === "numbers" || id === "discussion").map(([id]) => (
         <div key={id} id={`panel-${id}`} role="tabpanel" aria-labelledby={`record-tab-${id}`} hidden={tab !== id}>
           {panels[id]}
         </div>

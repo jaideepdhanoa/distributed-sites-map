@@ -106,11 +106,13 @@ export function SitePacket({
         <Metric icon={Trees} label="Open land" value={spare.value} note={spare.note} title={isOpenLandBlank(spare.value) ? "Not on file" : undefined} />
       </div>
       <PowerEvidence {...(power || {site})} signedIn={signedIn} />
-      <h3 className="job">Attractiveness</h3>
-      <div className="metrics">
-        {asking ? <Metric icon={Wallet} label="Asking" value={asking} title={asking} /> : <Metric icon={Wallet} label="Asking" value="—" title="Not on file" />}
-        <Metric icon={Ruler} label="Depot" value={depotLine(site.miles_to_depot, hasPin)} />
-      </div>
+      <details className="disclosure record-disclosure">
+        <summary className="disclosure">Supporting market and financial figures</summary>
+        <div className="metrics">
+          {asking ? <Metric icon={Wallet} label="Asking" value={asking} title={asking} /> : <Metric icon={Wallet} label="Asking" value="—" title="Not on file" />}
+          <Metric icon={Ruler} label="Depot" value={depotLine(site.miles_to_depot, hasPin)} />
+        </div>
+      </details>
     </section>
   );
 }
@@ -214,64 +216,66 @@ export default function KeyStrip({
         <Metric icon={Ruler} label="Earlier stall estimate" value={bays ? bays.replace("Bays that fit ", "") : "—"} title={bays ? undefined : "Not on file"} />
       </div>
       <PowerEvidence {...(power || {deal,site:universeSite})} signedIn={signedIn} />
-      <h3 className="job">Attractiveness</h3>
-      <div className="metrics">
-        {signedIn && showFinancials ? (
-          <article className="wide">
-            {pending ? (
-              <div className="fin-tile" data-testid="revenue-tile" aria-busy="true">
-                <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Revenue</span>
-                <PendingFigure />
-              </div>
-            ) : (
-              <button type="button" className="fin-tile" data-testid="revenue-tile" onClick={() => {setFigure("revenue"); setFinancialsOpen(true);}}>
-                <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Revenue</span>
-                <strong title={(tiles?.revenue || revenue).title}>{(tiles?.revenue || revenue).text}</strong>
-                <small className="figure-hold">{tiles ? tiles.revenue.note : (deal.revenue_period || "")}</small>
-                {tiles ? null : revenueBasis ? <em>{revenueBasis}</em> : null}
-              </button>
-            )}
-          </article>
+      <details className="disclosure record-disclosure">
+        <summary className="disclosure">Supporting market and financial figures</summary>
+        <div className="metrics">
+          {signedIn && showFinancials ? (
+            <article className="wide">
+              {pending ? (
+                <div className="fin-tile" data-testid="revenue-tile" aria-busy="true">
+                  <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Revenue</span>
+                  <PendingFigure />
+                </div>
+              ) : (
+                <button type="button" className="fin-tile" data-testid="revenue-tile" onClick={() => {setFigure("revenue"); setFinancialsOpen(true);}}>
+                  <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> Revenue</span>
+                  <strong title={(tiles?.revenue || revenue).title}>{(tiles?.revenue || revenue).text}</strong>
+                  <small className="figure-hold">{tiles ? tiles.revenue.note : (deal.revenue_period || "")}</small>
+                  {tiles ? null : revenueBasis ? <em>{revenueBasis}</em> : null}
+                </button>
+              )}
+            </article>
+          ) : null}
+          {signedIn && !cash.hidden && showFinancials ? (
+            <article className="wide">
+              {pending ? (
+                <div className="fin-tile" data-testid="cash-flow-tile" aria-busy="true">
+                  <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> {tiles?.cash.note.split(" · ")[0] || deal.cash_flow_label || "Cash flow"}</span>
+                  <PendingFigure />
+                </div>
+              ) : (
+                <button type="button" className="fin-tile" data-testid="cash-flow-tile" onClick={() => {setFigure("earnings"); setFinancialsOpen(true);}}>
+                  <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> {tiles?.cash.note.split(" · ")[0] || deal.cash_flow_label || "Cash flow"}</span>
+                  <strong title={tiles?.cash.title || cashView.title}>{tiles?.cash.text || cashView.text}</strong>
+                  <small className="figure-hold">{tiles ? tiles.cash.note : cashNote}</small>
+                  {tiles ? null : cashBasis ? <em>{cashBasis}</em> : null}
+                </button>
+              )}
+            </article>
+          ) : null}
+          <Metric icon={Wallet} label="Asking" value={signedIn ? askingText : "—"} title={signedIn ? askingText : "—"} note={signedIn ? (shownPriceSource(deal) || "") : ""} basis={signedIn && deal.asking_price_display ? "Broker-stated" : ""} />
+          {trafficValue ? <Metric icon={Wallet} label="Nearest traffic" value={trafficValue} note={trafficNote} /> : null}
+          {deal.trade_aadt_max != null ? <Metric icon={Wallet} label="Max traffic" value={Math.round(deal.trade_aadt_max).toLocaleString()} note="Workbook trade area" /> : null}
+          {population ? <Metric icon={Wallet} label="3-mile population" value={population.replace("3-mile population ", "")} /> : null}
+          {washes ? <Metric icon={Wallet} label="Washes" value={washes.replace(/^Washes /, "")} /> : null}
+        </div>
+        {signedIn && showFinancials && financialsOpen && shownPanel ? createPortal(
+          <PnlOverlay statement={shownPanel.pnl ?? emptyStatement()} conflicts={conflicts} comments={comments} siteId={signedIn ? deal.deal_id : ""} initialGrain={card?.grain || grain} selection={selection} onClose={() => setFinancialsOpen(false)} onChecklist={() => setChecklistOpen(true)} />,
+          document.body,
         ) : null}
-        {signedIn && !cash.hidden && showFinancials ? (
-          <article className="wide">
-            {pending ? (
-              <div className="fin-tile" data-testid="cash-flow-tile" aria-busy="true">
-                <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> {tiles?.cash.note.split(" · ")[0] || deal.cash_flow_label || "Cash flow"}</span>
-                <PendingFigure />
-              </div>
-            ) : (
-              <button type="button" className="fin-tile" data-testid="cash-flow-tile" onClick={() => {setFigure("earnings"); setFinancialsOpen(true);}}>
-                <span><Banknote size={15} strokeWidth={1.75} aria-hidden="true" /> {tiles?.cash.note.split(" · ")[0] || deal.cash_flow_label || "Cash flow"}</span>
-                <strong title={tiles?.cash.title || cashView.title}>{tiles?.cash.text || cashView.text}</strong>
-                <small className="figure-hold">{tiles ? tiles.cash.note : cashNote}</small>
-                {tiles ? null : cashBasis ? <em>{cashBasis}</em> : null}
-              </button>
-            )}
-          </article>
+        {signedIn && showFinancials && checklistOpen && shownPanel?.open ? (
+          <FinancialsPanel dealId={deal.deal_id} initial={shownPanel} onClose={() => setChecklistOpen(false)} />
         ) : null}
-        <Metric icon={Wallet} label="Asking" value={signedIn ? askingText : "—"} title={signedIn ? askingText : "—"} note={signedIn ? (shownPriceSource(deal) || "") : ""} basis={signedIn && deal.asking_price_display ? "Broker-stated" : ""} />
-        {trafficValue ? <Metric icon={Wallet} label="Nearest traffic" value={trafficValue} note={trafficNote} /> : null}
-        {deal.trade_aadt_max != null ? <Metric icon={Wallet} label="Max traffic" value={Math.round(deal.trade_aadt_max).toLocaleString()} note="Workbook trade area" /> : null}
-        {population ? <Metric icon={Wallet} label="3-mile population" value={population.replace("3-mile population ", "")} /> : null}
-        {washes ? <Metric icon={Wallet} label="Washes" value={washes.replace(/^Washes /, "")} /> : null}
-      </div>
-      {signedIn && showFinancials && financialsOpen && shownPanel ? createPortal(
-        <PnlOverlay statement={shownPanel.pnl ?? emptyStatement()} conflicts={conflicts} comments={comments} siteId={signedIn ? deal.deal_id : ""} initialGrain={card?.grain || grain} selection={selection} onClose={() => setFinancialsOpen(false)} onChecklist={() => setChecklistOpen(true)} />,
-        document.body,
-      ) : null}
-      {signedIn && showFinancials && checklistOpen && shownPanel?.open ? (
-        <FinancialsPanel dealId={deal.deal_id} initial={shownPanel} onClose={() => setChecklistOpen(false)} />
-      ) : null}
 
-      <div className="supporting">
-        {growth ? <><span>Growth</span><strong>{growth.replace(/^Growth /, "")}</strong></> : null}
-        {income ? <><span>Income</span><strong>{income.replace(/^Income /, "")}</strong></> : null}
-        {signedIn && deal.price_per_acre != null ? <><span>Per acre</span><strong>{fullMoney(deal.price_per_acre)}</strong></> : null}
-        <span>Depot</span><strong>{depotLine(deal.miles_to_depot, hasPin)}</strong>
-        {deal.access_notes ? <><span>Access</span><strong data-testid="access-notes">{stripGmailIds(deal.access_notes)}</strong></> : null}
-        {listing.label ? <><span>Listing</span><strong>{listing.label}</strong></> : null}
-      </div>
+        <div className="supporting">
+          {growth ? <><span>Growth</span><strong>{growth.replace(/^Growth /, "")}</strong></> : null}
+          {income ? <><span>Income</span><strong>{income.replace(/^Income /, "")}</strong></> : null}
+          {signedIn && deal.price_per_acre != null ? <><span>Per acre</span><strong>{fullMoney(deal.price_per_acre)}</strong></> : null}
+          <span>Depot</span><strong>{depotLine(deal.miles_to_depot, hasPin)}</strong>
+          {deal.access_notes ? <><span>Access</span><strong data-testid="access-notes">{stripGmailIds(deal.access_notes)}</strong></> : null}
+          {listing.label ? <><span>Listing</span><strong>{listing.label}</strong></> : null}
+        </div>
+      </details>
     </section>
   );
 }

@@ -431,6 +431,7 @@ test("discussion stays a comment box, and a reviewer can accept a knock off", as
   await expect(page.getByTestId("proposed-next-step")).toContainText("Awaiting approval");
 
   await openAs(page, "reviewer", `/?funnel=pipeline&site=${target}`);
+  await page.getByRole("tab", { name: "Diligence", exact: true }).click();
   const card = page.getByTestId("proposed-next-step");
   await expect(card.getByRole("button", { name: "Send" })).toBeVisible();
   const storedStage = generatedDeal(target)?.stage;
@@ -769,7 +770,7 @@ for (const size of [
     expect(found.nda).toMatch(/^NDA-/);
     await page.goto(`/?funnel=pipeline&site=${found.deal}`);
     await page.getByRole("tab", {name:"Diligence",exact:true}).click();
-  await page.getByTestId("nda-open").click();
+    await page.getByTestId("nda-open").click();
     await expect(page.getByTestId("nda-detail")).toBeVisible();
     const text = `Sample note ${size.label} on the agreement.`;
     const discussion = page.getByTestId("nda-discussion");

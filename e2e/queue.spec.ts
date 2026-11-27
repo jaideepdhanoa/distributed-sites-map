@@ -747,11 +747,12 @@ for (const width of [1440, 390]) {
 
     await gap.evaluate(element => element.scrollIntoView({ block: "center", behavior: "instant" }));
     await capture("gap-action", gap);
-    await expect(drawer.getByTestId("next-step").getByRole("link", { name: "Open evidence thread" })).toHaveAttribute("href", new RegExp("note=" + gapId));
     await gap.getByRole("button", { name: "Open evidence thread" }).click();
+    await expect(drawer.getByTestId("next-step").getByRole("link", { name: "Open evidence thread" })).toHaveAttribute("href", new RegExp("note=" + gapId));
     const thread = drawer.locator('[data-note-id="' + gapId + '"]');
     await expect(thread).toContainText(gapText);
     expect(new URL(page.url()).searchParams.get("note")).toBe(gapId);
+    await drawer.getByRole("tab", {name:"Overview"}).click();
     await expect(brief.getByRole("time").first()).toBeAttached();
     await brief.locator("summary").filter({ hasText: "Earlier findings" }).click();
     await expect(brief).toContainText("Parcel boundary located.");
@@ -760,6 +761,7 @@ for (const width of [1440, 390]) {
     expect((await request.post("/api/actions/notes/" + gapId + "/resolve", { data: {} })).ok()).toBe(true);
     await page.reload();
     await expect(gap).toContainText("Evidence gap resolved");
+    await gap.getByRole("button", { name: "Open evidence thread" }).click();
     await expect(thread).toContainText("Field check confirmed");
     const jobs = page.getByRole("navigation",{name:"Acquisition workspace"});
     await jobs.getByRole("button",{name:"My work",exact:true}).click();
@@ -771,6 +773,7 @@ for (const width of [1440, 390]) {
     await hub.getByRole("button",{name:"Return to workspace"}).click();
     await expect(thread).toContainText("Field check confirmed");
 
+    await drawer.getByRole("tab", {name:"Overview"}).click();
     await expect(gap.getByRole("button", { name: "Propose gap action" })).toHaveCount(0);
   });
 }

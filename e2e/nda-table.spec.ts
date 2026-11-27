@@ -19,6 +19,7 @@ test("a site card opens its NDA and can come back", async ({ page }, info) => {
   await page.goto(`/?funnel=pipeline&site=${found.deal}`, { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("nda-site-thread")).toHaveCount(0);
   await expect(page.getByTestId("nda-view-all")).toHaveCount(0);
+  await page.getByRole("tab", { name: "Diligence", exact: true }).click();
   const card = page.getByTestId("nda-card-line");
   await expect(card).toBeVisible();
   if (info.project.name !== "mobile") await page.mouse.move(0, 0);

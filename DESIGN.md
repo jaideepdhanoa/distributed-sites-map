@@ -89,6 +89,8 @@ Pins, area strokes, and labels stay legible on imagery: cream edges, a dark halo
 
 A pin tap opens a compact preview with its screening status, strongest available fact, next check, and a single action to open the full record. Closing returns to the original map extent. Direct record links open the full record. The map key expands on request. Compare keeps acquisition criteria visible when values match or evidence is missing. Highlight differences distinguishes unlike values from evidence gaps and incompatible bases. Show all measures adds supporting information. Saved comparisons load current figures. Download dated snapshot captures the figures displayed to the signed-in reviewer.
 
+On desktop, the Map key, Nearby sites, Market context, Layers, Map tools, site preview and Spaces inspector each have a grip. Drag the grip to move the panel, or click it and choose a corner or Restore default position. Placement is a browser preference. Phone controls keep their sheet layout. Hide space details folds the Spaces inspector while keeping the footprint and edits available.
+
 ## Chips
 
 A chip, pill, or badge is a short label on one line. More than one word is fine: `Outside service area`, `Near, 4.2 mi`, `Financial screen`. It is not a sentence, and it does not join clauses with a middle dot.

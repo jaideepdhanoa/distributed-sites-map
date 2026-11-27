@@ -310,7 +310,7 @@ test("power follow-up stays with the selected map pin", async ({ page }, info) =
   }]}}));
   await page.goto("/?city=PHX&funnel=pipeline&pstage=all");
   const nearby = page.getByRole("complementary",{name:"Nearby sites"});
-  const toggle = nearby.getByRole("button",{name:/Nearby sites/});
+  const toggle = nearby.getByRole("button",{name:/^Nearby sites/});
   await expect(toggle).toBeVisible();
   if (await toggle.getAttribute("aria-expanded") === "false") await toggle.click();
   await nearby.locator("[data-nearby-id]").first().click();

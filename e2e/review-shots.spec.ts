@@ -419,7 +419,7 @@ test("map tools are one tap away and Layers restores the last explicit choice", 
   await page.reload();
   await expect(layers).toBeVisible();
   const tools = page.getByRole("group", { name: "Map tools" });
-  await expect(tools.getByText("Map tools")).toBeVisible();
+  await expect(tools.getByText("Map tools", { exact: true })).toBeVisible();
   await tools.getByTestId("measure").click();
   await expect(tools.getByTestId("measure-done")).toBeVisible();
   await tools.getByTestId("measure-done").click();

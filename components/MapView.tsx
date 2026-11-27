@@ -10,7 +10,7 @@ import type { NearbyWash } from "@/lib/nearbyWashes";
 import { areaTip, dealTip, depotTip, ringTip, siteTip, tipHtml, washTip, type TipModel } from "@/lib/markerTip";
 import { CLUSTER_SOURCE, PHONE_BUBBLE_PX, PIN_SPLIT_ZOOM, clusterBubbleLabel, countedPins, leafBounds, phoneBubbleRadius, takeSolo, type PinFeature } from "@/lib/mapClusters";
 import { mutedPositronStyle } from "@/lib/mutedStyle";
-import { AREA_TIP_DWELL_MS, placeReadableTip, type TipBox } from "@/lib/tipPlace";
+import { AREA_TIP_DWELL_MS, mapChromeBoxes, placeReadableTip } from "@/lib/tipPlace";
 import { dealLabelFeatures, publicDeal, type PinLabel } from "@/lib/keyNumbers";
 import { formatMarket, marketColor, type MarketMetric, type MarketRow } from "@/lib/marketContext";
 import { ringLine, depotRingFeatures, ringFrameCoordinates, ringStrokeMeets, type LngLatBounds } from "@/lib/depotRings";
@@ -20,6 +20,8 @@ import type { GroundBox } from "@/lib/spaces/measure";
 import type { MapOutline } from "./spaces/SpaceOptions";
 import { worldPoint } from "@/lib/spaces/options";
 import { navigateSpaces } from "@/lib/spaces/navigation";
+import { clearPanelPadding } from "@/lib/mapPanelPadding";
+import MapPanelGrip from "./MapPanelGrip";
 import MainMapSpaces from "./spaces/MainMapSpaces";
 import SpaceTools, { spaceIdAt } from "./spaces/SpaceTools";
 import type { SpaceShape } from "./spaces/SpacePopover";
@@ -144,6 +146,10 @@ function pointPadding(map: Map) {
     const headerBottom = shell?.querySelector(".bar")?.getBoundingClientRect().bottom || bounds.top;
     return { top: Math.max(0, headerBottom - bounds.top), bottom: Math.max(0, bounds.bottom - preview.getBoundingClientRect().top), left: 0, right: 0 };
   }
+  if (preview?.hasAttribute("data-placed")) {
+    return clearPanelPadding(map.getContainer().getBoundingClientRect(), preview.getBoundingClientRect(),
+      { top: 0, bottom: 0, left: 0, right: 0 });
+  }
   return { top: 0, bottom: 0, left: 0, right: drawerInset(map) };
 }
 
@@ -210,10 +216,11 @@ function fitMap(
   }
   const canvas = box.getBoundingClientRect();
   const scope = box.closest(".shell")?.querySelector("#workspace-scope")?.getBoundingClientRect();
-  const occupied = { top: 0, bottom: 0, left: 0, right: drawerInset(map) };
+  const occupied = window.matchMedia("(max-width: 767px)").matches
+    ? { top: 0, bottom: 0, left: 0, right: 0 } : pointPadding(map);
   if (scope && scope.height && scope.bottom > canvas.top && scope.top < canvas.bottom) {
-    if (scope.top < canvas.top + canvas.height / 2) occupied.top = scope.bottom - canvas.top;
-    else occupied.bottom = canvas.bottom - scope.top;
+    if (scope.top < canvas.top + canvas.height / 2) occupied.top = Math.max(occupied.top, scope.bottom - canvas.top);
+    else occupied.bottom = Math.max(occupied.bottom, canvas.bottom - scope.top);
   }
   const edge = (side: keyof typeof occupied, room: number) =>
     Math.min(Math.max(0, Math.max(options.padding[side], occupied[side] + 28) - (reserved[side] || 0)), Math.max(0, room * 0.66));
@@ -1032,7 +1039,7 @@ export default function MapView(props: Props) {
           fitMap(map, bounds, {
             padding: phone
               ? { top: 96, bottom: 120, left: 28, right: 28 }
-              : { top: 72, bottom: 64, left: 48, right: Math.max(48, drawerInset(map)) },
+              : { top: 72, bottom: 64, left: 48, right: 48 },
             maxZoom: 16,
             duration: reduce ? 0 : 450,
           });
@@ -1156,13 +1163,6 @@ export default function MapView(props: Props) {
         map.getCanvas().style.cursor = "";
       };
       hideGroupTip = hideTip;
-      const chromeBoxes = (): TipBox[] => ["aside.drawer", "aside.layers.open", ".map-float", ".maplibregl-ctrl-top-right"].flatMap((selector) => {
-        const node = document.querySelector(selector);
-        if (!node) return [];
-        const rect = node.getBoundingClientRect();
-        if (rect.width < 8 || rect.height < 8) return [];
-        return [{ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }];
-      });
       const placeTip = (point?: { x: number; y: number }, above = false) => {
         const box = map.getContainer().getBoundingClientRect();
         const cursor = point
@@ -1171,7 +1171,7 @@ export default function MapView(props: Props) {
         const placed = placeReadableTip({
           cursor,
           bounds: { left: box.left, top: box.top, right: box.right, bottom: box.bottom },
-          obstacles: chromeBoxes(),
+          obstacles: mapChromeBoxes(),
           widths: [248, 200, 168],
           above,
           measure: (width) => {
@@ -2048,7 +2048,7 @@ export default function MapView(props: Props) {
       if (!map || propsRef.current.gridFocusId !== id) return;
       const canvas = container.getBoundingClientRect();
       const pad = pointPadding(map);
-      if (preview && !window.matchMedia("(max-width: 767px)").matches) {
+      if (preview && !preview.hasAttribute("data-placed") && !window.matchMedia("(max-width: 767px)").matches) {
         pad.right = Math.max(0, canvas.right - preview.getBoundingClientRect().left);
       }
       const edge = Math.max(0, Math.min(32, (canvas.height - pad.top - pad.bottom) / 5, (canvas.width - pad.left - pad.right) / 5));
@@ -2293,12 +2293,13 @@ export default function MapView(props: Props) {
           {props.onShowList ? <button type="button" className="paper-btn" data-testid="map-switch-list" onClick={props.onShowList}>Switch to list</button> : null}
         </div>
       ) : null}
-      <div className="map-float">
+      <div className="map-float" data-map-panel="tools">
         <div className="segmented map-basemap only-desktop" role="group" aria-label="Basemap" data-testid="basemap-desktop">
           <button type="button" className={`segmented ${(props.basemap || "positron") === "satellite" ? "on" : ""}`} onClick={() => props.onBasemap?.("satellite")}>Satellite</button>
           <button type="button" className={`segmented ${(props.basemap || "positron") === "positron" ? "on" : ""}`} onClick={() => props.onBasemap?.("positron")}>Streets</button>
         </div>
         <div className={`measure-row${props.previewName ? " parcel-selected" : ""}${parcelTools ? " parcel-tools-open" : ""}`} role="group" aria-label="Map tools">
+          <MapPanelGrip label="Map tools" />
           {props.previewName && !props.spaceDrawing && !measure && <button type="button" className="tool parcel-toggle" aria-expanded={parcelTools} onClick={() => setParcelTools(open => !open)}>Parcel tools</button>}
           {!props.spaceDrawing && !measure && <span className="map-tools-label" aria-hidden="true">Map tools</span>}
           {props.signedIn && !mapFailed && !props.spaceDrawing && !measure && <button type="button" className="tool" data-testid="open-map-spaces" onClick={() => navigateSpaces(true, props.spaceSelectedId)}><Layers3 size={16} aria-hidden="true" />Spaces</button>}

@@ -2,6 +2,7 @@ import { nextDecision, offeredTransaction, recommendation } from "@/lib/selectio
 import { pipelineCost } from "@/lib/charging/pipelineCost";
 import {ChargingLink} from "@/components/ChargingLink";
 import { filedScreenLabel } from "@/lib/charging/summary";
+import MapPanelGrip from "./MapPanelGrip";
 import MapPowerCard, { type GridCoverage } from "./MapPowerCard";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, LocateFixed } from "lucide-react";
@@ -58,10 +59,10 @@ export default function MapSitePreview(props: PreviewProps) {
   const power = props.signedIn && !listing && access.enabled && !evidence && /power|utility|electrical/i.test(review) && powerDeal?.kind !== "land" && !site?.land_only && powerDeal?.stage_group !== "dropped";
   const address = displayAddress(record.address);
   return (
-    <aside className={`drawer map-preview${showingPower ? " with-power" : ""}`} aria-labelledby="pin-preview-title" data-record={id}
+    <aside data-map-panel="preview" className={`drawer map-preview${showingPower ? " with-power" : ""}`} aria-labelledby="pin-preview-title" data-record={id}
       onKeyDown={event => { if (event.key === "Escape" && !document.querySelector(".pnl-overlay, dialog[open]")) { event.stopPropagation(); onClose(); } }}>
       <div className="preview-topline">
-        <span className="preview-stage"><LocateFixed size={17} aria-hidden="true" />{status}</span>
+        <div className="panel-grip-row"><MapPanelGrip label="Site preview" /><span className="preview-stage"><LocateFixed size={17} aria-hidden="true" />{status}</span></div>
         <button className="close" type="button" aria-label="Close site preview" onClick={onClose}>×</button>
       </div>
       <h2 id="pin-preview-title" ref={titleRef} tabIndex={-1}>{record.name || address || id}</h2>

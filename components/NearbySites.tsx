@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import MapPanelGrip from "./MapPanelGrip";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { milesBetween, type MapArea } from "@/lib/geoFilter";
 
@@ -31,12 +32,14 @@ export default function NearbySites({ locations, area, onPick, onSpot, fact }: {
     if (!point || point[0] < west || point[0] > east || point[1] < south || point[1] > north) return [];
     return [{ id, name, distance: milesBetween(lng, lat, ...point) }];
   }).sort((a, b) => a.distance - b.distance || a.id.localeCompare(b.id));
-  return <aside className="nearby-sites" aria-label="Nearby sites">
+  return <aside data-map-panel="nearby" className="nearby-sites" aria-label="Nearby sites">
+    <div className="panel-grip-row"><MapPanelGrip label="Nearby sites" />
     <button type="button" className="paper-btn nearby-toggle" aria-expanded={open} aria-controls="nearby-results"
       onClick={() => { setOpen(!open); setLimit(8); setHover(null); setFocus(null); }}>
       <span>Nearby sites</span><span className="nearby-count">{nearby.length}</span>
       <ChevronDown size={16} aria-hidden="true" />
     </button>
+    </div>
     {open && <div id="nearby-results">
       {nearby.length ? <><small>Closest to the center of this map</small>
         <ul>{nearby.slice(0, limit).map(row => <li key={row.id}>

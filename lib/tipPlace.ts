@@ -1,5 +1,10 @@
 export type TipBox = { left: number; right: number; top: number; bottom: number };
 
+export function mapChromeBoxes(): TipBox[] {
+  const controls = document.querySelectorAll(".map-stage aside.drawer, .map-stage [data-map-panel], .maplibregl-ctrl-top-right");
+  return Array.from(controls, node => node.getBoundingClientRect()).filter(rect => rect.width >= 8 && rect.height >= 8);
+}
+
 export function boxesOverlap(a: TipBox, b: TipBox): boolean {
   return a.right > b.left + 1 && a.left < b.right - 1 && a.bottom > b.top + 1 && a.top < b.bottom - 1;
 }

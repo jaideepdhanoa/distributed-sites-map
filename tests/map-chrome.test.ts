@@ -1,3 +1,4 @@
+import { clearPanelPadding } from "../lib/mapPanelPadding";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AREA_LABELS, AREA_PAINT, areaRole, miamiAreaLabels } from "../lib/areas.ts";
@@ -246,4 +247,12 @@ test("nearby washes use real pins and skip anything without a location", () => {
   assert.equal(points[0]?.band, "1");
   assert.equal(points[1]?.band, "3");
   assert.equal(points.some((point) => point.name === "No pin"), false);
+});
+
+test("camera fits avoid the current side of a floating panel", () => {
+  const canvas = { left: 0, top: 90, right: 1200, bottom: 840 };
+  const base = { left: 24, right: 24, top: 50, bottom: 24 };
+  assert.deepEqual(clearPanelPadding(canvas, { left: 8, right: 320, top: 140, bottom: 818 }, base), { ...base, left: 320 });
+  assert.deepEqual(clearPanelPadding(canvas, { left: 800, right: 1180, top: 200, bottom: 815 }, base), { ...base, right: 400 });
+  assert.deepEqual(clearPanelPadding(canvas, { left: 410, right: 790, top: 670, bottom: 805 }, base), { ...base, bottom: 170 });
 });

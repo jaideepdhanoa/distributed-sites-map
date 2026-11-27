@@ -122,6 +122,7 @@ test("open an analyzed space on the main map and adjust a source-plan corner", a
   await work.getByRole("button",{name:"Convert bays",exact:true}).click();
   await expect(work).toContainText("No bay footprint established");
   await work.getByRole("button",{name:"Convert outdoor space",exact:true}).click();
+  await expect(work.getByTestId("map-space-title")).toHaveText("East parking row");
   await work.getByRole("button",{name:"Hide overlays"}).click();
   await expect(work.locator("svg polygon")).toHaveCount(0);
   await work.getByRole("button",{name:"Show overlays"}).click();
@@ -130,6 +131,21 @@ test("open an analyzed space on the main map and adjust a source-plan corner", a
   await work.getByLabel("Horizontal %").fill("16");
   await expect(work.getByRole("button",{name:"Save outline"})).toBeEnabled();
   await work.getByText("Corner coordinates").click();
+  const inspector = work.locator(".space-map-inspector");
+  const inspectorUrl = page.url();
+  if (info.project.name === "mobile") {
+    await inspector.getByRole("button", {name:"Hide space details"}).click();
+    await expect(work.getByRole("button", {name:"Save outline"})).toBeHidden();
+    await mkdir("review-shots",{recursive:true});
+    await page.screenshot({path:"review-shots/mobile-folded-spaces.png",animations:"disabled"});
+    await inspector.getByRole("button", {name:"Show space details"}).click();
+  } else {
+    await inspector.getByRole("button", {name:"Move Spaces inspector"}).click();
+    await inspector.getByRole("button", {name:"Bottom left"}).click();
+    await expect(inspector).toHaveAttribute("data-placed", "true");
+  }
+  expect(page.url()).toBe(inspectorUrl);
+  await expect(work.getByRole("button",{name:"Save outline"})).toBeEnabled();
   await mkdir("review-shots",{recursive:true});
   await page.screenshot({path:"review-shots/"+info.project.name+"-main-map-spaces.png",animations:"disabled"});
   await work.getByRole("button",{name:"Browse spaces"}).click();

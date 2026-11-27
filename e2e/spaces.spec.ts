@@ -120,8 +120,7 @@ test("phone mark space uses the full map and can comment", async ({ page }) => {
   expect(seeded.status, seeded.error).toBe(200);
   await page.reload();
   await expect(page.getByTestId("space-summary")).toContainText("slots");
-  await page.getByTestId("open-map-spaces").click();
-  await page.getByTestId("mark-space").click();
+  await page.getByTestId("space-summary-line").click();
   await expect(page.getByTestId("space-finish")).toBeVisible();
   await expect(page.getByTestId("space-cancel")).toBeVisible();
   await expect(page.locator("aside.drawer")).toBeHidden();
@@ -220,6 +219,10 @@ test("a saved lot opens its popover outside drawing mode", async ({ page }) => {
   await page.reload();
   await expect(page.getByTestId("space-summary")).toContainText("slots");
   await expect(page.getByTestId("space-draw-bar")).toHaveCount(0);
+  const grab = page.getByRole("button", { name: "Drag sheet" });
+  await grab.press("ArrowDown");
+  await grab.press("ArrowDown");
+  await expect(page.locator("aside.drawer")).toHaveClass(/snap-peek/);
   await clickSavedLot(page);
   await expect(page.getByTestId("space-popover").getByTestId("space-comment")).toBeVisible();
   await expect(page.getByTestId("space-popover").getByTestId("space-delete")).toBeVisible();

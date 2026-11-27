@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import MapPanelGrip from "./MapPanelGrip";
 import { ChevronDown } from "lucide-react";
 import { inMapArea, type MapArea } from "@/lib/geoFilter";
 import { formatMarket, marketColor, marketColors, marketMeasures, missingColor, sortMarketRows, type MarketMetric, type MarketRow } from "@/lib/marketContext";
@@ -30,8 +31,8 @@ export default function MarketMapPanel({metric, choose, rows, area, pick, spot, 
       <button type="button" className="sort-header" onClick={()=>setSort({key,desc:sortKey === key ? !desc : key !== "washes"})}>{label}{sortKey === key ? (desc ? " ↓" : " ↑") : ""}</button>
     </th>;
   }
-  return <aside className="market-panel" aria-label="Market context map">
-    <header><h2>Market context</h2><button type="button" className="close" aria-label="Close market context" onClick={()=>choose(null)}>×</button></header>
+  return <aside data-map-panel="market" className="market-panel" aria-label="Market context map">
+    <header><div className="panel-grip-row"><MapPanelGrip label="Market context" /><h2>Market context</h2></div><button type="button" className="close" aria-label="Close market context" onClick={()=>choose(null)}>×</button></header>
     <div className="segmented market-tabs" role="group" aria-label="Market measure">
       {([["traffic","Traffic"],["washes","Nearby washes"],["population","Trade area"]] as const).map(([key,label])=>{
         const active = key === metric || (key === "population" && trade);

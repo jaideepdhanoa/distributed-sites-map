@@ -527,9 +527,11 @@ export default function Detail({
       waitingShown={Boolean(waitingChip)}
     />
   );
+  const screening = statusOf(site);
+  const screeningBadge = <span data-testid="site-screening-status" className={`badge ${site.verdict === "PASS" ? "checked" : site.verdict === "FAIL" || site.verdict === "NOT_A_WASH" ? "gone" : "pending"}`} title={screening.note}>{screening.label}</span>;
   return (
     <RecordDrawer key={site.site_id} id={site.site_id} name={site.name} address={site.address} context={[cityLabel(site.city), site.business_type || (site.land_only ? "Land" : "Universe site")].filter(Boolean).join(" · ")}
-      status={<DecisionChips deal={linkedDeal} waiting={waitingChip} />} banner={banner} sheet={sheet} onClose={onClose} onSwipe={onSwipe} signedIn={signedIn}
+      status={linkedDeal ? <DecisionChips deal={linkedDeal} waiting={waitingChip} /> : <div className="card-chips">{screeningBadge}</div>} banner={banner} sheet={sheet} onClose={onClose} onSwipe={onSwipe} signedIn={signedIn}
       tools={<>
         {locationFix ? <LocationFix id={site.site_id} mode={locationFix} address={site.address || ""} lat={lat} lng={lng} /> : null}
         {outsideFilter ? <p className="note" data-testid="outside-filter">Outside the current filter</p> : null}
@@ -563,7 +565,7 @@ export default function Detail({
                 <button className="text-link" type="button" data-testid="copy-site-link" onClick={() => void navigator.clipboard.writeText(siteHref(window.location.origin, site.site_id))}>Copy site link</button>
                 {site.also_known_as && <p>Also known as {site.also_known_as}</p>}
                 <AreaChip record={linkedDeal?.service_area_class ? linkedDeal : site} />
-                <span className="badge quiet" title={statusOf(site).note}>{statusOf(site).label}</span>
+                {linkedDeal && screeningBadge}
                 <p>{site.site_id}{site.linked_deal_id ? ` · ${site.linked_deal_id}` : ""}</p>
               </div>
               {unscreened ? (

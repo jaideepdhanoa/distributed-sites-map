@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import MapPanelGrip from "../MapPanelGrip";
 import { useSearchParams } from "next/navigation";
 import type { Map } from "maplibre-gl";
 import { ChevronLeft, Pencil, MessageSquare, Minus, Plus } from "lucide-react";
@@ -83,6 +84,8 @@ export default function MainMapSpaces({
   const image = assessment?.image;
   const [overlays, setOverlays] = useState(true);
   const [imageError, setImageError] = useState("");
+  const [compactInspector, setCompactInspector] = useState(false);
+  useEffect(() => { setCompactInspector(false); }, [open, id, area]);
   const [sourceView, setSourceView] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [draft, setDraft] = useState<Point[] | null>(null);
@@ -409,9 +412,16 @@ export default function MainMapSpaces({
             </div>
           )}
           <aside
+            data-map-panel="spaces" data-compact={compactInspector && !discard}
             className={"space-map-inspector" + (site ? " selected" : "")}
             aria-label={site ? "Selected space" : "Analyzed spaces"}
           >
+            <MapPanelGrip label="Spaces inspector" />
+            <button type="button" className="text-link space-inspector-toggle" aria-controls="space-inspector-content"
+              aria-expanded={!compactInspector || Boolean(discard)} disabled={Boolean(discard)} onClick={() => setCompactInspector(value => !value)}>
+              {compactInspector && !discard ? "Show space details" : "Hide space details"}
+            </button>
+            <div id="space-inspector-content">
             {loadError && (
               <p role="alert">
                 {loadError}{" "}
@@ -762,6 +772,7 @@ export default function MainMapSpaces({
                 </button>
               </div>
             )}
+            </div>
           </aside>
         </div>
       )}

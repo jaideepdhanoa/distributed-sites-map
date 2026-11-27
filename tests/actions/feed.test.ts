@@ -83,6 +83,22 @@ test("queue order is approval, then mentions, then assigned, then the rest", () 
   assert.deepEqual(rows.map((item) => item.siteId), ["approval", "mentioned", "assigned", "flagged", "fresh", "newer", "older"]);
 });
 
+test("rediscovered sites retain read receipts while later changes and approvals stay visible", () => {
+  const seen = "2026-01-01T12:00:00.000Z", at = "2026-01-02T12:00:00.000Z";
+  const discovery = { at, type: "new_site", summary: "New pipeline site." };
+  const rows = buildQueue({
+    sites: ["read", "changed", "approval", "unseen"].map(id => row(id)),
+    reasons: { read: [discovery], changed: [discovery, {at, type: "stage", summary: "Stage changed."}],
+      approval: [discovery], unseen: [discovery] },
+    reviewedAt: {read: seen, changed: seen, approval: seen}, snoozeUntil: {},
+    flagged: new Set(), mentioned: new Set(), assigned: new Set(), needsApproval: new Set(["approval"]),
+    today: "2026-01-02", filters: {},
+  });
+  assert.deepEqual(rows.map(r => r.siteId), ["approval", "unseen", "changed"]);
+  assert.deepEqual(rows.find(r => r.siteId === "changed")?.reasons.map(r => r.type), ["stage"]);
+  assert.equal(rows.find(r => r.siteId === "unseen")?.isNew, true);
+});
+
 test("a hidden c-store stays out of every review section", () => {
   const sites = [row("store", { }), row("open")].map((item) => item.id === "store" ? { ...item, hidden: true } : item);
   const hidden = buildQueue({

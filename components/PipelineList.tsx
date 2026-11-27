@@ -2,7 +2,10 @@
 
 import { compareAttention, matchingOption } from "@/lib/selection/opportunity";
 import { recommendation, nextDecision } from "@/lib/selection/opportunityDisplay";
-import { pipelineCost } from "@/lib/charging/pipelineCost";
+import { listScreen, listSpace, hasListChanges, proxyReading } from "@/lib/charging/listScreen";
+import { defaultListAssumptions, type ListAssumptions } from "@/lib/charging/preliminary";
+import "./pipeline-charging.css";
+import { PipelineChargingDialog } from "./PipelineChargingDialog";
 import { ChargingLink } from "./ChargingLink";
 import { dropReasons } from "@/lib/selection/dropReasons";
 import { useSearchParams } from "next/navigation";
@@ -60,7 +63,11 @@ import { TagChip } from "./TagChip";
 import { useNarrowList } from "./useNarrowList";
 import { StagePending } from "./StagePending";
 
+const coverageLabels = {positive:"with potential spaces", zero:"zero in assessed layout", unmeasured:"need measurement",
+  priced:"site estimates", scenario:"what-if only", pending:"awaiting inputs"} as const;
+type Coverage = keyof typeof coverageLabels;
 export type PipelineRow = {
+  screen?:ReturnType<typeof listScreen>;
   deal: DealProps;
   noPin: boolean;
   zoning?: string;
@@ -120,7 +127,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   if (id === "priority") return signedIn ? (deal.opportunityReview ? recommendation(deal.opportunityReview.primary) : "Awaiting review") : "";
   if (id === "spaces" || id === "chargeCost") {
     if (!signedIn || deal.kind === "land") return "";
-    const fact = id === "spaces" ? deal.chargingSpace : pipelineCost(deal.charging);
+    const fact = id === "spaces" ? listSpace(deal.chargingSpace) : (row.screen ?? listScreen(deal)).cost;
     return fact ? [fact.value, fact.basis].filter(Boolean).join(" · ") : "No layout estimate";
   }
   if (id === "merit") return signedIn ? deal.charging?.merit.action ?? deal.screening?.priority ?? "—" : "";
@@ -210,8 +217,8 @@ function stageFilterCode(deal: DealProps): string {
 
 function sortValue(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   const deal = row.deal;
-  if (id === "spaces") return signedIn ? deal.chargingSpace?.count ?? null : null;
-  if (id === "chargeCost") return signedIn ? pipelineCost(deal.charging).amount : null;
+  if (id === "spaces") return signedIn ? listSpace(deal.chargingSpace).count : null;
+  if (id === "chargeCost") return signedIn ? (row.screen ?? listScreen(deal)).cost.amount : null;
   if (id === "merit") return deal.charging?.merit.order ?? null;
   if (id === "asking") return signedIn ? deal.asking_price : null;
   if (id === "score") return typeof deal.score === "number" ? deal.score : null;
@@ -258,7 +265,7 @@ export function pipelineCsv(rows: PipelineRow[], columns: PipelineColumnId[], si
 
 export default function PipelineList({
   title,
-  rows,
+  rows: sourceRows,
   outsideRow = null,
   columns,
   selectedId, initialSelection, onSelection, onScope,
@@ -315,6 +322,26 @@ export default function PipelineList({
   onClearArea?: () => void;
   onDismiss?: () => void;
 }) {
+  const [assumptions, setAssumptions] = useState<ListAssumptions>(defaultListAssumptions);
+  const [costPanel, setCostPanel] = useState<string|null>(null);
+  const sessionKey = "pipeline-cost-trial-v1:" + (userId || "");
+  useEffect(() => {
+    if (!signedIn) { setAssumptions(defaultListAssumptions); setCostPanel(null); return; }
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(sessionKey) || "null");
+      setAssumptions(saved && Number.isInteger(saved.stalls) && saved.stalls >= 1 && saved.stalls <= 200 &&
+        Number.isFinite(saved.volume) && saved.volume >= 1 && saved.volume <= 200 && typeof saved.creditCash === "boolean" &&
+        ["unitBuild", "attendant", "upgrade"].every(k => saved[k] == null || (Number.isFinite(saved[k]) && saved[k] >= 0 && saved[k] <= 1e9))
+        ? saved : defaultListAssumptions);
+    } catch { setAssumptions(defaultListAssumptions); }
+  }, [sessionKey, signedIn]);
+  function applyAssumptions(next:ListAssumptions) {
+    setAssumptions(next);
+    try { sessionStorage.setItem(sessionKey, JSON.stringify(next)); } catch {}
+    setCostPanel(null);
+  }
+  const rows = useMemo(() => signedIn ? sourceRows.map(row => ({ ...row, screen:listScreen(row.deal, assumptions) })) : sourceRows,
+    [sourceRows, assumptions, signedIn]);
   const unread = new Set(unreadIds || []);
   const [moreOpen, setMoreOpen] = useState(false);
   const allowed = useMemo(() => allowedIds(PIPELINE_COLUMNS.map((column) => column.id), signedIn), [signedIn]);
@@ -375,10 +402,15 @@ export default function PipelineList({
   const params=useSearchParams();
   const finEvidence=params.get("finEvidence") || "", finCarry=params.get("finCarry") || "";
   const financeOpen=params.get("finFilter")==="1";
-  const ordered = useMemo(() => {
+  const scopedRows = useMemo(() => {
     const scoped = mapArea ? rows.filter((row) => row.point && inMapArea(row.point[0], row.point[1], mapArea)) : rows;
     return prepareRows(signedIn && financeOpen ? scoped.filter(r=>financeMatch(r.deal,finEvidence,finCarry)) : scoped, sheetColumns, activeLayout, visible);
   }, [activeLayout, mapArea, rows, sheetColumns, visible,signedIn,financeOpen,finEvidence,finCarry]);
+  const coverage = params.get("chargeCoverage") || "";
+  const matches = (row:PipelineRow, key:string) => row.deal.kind === "pipeline" &&
+    (row.screen?.group === key || listSpace(row.deal.chargingSpace).group === key);
+  const ordered = signedIn && Object.hasOwn(coverageLabels,coverage) ? scopedRows.filter(row=>matches(row, coverage)) : scopedRows;
+  const detailRow = costPanel && costPanel !== "assumptions" ? ordered.find(row=>row.deal.deal_id === costPanel) : undefined;
   const scope = ordered.map(row=>row.deal.deal_id).join("|");
   const origin = "/?" + params;
   const listScroller = () => scrollRef.current || paneRef.current?.querySelector<HTMLElement>(".list-scroll") || null;
@@ -520,12 +552,24 @@ export default function PipelineList({
     }
   }
 
+  function coverageLinks(keys: Coverage[]) {
+    return keys.map(key => {
+      const count = scopedRows.filter(row => matches(row,key)).length;
+      return <button type="button" key={key} className="text-link pipeline-coverage" aria-pressed={coverage === key}
+        onClick={() => {
+          const column = ["positive","zero","unmeasured"].includes(key) ? "spaces" : "chargeCost";
+          if (activeLayout.hidden.includes(column)) toggleColumn(column);
+          setReviewFilter("chargeCoverage", coverage === key ? "" : key);
+        }}>{count} {coverageLabels[key]}</button>;
+    });
+  }
   const summaryBar = (
     <ShortlistSummary noun="pipeline" title={title} count={ordered.length} commonStage={commonStage}>
       <div><span className="only-desktop">Median asking</span><span className="only-mobile">Median asking</span><strong title={summary.medianAsking == null ? "Not on file" : undefined}>{summary.medianAsking == null ? "—" : fullMoney(summary.medianAsking)}</strong><small>{summary.withAsking} of {summary.count} reported</small></div>
       {signedIn && <div><span>Acquisition shortlist</span><strong>{ordered.filter(({deal}) => matchingOption(deal.opportunityReview, "Shortlist", "")).length}</strong>
         <a className="text-link" onClick={() => rememberReviewPosition(listScroller(), "", picked)} href={reviewLink("/selection-review", {scope, disposition:"Shortlist"}, origin)}>Review shortlisted sites</a></div>}
-      {signedIn && <div><span>Space estimates</span><strong>{ordered.filter(({deal}) => deal.chargingSpace?.count != null).length} of {ordered.length}</strong><small>sites with a stall count</small></div>}
+      {signedIn && <><div><span>Cost per charge</span>{coverageLinks(["priced","scenario","pending"])}</div>
+        <div><span>Charging layouts</span>{coverageLinks(["positive","zero","unmeasured"])}</div></>}
     </ShortlistSummary>
   );
   const outside = outsideRow ? (
@@ -541,7 +585,14 @@ export default function PipelineList({
   return (
     <div ref={paneRef} className="list-pane pipeline-list" data-list-count={rows.length} data-testid="pipeline-list">
       {summaryBar}
+      {signedIn && costPanel && (costPanel === "assumptions" || detailRow?.screen) && <PipelineChargingDialog
+        key={costPanel} onClose={()=>setCostPanel(null)} assumptions={assumptions} apply={applyAssumptions}
+        workbook={rows.map(r=>r.deal.purchase?.assumptions ?? r.deal.charging?.screenAssumptions).find(Boolean)}
+        site={detailRow?.screen ? {id:detailRow.deal.deal_id, name:detailRow.deal.name || detailRow.deal.deal_id, screen:detailRow.screen,
+          revision:detailRow.deal.charging?.selected, next:detailRow.deal.opportunityReview?.primary.next} : undefined}/>}
       <div className="list-bar">
+        {signedIn && <button type="button" className="paper-btn" onClick={()=>setCostPanel("assumptions")}>{hasListChanges(assumptions) ? "Cost assumptions · edited" : "Cost assumptions"}</button>}
+        {signedIn && Object.hasOwn(coverageLabels,coverage) && <button type="button" className="chip removable" aria-label="Clear charging filter" onClick={()=>setReviewFilter("chargeCoverage","")}>{coverageLabels[coverage as Coverage]} ×</button>}
         {mapArea ? <p>Within map area</p> : null}
         {mapArea ? <button type="button" className="chip removable only-desktop" onClick={onClearArea}>Map area</button> : null}
         {Object.entries(activeLayout.filters).map(([id, value]) => {
@@ -621,7 +672,7 @@ export default function PipelineList({
               action: signedIn ? (row.deal.opportunityReview ? recommendation(row.deal.opportunityReview.primary) : plainNextStep(row.deal.next_step || "").line || undefined) : undefined,
               measures: signedIn && row.deal.kind === "pipeline" ? [
                 ...(row.deal.opportunityReview ? [["Next decision", nextDecision(row.deal.opportunityReview)] as [string, string]] : []),
-                ["Charging spaces", cell(row, "spaces", true)], ["Cost per charge", cell(row, "chargeCost", true)],
+                ["Charging spaces", cell(row, "spaces", true)], ["Cost per charge", [cell(row, "chargeCost", true), row.screen && proxyReading(row.screen)].filter(Boolean).join(" · ")],
               ] : undefined,
               chips: (() => {
                 if (row.deal.kind === "land") return <LandPausedChip />;
@@ -636,7 +687,10 @@ export default function PipelineList({
                   <input className="check" type="checkbox" aria-label={`Select ${row.deal.name || id}, ${displayAddress(row.deal.address) || id}`} checked={pickedSet.has(id)} onChange={() => toggleRow(id)} />
                 </label>
               ),
-              secondaryAction:signedIn && onFinancials && row.deal.kind==="pipeline" && <button type="button" className="text-link" onClick={()=>onFinancials(id)}>Financials</button>,
+              secondaryAction:signedIn && row.deal.kind==="pipeline" && <div className="pipeline-dialog-actions">
+                {row.screen?.estimate ? <button type="button" className="text-link" onClick={()=>setCostPanel(id)}>View calculation</button>
+                  : row.deal.charging && <ChargingLink site={id} revision={row.deal.charging.selected}>View charging case</ChargingLink>}
+                {onFinancials && <button type="button" className="text-link" onClick={()=>onFinancials(id)}>Financials</button>}</div>,
               onOpen: () => onOpen(id),
             };
           })} />
@@ -662,11 +716,12 @@ export default function PipelineList({
           if (column === "spaces" || column === "chargeCost") {
             if (!signedIn || row.deal.kind === "land") return "—";
             const cost = column === "chargeCost";
-            const fact = cost ? pipelineCost(row.deal.charging) : row.deal.chargingSpace;
-            return <span className="pipeline-measure">{cost && row.deal.charging
-              ? <ChargingLink site={id} revision={row.deal.charging.selected}>{fact?.value}</ChargingLink>
+            const fact = cost ? row.screen?.cost : listSpace(row.deal.chargingSpace);
+            return <span className="pipeline-measure">{cost && row.screen?.group === "scenario" && <strong className="pipeline-what-if">What-if estimate</strong>}{cost && row.deal.charging
+              ? row.screen?.estimate ? <button type="button" className="text-link" onClick={ev=>{ev.stopPropagation();setCostPanel(id);}}>{fact?.value}</button>
+                : <ChargingLink site={id} revision={row.deal.charging.selected}>{fact?.value}</ChargingLink>
               : <strong>{fact?.value || "No layout estimate"}</strong>}
-              {fact?.basis && <small>{fact.basis}</small>}</span>;
+              {fact?.basis && <small>{fact.basis}</small>}{cost && row.screen && proxyReading(row.screen) && <small className="proxy-reading">{proxyReading(row.screen)}</small>}</span>;
           }
           if (column === "openLand") return <NumberCell label={cell(row, "openLand", signedIn)} value={openLandMeasured(row.deal.open_land_sqft, row.deal.open_land_basis) ? row.deal.open_land_sqft : null} stats={strips.openLand} direction="higher" format={openLandText} />;
           if (column === "asking") return <AskingCell deal={row.deal} stats={strips.asking} onBroker={onBroker} signedIn={signedIn} />;

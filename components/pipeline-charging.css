@@ -1,0 +1,20 @@
+.pipeline-list .pipeline-what-if { color: var(--ink-2); font-size: var(--type-cap); }
+.pipeline-list .pipeline-coverage { display: block; font-size: var(--type-cap); text-align: left; }
+.pipeline-coverage[aria-pressed="true"] { font-weight: 700; }
+.pipeline-cost-dialog { color: var(--ink); background: #fffdf8; border: 1px solid var(--line); border-radius: 14px; width: min(36rem, calc(100vw - 32px)); max-height: 84dvh; padding: 18px 22px; overflow: auto; }
+.pipeline-cost-dialog::backdrop { background: rgb(25 27 23 / .4); }
+.pipeline-cost-dialog h2 { margin: 0; font: 600 1.4rem/1.15 Georgia, serif; color: var(--green); }
+.pipeline-cost-dialog p { margin: .8rem 0; }
+.pipeline-cost-dialog dt { font-weight: 650; margin-top: .75rem; }
+.pipeline-cost-dialog dd { margin: .25rem 0; }
+.pipeline-assumption-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: 12px; margin: 14px 0; }
+.pipeline-assumption-fields label { display: grid; align-content: end; gap: 4px; }
+.pipeline-assumption-fields input { width: 100%; min-width: 0; }
+.pipeline-cash-option, .pipeline-dialog-actions { display: flex; align-items: center; gap: .75rem; }
+.pipeline-cash-option .check { flex-shrink: 0; }
+.pipeline-dialog-actions { flex-wrap: wrap; }
+.pipeline-list .pipeline-measure .proxy-reading { color: var(--green); }
+@media (max-width: 767px) {
+  .pipeline-cost-dialog .field, .pipeline-list .pipeline-coverage { min-height: 44px; }
+  .pipeline-list .list-cards .pipeline-dialog-actions { grid-column: 2 / -1; }
+}

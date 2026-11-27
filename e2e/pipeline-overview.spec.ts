@@ -56,3 +56,53 @@ test("pipeline shows ranked opportunities, charging figures and a compact header
     await expect(card.getByText("An earlier listing was withdrawn.")).toBeVisible();
   }
 });
+
+test("filter layouts and reprice the pipeline from the list", async ({page}, info) => {
+  const a = {horizon:10,demand:10,hub:1000000,capital:0,closing:.1,charging:{charges:100000,perPost:3,ports:2,
+    unitBuild:10000,upgrade:20000,attendant:12000,fixed:2000,insurance:1000,perCharger:500,tax:.01}};
+  const deals = ["Sample footprint trial","Sample selected case"].map((name,i) => ({
+    type:"Feature",geometry:{type:"Point",coordinates:[-112+i*.01,33.45]}, properties:{
+      deal_id:"PIPE-PHX-98"+(71+i), kind:"pipeline",city:"PHX",name,stage:"1 Desk screen",stage_group:"desk",
+      business_type:"Auto repair",asking_price:100000, purchase:{inputs:{cash:5000,ownership:"Yes"},assumptions:a},
+      chargingSpace:i ? {value:"0 spaces",count:0,basis:"Parking",layouts:[{stalls:4,condition:"Parking with shared aisle access"}]}
+        : {value:"Needs measurement",count:null,basis:"Measure the bays"},
+      charging:{name:"Sample case",merit:{action:"Evidence needed",order:5,next:"Measure the site."},
+        result:{siteCost:i ? 8 : null,missing:[]},selected:i ? "sample:1" : null,stale:false,screen:[],energyScope:"excluded",
+        preliminary:{reason:"Measure the bays"}}
+    }}));
+  await page.route("**/api/data/deals",route=>route.fulfill({json:{type:"FeatureCollection",features:deals}}));
+  await page.route("**/api/list/layout**",route=>route.fulfill({json:{stored:false,layout:null}}));
+  await page.goto("/?funnel=pipeline&view=list&city=PHX&pstage=all");
+  const list=page.getByTestId("pipeline-list");
+  await list.getByTestId("sort-by").selectOption("chargeCost");
+  const rows=list.locator("[data-site-row]");
+  await expect(rows.first()).toContainText("Sample footprint trial");
+  await expect(rows.first()).toContainText("$7.22");
+  await expect(rows.first()).toContainText("If 6 spaces fit");
+  const phone=info.project.name==="mobile";
+  if (phone) await list.getByRole("button",{name:"Figures",exact:true}).click();
+  await list.getByRole("button",{name:"1 with potential spaces"}).click();
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText("Up to 4 spaces");
+  await list.getByRole("button",{name:"Clear charging filter"}).click();
+  if (phone) await list.getByRole("button",{name:"Figures",exact:true}).click();
+  await list.getByRole("button",{name:"Cost assumptions",exact:true}).click();
+  const dialog=page.getByRole("dialog");
+  await dialog.getByLabel("Completed charges (% of workbook)").fill("50");
+  await mkdir("review-shots",{recursive:true});
+  await dialog.screenshot({path:`review-shots/${info.project.name}-pipeline-assumptions.png`});
+  await dialog.getByRole("button",{name:"Apply to list"}).click();
+  await expect(rows.first()).toContainText("Sample selected case");
+  await expect(rows.last()).toContainText("$14.43");
+  await page.reload();
+  await expect(rows.last()).toContainText("$14.43");
+  await (phone ? rows.last().getByRole("button",{name:"View calculation"}) : rows.last().getByRole("button",{name:/\$14\.43/})).click();
+  await expect(dialog).toContainText("What if this footprint fits?");
+  await dialog.getByText("How this range was calculated").click();
+  await expect(dialog).toContainText("3,000 annual charges");
+  await page.keyboard.press("Escape");
+  await list.getByRole("button",{name:"Cost assumptions · edited"}).click();
+  await dialog.getByRole("button",{name:"Restore defaults"}).click();
+  await expect(rows.first()).toContainText("$7.22");
+  await page.screenshot({path:`review-shots/${info.project.name}-pipeline-charging.png`,animations:"disabled"});
+});

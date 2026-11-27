@@ -49,6 +49,37 @@ test("limited rights and lease terms do not inherit a purchase price or the sell
   assert.equal(estimate.layouts[0].base.annualCost,44200);
 });
 
+import { listScreen, listSpace } from "../../lib/charging/listScreen";
+import { defaultListAssumptions } from "../../lib/charging/preliminary";
+
+test("list coverage counts a conditional layout, a scoped zero and an unknown separately", () => {
+  const fit = listSpace(deal.chargingSpace);
+  assert.equal(fit.count, 4);
+  assert.match(fit.value, /4 spaces/);
+  assert.match(fit.basis, /shared aisle.*0 spaces inside/);
+  assert.equal(listSpace({value:"0 spaces", count:0, basis:"Parking"}).group,"zero");
+  assert.equal(listSpace().group,"unmeasured");
+});
+
+test("what-if costs can be compared without creating a footprint or replacing a selected case", () => {
+  const emptyFit = {...deal, chargingSpace:undefined};
+  const c = {result:{siteCost:null},screen:[],screenAssumptions:assumptions,preliminary:preliminaryCost(emptyFit,assumptions)} as unknown as ChargingSummary;
+  const d = {...emptyFit, charging:c};
+  const screen = listScreen(d);
+  assert.equal(screen.group,"scenario");
+  assert.match(screen.cost.basis,/If 6 spaces fit/);
+  assert.equal(screen.cost.amount,43300/6000);
+  assert.equal(listScreen(d,{...defaultListAssumptions,volume:50}).cost.amount,43300/3000);
+  const trial = listScreen(d,{...defaultListAssumptions,upgrade:0,attendant:0,unitBuild:0,creditCash:false});
+  assert.equal(trial.cost.amount,15500/6000);
+  assert.equal(listScreen({...d,charging:{...c,selected:"case:1",result:{...c.result,siteCost:8}}}).cost.amount,8);
+  assert.equal(listScreen({...d,charging:{...c,stale:true}}).group,"pending");
+  assert.equal(listScreen({...d,listing_removed:true}).group,"pending");
+  assert.equal(listScreen({...d,asking_price:null}).cost.amount,null);
+  assert.equal(listScreen({...d, charging:{...c,screenTenure:{rights:"unavailable",terms:"purchase",values:{rent:null}}}}).cost.amount,null);
+  assert.equal(listSpace(d.chargingSpace).count,null);
+});
+
 test("a parcel row includes documented conversion cost and income displacement once",()=>{
   const row={stalls:4,condition:"North parking",parcel:true,conversionCost:10000,lostAnnualCash:1000};
   const priced=preliminaryCost({...deal,chargingSpace:{count:4,value:"4 spaces",basis:"Conditional",layouts:[row]}},assumptions);

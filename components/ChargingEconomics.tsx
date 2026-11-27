@@ -171,7 +171,7 @@ function Editor({data,reload,revision,explain,updateHistory}:{updateHistory:(row
     <div className="segmented cost-modes" role="group" aria-label="Charging view">
       <button type="button" className={explaining?"segmented on":"segmented"} aria-pressed={explaining} onClick={()=>setExplaining(true)}>Explanation</button>
       <button type="button" className={explaining?"segmented":"segmented on"} aria-pressed={!explaining} onClick={()=>setExplaining(false)}>Case editor</button></div>
-    {explaining && !trial && (!parent || (parent.selected && !stale && current.siteCost == null)) && site.charging?.preliminary &&
+    {explaining && !trial && (!parent || (parent.selected && !stale && current.siteCost == null) || (site.charging?.preliminary && "layouts" in site.charging.preliminary && site.charging.preliminary.layouts.some(l=>l.parcel))) && site.charging?.preliminary &&
       <PreliminaryChargingCost estimate={site.charging.preliminary} />}
     <div className="charging-controls">
       <label>Work on a case<select className="secondary" value={parent?keyOf(parent):""} onChange={e=>{const row=history.find(r=>keyOf(r)===e.target.value);load(row);pin(row);}}>

@@ -1,3 +1,4 @@
+import { isExcludedSite } from "@/lib/alerts/excluded";
 import { inReach, type Reach } from "@/lib/reach";
 
 export type QueueReason = {
@@ -108,7 +109,7 @@ export function buildQueue(input: {
   const rows: QueueRow[] = [];
   const reach = input.filters.reach || "within10";
   for (const site of input.sites) {
-    if (!inReach(site, reach)) continue;
+    if (isExcludedSite(site.id) || !inReach(site, reach)) continue;
     const needsApproval = input.needsApproval.has(site.id);
     const mentioned = input.mentioned.has(site.id);
     const assigned = input.assigned.has(site.id);

@@ -1,0 +1,27 @@
+.shortlist-page { background:#f7f5ee; }
+.shortlist-intro { margin:18px 0; padding-bottom:18px; border-bottom:1px solid #cec9bb; }
+.shortlist-intro small { display:block; margin-top:5px; color:#595f54; }
+.shortlist-results { display:grid; gap:18px; padding:0; list-style:none; }
+.shortlist-results > li { min-width:0; }
+.shortlist-card { padding:clamp(16px,2.6vw,28px); background:#fffdf8; border:1px solid #d9d4c7; border-radius:14px; overflow-wrap:anywhere; }
+.shortlist-card header, .shortlist-judgment { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:18px; align-items:start; }
+.shortlist-card h2 { margin:3px 0; font-family:var(--font-serif),serif; font-size:clamp(1.45rem,3vw,2rem); line-height:1.15; }
+.shortlist-kicker,.shortlist-judgment small { color:#456352; font-size:.78rem; font-weight:650; }
+.shortlist-card header .paper-btn { display:inline-flex; align-items:center; justify-content:center; min-height:44px; text-decoration:none; }
+.shortlist-page .shortlist-visit { margin:14px 0 4px; padding:0; border:none; background:transparent; }
+.shortlist-judgment { grid-template-columns:minmax(0,2fr) minmax(160px,1fr); padding:16px; border-radius:9px; background:#eff3ec; }
+.shortlist-judgment h3 { margin:4px 0 8px; line-height:1.25; color:#1e4636; }
+.shortlist-judgment p { margin:0; }
+.shortlist-owner { display:grid; gap:3px; padding-left:16px; border-left:1px solid #c5d2c6; font-size:.88rem; }
+.shortlist-owner small:not(:first-child) { margin-top:8px; }
+.shortlist-card .shortlist-next { margin:14px 0 6px; }
+.shortlist-card .shortlist-next b { display:block; color:#475748; font-size:.83rem; }
+.shortlist-card summary { display:flex; align-items:center; gap:.55rem; min-height:44px; cursor:pointer; font-weight:600; }
+.shortlist-card summary::before { content:"+"; color:#345d45; }
+.shortlist-card details[open] > summary::before { content:"−"; }
+.shortlist-evidence { border-top:1px solid #dad8cd; }
+@media(max-width:600px) {
+  .shortlist-card header,.shortlist-judgment { grid-template-columns:1fr; gap:8px; }
+  .shortlist-card header .paper-btn { justify-self:start; }
+  .shortlist-owner { margin-top:6px; border:0; border-top:1px solid #c5d2c6; padding:10px 0 0; }
+}

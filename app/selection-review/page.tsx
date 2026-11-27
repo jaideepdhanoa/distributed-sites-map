@@ -7,6 +7,8 @@ import { filedScreenLabel } from "@/lib/charging/summary";
 import { useSearchParams } from "next/navigation";
 import { reviewLink, reviewReturn, setReviewFilter, rememberReviewPosition, restoreReviewPosition } from "@/lib/reviewNavigation";
 import { Suspense, useEffect, useRef, useState } from "react";
+import ShortlistCard from "@/components/ShortlistCard";
+import "./shortlist.css";
 import OpportunityReview from "@/components/OpportunityReview";
 import { compareAttention, currentDisposition, dispositions, matchingOption, routes, type OpportunitySite, type FiledReview } from "@/lib/selection/opportunity";
 import SelectionResearch from "@/components/SelectionResearch";
@@ -53,6 +55,7 @@ function SelectionList() {
   const matchesPlace = (r:{id:string;city:string}, name:string) => (!scope || scope.has(r.id)) && (!market || r.city === market) && [name,r.city,r.id].join(" ").toLowerCase().includes(query.trim().toLowerCase());
   const filed = (data?.filed || []).filter(r => matchesPlace(r,r.review.name) && matchesDecision(r.review));
   const showFiled = !check && !params.get("stalls") && !params.get("charging") && !investment;
+  const shortlist = decision === "Shortlist";
   const droppedView = decision === "Dropped";
   const scoped = rows.filter(r => (!investment || sequence.has(r.id)) && matchesPlace(r,r.name + " " + (r.review?.name || "")) && matchesDecision(r.review) && (!check || r.priority === check) &&
     (!params.get("stalls") || r.charging?.screen.some(c=>c.stalls===Number(params.get("stalls")) && c.downside>=0)) &&
@@ -63,9 +66,13 @@ function SelectionList() {
       return priority || (scope && order !== "market" ? scope.get(a.id)! - scope.get(b.id)! : 0) || (order === "attention" ? diligenceOrder(a.charging?.merit,b.charging?.merit) : 0) || a.city.localeCompare(b.city) || a.name.localeCompare(b.name);
     });
   const droppedCount = scoped.length + (showFiled ? filed.length : 0);
-  return <main ref={pane} className="space-review-page">
+  return <main ref={pane} className={shortlist ? "space-review-page shortlist-page" : "space-review-page"}>
     <a className="text-link" href={back}>← Pipeline list</a>
-    <h1>Selection review</h1><p>Choose the next diligence check. Investment approval requires verified site rights, usable space, power, retained cash flow and network benefit.</p>
+    {shortlist ? <header className="shortlist-intro"><h1>Acquisition shortlist</h1>
+      <p>Choose the next visit by the question it can settle.</p>
+      <a className="text-link" href="/?review=1&qmarket=all&qstage=any&qapprove=1">Open items needing my approval →</a>
+      <small>The Review inbox also includes changes and requests across the wider pipeline.</small>
+    </header> : <><h1>Selection review</h1><p>Choose the next diligence check. Investment approval requires verified site rights, usable space, power, retained cash flow and network benefit.</p></>}
     {data?.registerUrl && <p><a className="text-link" href={data.registerUrl} target="_blank" rel="noreferrer">Open the team’s review register</a> to file new evidence, assign the next check or revise a decision.</p>}
     {scoped.some(r => r.review && match(r.review)?.disposition === "Shortlist") &&
       <details className="disclosure"><summary className="disclosure">How to decide on visits, utility studies and offers</summary>
@@ -106,7 +113,13 @@ function SelectionList() {
       {!data.hasInputs && <p>Workbook screen pending. Some unlocated sites use their dated assessment cohort.</p>}
       {data.hasInputs && <details className="disclosure"><summary className="disclosure">Data details{data.mismatches > 0 && " · Stage differences"}</summary><p>{data.mismatches} stage differences across the joined records. The application stage is shown when available.</p></details>}
       {!scoped.length && !(droppedView && showFiled && filed.length) && <p>{investment?"No current site case qualifies for investment ranking in this view.":"No sites match these filters."}</p>}
-      <ul className="space-review-results">{scoped.map(r=><li id={r.id} tabIndex={-1} key={r.id} onClick={()=>rememberReviewPosition(pane.current,r.id)}><div>
+      <ul className={shortlist ? "shortlist-results" : "space-review-results"}>{scoped.map(r=>{
+        const selected = match(r.review);
+        if (shortlist && selected && r.review) return <li id={r.id} key={r.id} tabIndex={-1} onClick={()=>rememberReviewPosition(pane.current,r.id)}>
+          <ShortlistCard row={r} review={r.review} option={selected} origin={origin+"#"+r.id}/>
+          {investment && <p>{r.city} #{sequence.get(r.id)!.rank} · {amounts(sequence.get(r.id)!.value)} incremental value · {sequence.get(r.id)!.peak} residual peak charges</p>}
+        </li>;
+        return <li id={r.id} tabIndex={-1} key={r.id} onClick={()=>rememberReviewPosition(pane.current,r.id)}><div>
         <small>{droppedView ? r.city : `${r.city} · ${r.stage} · ${r.section}`}</small><h2>{r.name}</h2>{r.review?.name && r.review.name !== r.name && <small>{r.review.name}</small>}
         {r.review?.primary.disposition === "Dropped" && r.review.primary.route === "Site lead" && <p><strong>Reconcile stage history before reopening.</strong></p>}{r.review ? <OpportunityReview review={r.review} matched={match(r.review)} active charging={r.charging}/> : <><strong>{r.charging?.merit.action ?? r.priority}</strong><p>{r.charging?.merit.next ?? r.instruction}</p></>}{investment && <p>{r.city} #{sequence.get(r.id)!.rank} · {amounts(sequence.get(r.id)!.value)} incremental value · {sequence.get(r.id)!.peak} residual peak charges</p>}<small>{r.id}</small></div><div>{!droppedView && <strong>{r.readiness}</strong>}
         {r.mirrorStage && r.stage !== r.mirrorStage && <p>Workbook stage: {r.mirrorStage}</p>}
@@ -119,7 +132,7 @@ function SelectionList() {
       {match(r.review)?.disposition !== "Dropped" && <p>{r.geometry} · {r.option}</p>}
         {match(r.review)?.disposition !== "Dropped" && r.quickLube && r.priority !== "Screen fleet service" && <p>Retained lifts and fleet-service rights also need a separate check.</p>}
         {!droppedView && r.assessed && <a href={reviewLink("/space-review",{site:r.id,panel:"space-options"},origin+"#"+r.id)}>Review layout evidence{r.evidenceDate && " · "+r.evidenceDate}</a>}
-      </div></li>)}</ul>
+      </div></li>;})}</ul>
       {filed.length > 0 && showFiled && <details className="disclosure" key={decision} open={droppedView || undefined}>
         <summary className="disclosure">{droppedView ? "Outside the active pipeline" : "Filed reviews outside the active list"} ({filed.length})</summary>
         <ul className="space-review-results">{filed.map(r=><li key={r.id}><div><small>{r.city} · {r.stage} · {r.id}</small><h2>{r.review.name}</h2><OpportunityReview review={r.review} matched={match(r.review)}/>{r.hasRecord && <a href={reviewLink("/",{site:r.id,city:r.city,funnel:"pipeline",sheet:"full"},origin+"#"+r.id)}>Open site record</a>}</div></li>)}</ul>

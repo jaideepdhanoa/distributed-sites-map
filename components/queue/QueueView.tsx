@@ -385,13 +385,13 @@ export function ReviewRail({
     <aside className="review-rail" data-testid="review-rail" aria-label="Review inbox">
       {groups.map((group) => (
         <section key={group.testId} data-testid={group.testId}>
-          <h2>{group.label}</h2>
+          <h2>{group.label} <small aria-hidden="true">{group.rows.length}</small></h2>
           {group.rows.length ? group.rows.map(({ site, index }) => row(site, index)) : <p className="review-empty">Nothing in this group.</p>}
         </section>
       ))}
       {rest.length ? (
         <section data-testid="review-other">
-          <h2>Also in review</h2>
+          <h2>Also in review <small aria-hidden="true">{rest.length}</small></h2>
           {rest.map(({ site, index }) => row(site, index))}
         </section>
       ) : null}
@@ -439,13 +439,13 @@ export function ReviewFeedSheet({
           <>
             {groups.map((group) => (
               <section key={group.testId} data-testid={`${group.testId}-sheet`}>
-                <h3>{group.label}</h3>
+                <h3>{group.label} <small aria-hidden="true">{group.rows.length}</small></h3>
                 {group.rows.length ? group.rows.map(({ site, index }) => row(site, index)) : <p className="review-empty">Nothing in this group.</p>}
               </section>
             ))}
             {rest.length ? (
               <section data-testid="review-other-sheet">
-                <h3>Also in review</h3>
+                <h3>Also in review <small aria-hidden="true">{rest.length}</small></h3>
                 {rest.map(({ site, index }) => row(site, index))}
               </section>
             ) : null}

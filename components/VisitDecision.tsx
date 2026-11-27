@@ -16,7 +16,12 @@ export default function VisitDecision({ option, plan, charging }: Props) {
     {plan && <p><b>Travel</b> · {plan.decision}</p>}
     <p><b>Charging</b> · {charging?.merit.action ?? "Case pending"}</p>
     <small>{option.owner ?? "Owner unassigned"}{option.revisitOn && " · Review " + option.revisitOn}</small>
-    {plan && <details className="disclosure">
+    {plan && <VisitActions plan={plan} charging={charging}/>}
+  </div>;
+}
+
+export function VisitActions({plan,charging}:{plan: NonNullable<Props["plan"]>; charging?: ChargingSummary}) {
+  return <details className="disclosure">
       <summary className="disclosure">Actions and offer conditions</summary>
       <h4>Run in parallel</h4>
       <p><b>Seller and economics.</b> {plan.commercial}</p>
@@ -29,6 +34,5 @@ export default function VisitDecision({ option, plan, charging }: Props) {
         <p><b>Selected local case</b> · Downside price ceiling {amounts(charging.merit.downsideCeiling)}</p>}
       <p><b>Before an LOI.</b> {plan.beforeLoi}</p>
       <PowerDelayTrial/>
-    </details>}
-  </div>;
+    </details>;
 }

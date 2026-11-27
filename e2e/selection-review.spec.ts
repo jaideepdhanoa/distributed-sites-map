@@ -146,6 +146,11 @@ test("shortlisted visit shows the charging decision and its parallel diligence w
       name:"Screen",result:{siteCost:null},screen:[],selected:null}};
   await page.route("**/api/data/selection-review",route=>route.fulfill({json:{rows:[row],hasInputs:true,mismatches:0}}));
   await page.goto("/selection-review?disposition=Shortlist");
+  await expect(page.getByRole("heading",{name:"Acquisition shortlist"})).toBeVisible();
+  await expect(page.getByRole("link",{name:/needing my approval/})).toHaveAttribute("href",/qapprove=1/);
+  await expect(page.getByText("Site evidence and economics")).toBeVisible();
+  await mkdir("review-shots",{recursive:true});
+  await page.screenshot({path:"review-shots/"+info.project.name+"-acquisition-shortlist.png",animations:"disabled"});
   const card = page.locator(".visit-decision");
   await expect(card.getByText(visitPlan.reason)).toBeVisible();
   await expect(card.getByText(/Review for closure/)).toBeVisible();

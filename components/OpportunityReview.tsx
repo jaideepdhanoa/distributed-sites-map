@@ -3,7 +3,7 @@ import type { Opportunity, OpportunitySite } from "@/lib/selection/opportunity";
 import type { ChargingSummary } from "@/lib/charging/summary";
 import VisitDecision from "./VisitDecision";
 
-function Evidence({option}:{option:Opportunity}) {
+export function Evidence({option}:{option:Opportunity}) {
   return <>
     <p>{option.rationale}</p>
     <small>Reviewed {option.reviewedOn}{option.owner && " · " + option.owner}{option.revisitOn && " · Revisit " + option.revisitOn}</small>

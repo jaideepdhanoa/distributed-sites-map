@@ -6,10 +6,13 @@ import { type Assessment } from "./options";
 const sourceDocument = z.string().regex(/^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/view$/);
 const percent = z.number().min(0).max(100);
 export const assessmentSchema = z.object({
+  reviewedOn:z.string().regex(/^\d{4}-\d\d-\d\d$/).optional(),
+  inventory: z.object({parking:z.string().min(1).max(600),ground:z.string().min(1).max(600),operations:z.string().min(1).max(600),bays:z.string().min(1).max(600)}).optional(),
+  parcelCases: z.array(z.object({name:z.string().min(1).max(100),condition:z.string().min(1).max(450),approach:z.array(z.tuple([percent,percent])).min(2).max(40).optional(),conversionCost:z.number().nonnegative().optional(),lostAnnualCash:z.number().nonnegative().optional(),rows:z.array(z.object({area:z.string().min(1).max(100),edge:z.number().int().min(0).max(39),angle:z.union([z.literal(45),z.literal(60),z.literal(90)]),count:z.number().int().min(1).max(100)})).min(1).max(12)})).max(8).optional(),
   summary: z.string().min(1).max(1200), status: z.enum(["reviewed", "hold", "needs-image"]),
   recorded: z.number().int().nonnegative().nullable(), baseline: z.enum(["recorded", "unconfirmed", "conflict"]),
   zones: z.array(z.object({
-    kind: z.enum(["pad", "parking", "vacuum", "apron", "storage", "bay", "clear"]), label: z.string().max(100),
+    kind: z.enum(["ground", "pad", "parking", "vacuum", "apron", "storage", "bay", "clear"]), label: z.string().max(100),
     points: z.array(z.tuple([percent, percent])).min(3).max(40), check: z.string().max(600).optional(),
     fitHold: z.enum(["footprint", "aisle"]).optional(),
   })).max(30),
@@ -51,5 +54,5 @@ export function layoutAssessment(site: string): { row: Assessment; reviewedOn: s
   const file = assessmentFile();
   if (!file?.reviewedOn) return null;
   const checked = assessmentSchema.safeParse(file.sites?.[site]);
-  return checked.success ? { row: checked.data, reviewedOn: file.reviewedOn } : null;
+  return checked.success ? { row: checked.data, reviewedOn: checked.data.reviewedOn ?? file.reviewedOn } : null;
 }

@@ -11,6 +11,7 @@ export type Option = keyof typeof options;
 export type Point = [number, number];
 export type Bounds = [number, number, number, number];
 export const kinds = {
+  ground: { option: "retain", label: "Undeveloped ground", protect: "Trace the part that could be paved while preserving existing operations.", check: "Verify buildable depth, landscape buffers, drainage, utilities and the cost of paving." },
   pad: { option: "retain", label: "Open pad", protect: "Keep access, drainage and equipment clearance.", check: "Measure the net pad and route from the street. Confirm control of the land." },
   parking: { option: "outdoor", label: "Parking", protect: "Keep required parking, accessible spaces and travel aisles.", check: "Count parked cars at the busiest hour and confirm the parking rights. Check whether an after-hours layout serves the fleet." },
   vacuum: { option: "outdoor", label: "Vacuum row", protect: "Keep the remaining vacuum positions, tunnel queue and bypass.", check: "Measure the row and bypass. Check peak vacuum demand and contribution lost from removing positions." },
@@ -22,6 +23,7 @@ export const kinds = {
 export type Zone = { kind: keyof typeof kinds; label: string; points: Point[]; check?: string; fitHold?: "footprint" | "aisle" };
 export type Aerial = { kind?: "site-plan" | "site-photo"; metersPerPixel?: number; documentUrl?: string; id: string; src: string; source: string; date: string; width: number; height: number; bounds?: Bounds };
 export type Assessment = {
+  reviewedOn?:string; inventory?: import("./parcelLayout").Inventory; parcelCases?: import("./parcelLayout").ParcelCase[];
   status: "reviewed" | "hold" | "needs-image"; summary: string; recorded: number | null;
   baseline: "recorded" | "unconfirmed" | "conflict"; zones: Zone[]; segment: string;
   cohort: "active" | "off-market" | "dropped"; evidence?: { label:string; url:string; option:Option }[]; revision: string; image?: Aerial;
@@ -62,7 +64,7 @@ export function conversionReturn(investment: number, charging: number, displaced
 
 /** A rectangular outdoor footprint needs a map registration or a source scale bar. */
 export function outlineDimensions(zone: Zone | undefined, bounds?: Bounds, image?: Pick<Aerial,"width"|"height"|"metersPerPixel">): [number, number] | null {
-  if ((!bounds && !image?.metersPerPixel) || !zone || zone.fitHold === "footprint" || zone.kind === "bay" || zone.kind === "clear" || zone.points.length !== 4) return null;
+  if ((!bounds && !image?.metersPerPixel) || !zone || zone.fitHold === "footprint" || zone.kind === "bay" || zone.kind === "ground" || zone.kind === "clear" || zone.points.length !== 4) return null;
   const edges = zone.points.map((point, i) => {
     const next = zone.points[(i + 1) % 4];
     if (bounds) {

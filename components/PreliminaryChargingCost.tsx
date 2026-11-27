@@ -5,12 +5,12 @@ import {costRange} from "@/lib/charging/pipelineCost";
 import type {SavedScreen} from "@/lib/charging/screenLedger";
 import {ScreeningLedger} from "./ScreeningLedger";
 
-export function PreliminaryChargingCost({estimate,hypothetical=false,saveContext,initial}:{
+export function PreliminaryChargingCost({estimate,hypothetical=false,saveContext,initial,layoutName}:{
   estimate:PreliminaryCost;hypothetical?:boolean;
-  saveContext?:{site:string;source:string;canWrite:boolean;listTrial?:ListAssumptions};initial?:SavedScreen;
+  saveContext?:{site:string;source:string;canWrite:boolean;listTrial?:ListAssumptions};initial?:SavedScreen;layoutName?:string|null;
 }){
-  const [index,setIndex]=useState(0);
   const layouts="layouts" in estimate?estimate.layouts:[];
+  const [index,setIndex]=useState(()=>layoutName ? Math.max(0,layouts.findIndex(row=>row.parcel && row.condition.startsWith(layoutName+". "))) : 0);
   const layout=layouts[index]??layouts[0], basis=initial?.inputs.basis??layout?.ledger;
   return <section className="preliminary-cost" aria-label="Preliminary site cost">
     <h3>{initial?initial.name:hypothetical?"What if this footprint fits?":"Preliminary site cost per completed charge"}</h3>

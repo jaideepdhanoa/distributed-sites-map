@@ -16,7 +16,7 @@ test("compare operating layouts and model a four-stall boundary", async ({ page 
   await page.route("**/api/data/space-options?view=portfolio",r=>r.fulfill({json:{rows:[record]}}));
   await page.goto("/space-review?" + new URLSearchParams({site:id,panel:"space-options"}));
   const panel = page.getByRole("main").getByTestId("space-options");
-  await expect(panel.getByRole("button",{name:"Convert outdoor space",exact:true})).toHaveAttribute("aria-pressed","true");
+  await expect(panel.getByRole("button",{name:"All areas",exact:true})).toHaveAttribute("aria-pressed","true");
   await expect(panel).toContainText("0 stalls in the earlier screen");
   await panel.getByRole("button",{name:"Convert bays",exact:true}).click();
   await expect(panel).toContainText("No bay footprint established");
@@ -183,6 +183,10 @@ test("open a released outline in the main map on both source types", async ({pag
     if(aligned){
       await page.waitForFunction(()=>Boolean((window as unknown as {__sitesMap?:import("maplibre-gl").Map}).__sitesMap?.getSource("space-evidence-image")));
     }else await expect(work.locator("svg[role=img] image")).toBeVisible();
+    const inspectedArea = work.getByLabel("Selected footprint", { exact: true });
+    if (await inspectedArea.isVisible() && await inspectedArea.inputValue() === "") {
+      await inspectedArea.selectOption({ index: 1 });
+    }
     if(status.enabled && ["contributor","reviewer"].includes(status.actionRole)){
       await work.getByRole("button",{name:"Edit outline"}).click();
       await expect(work.getByRole("button",{name:"Save outline"})).toBeDisabled();
@@ -192,4 +196,30 @@ test("open a released outline in the main map on both source types", async ({pag
     await expect(work.getByRole("button",{name:"Comment",exact:true,expanded:true})).toBeVisible();
   }
   expect(writes).toBe(0);
+});
+
+test("review a whole parcel, switch parking geometry and inspect its aisles", async ({page},info)=>{
+  const id="PIPE-PHX-9999";
+  const frame={id:"abcd1234567890ef",source:"Illustrative parcel plan",kind:"site-plan",date:"",width:100,height:100,metersPerPixel:.3048};
+  const lot={kind:"parking",label:"North court",points:[[4,4],[76,4],[76,49],[4,49]],edited:false};
+  const site={id,name:"Example parcel",market:"PHX",cohort:"active",revision:"abcdef123456",frame,center:null,zones:[lot]};
+  const row={area:lot.label,edge:0,angle:90,count:6};
+  const parcelCases=[{name:"North row",condition:"Check the approach and peak use.",rows:[row]}];
+  const source='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="silver"/></svg>';
+  await page.route("**/api/data/space-options?view=map",r=>r.fulfill({json:{sites:[site],reviewsAvailable:true}}));
+  await page.route("**/api/data/space-options?site=*",r=>r.fulfill({json:{assessment:{row:{...site,image:{...frame,src:source},parcelCases}}}}));
+  await page.goto("/?spaces=1&spaceSite="+id);
+  const workspace=page.getByTestId("map-spaces-workspace");
+  await expect(workspace.getByRole("button",{name:"All areas",exact:true})).toHaveAttribute("aria-pressed","true");
+  await expect(workspace.getByText("6 stalls sketched")).toBeVisible();
+  const ledgerLink = new URL((await workspace.getByRole("link", { name:"See cost per charge" }).getAttribute("href"))!, page.url());
+  expect(ledgerLink.searchParams.get("basis")).toBe("screen");
+  expect(ledgerLink.searchParams.get("layout")).toBe("North row");
+  await workspace.getByText("Whole-parcel review",{exact:true}).click();
+  await expect(workspace.getByText("Undeveloped ground",{exact:true})).toBeVisible();
+  await workspace.getByText("Whole-parcel review",{exact:true}).click();
+  await page.screenshot({path:"review-shots/"+info.project.name+"-whole-parcel.png",animations:"disabled"});
+  await workspace.getByLabel("Charging layout",{exact:true}).selectOption("row");
+  await workspace.getByLabel("Stall angle").selectOption("45");
+  await expect(workspace.getByText(/Verify one-way entry/)).toBeVisible();
 });

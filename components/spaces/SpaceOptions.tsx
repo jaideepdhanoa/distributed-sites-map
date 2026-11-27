@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { Layers3 } from "lucide-react";
 import { checkSpaceFit, fitChecks } from "@/lib/spaces/fitCheck";
 import { firstOption, kinds, options, outlineDimensions, usableOutline, fitRange, threshold, optionZones, recordedFit, type Assessment, type Option, type Point } from "@/lib/spaces/options";
+import ParcelInventory from "./ParcelInventory";
+import OutlineTools from "./OutlineTools";
 import OptionAerial from "./OptionAerial";
 import { imageCandidates, isPanoUrl, type PhotoCard } from "@/lib/photos";
 import { spacesMapHref } from "@/lib/spaces/mapCatalog";
@@ -26,6 +28,7 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
   const { row, reviewedOn } = data;
   const linked = findOutline(row, useSearchParams().get("outline") || "");
   const initialOption = (linked && kinds[linked.kind].option) || firstOption(row);
+  const [allAreas,setAllAreas]=useState(!linked);
   const [option, setOption] = useState<Option>(initialOption);
   const [which, setWhich] = useState(linked ? optionZones(row, initialOption).indexOf(linked) : 0);
   const [discussion, setDiscussion] = useState(Boolean(linked));
@@ -51,7 +54,11 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
     return { ...candidate, points: geometry };
   });
   const clear = row.status === "reviewed" ? row.zones.filter(z => z.kind === "clear") : [];
-  const painted = [...visible, ...clear];
+  const other = allAreas && row.status==="reviewed" ? row.zones.filter(z=>z.kind!=="clear" && kinds[z.kind].option!==option).map(z=>{
+    const updated=history.reviews.find(({review})=>review?.option===kinds[z.kind].option && review.area===z.label && review.frame===row.image?.id && review.points)?.review?.points;
+    return updated ? {...z,points:updated} : z;
+  }) : [];
+  const painted = [...other,...visible, ...clear];
   const overlayKey = JSON.stringify({ zones: painted, reviewed });
   useEffect(() => {
     if (editing && onOverlay && row.image?.bounds) onOverlay({ site, frame: row.image.bounds, ...JSON.parse(overlayKey) });
@@ -94,18 +101,23 @@ function Workspace({ site, data, photos, onOverlay }: { site: string; data: Load
   ).flatMap(photo => imageCandidates(photo, "full").slice(0, 1).map(url => ({ url, label: photo.caption || (photo.role === "building" ? "Building photo" : "Filed site evidence") }))) : [];
   const selectArea = (index: number) => { setWhich(index); setDiscussion(false); reset(); };
   return <div className="space-workspace">
-    <div className="space-tabs" role="group" aria-label="Operating layout">{(Object.keys(options) as Option[]).map(key =>
-      <button type="button" className={key === option ? "segmented on" : "segmented"} aria-pressed={key === option} disabled={saving} key={key}
-        onClick={() => { setOption(key); selectArea(0); }}>{options[key]}</button>)}</div>
-    {row.image && <OptionAerial image={row.image} zones={painted} active={zone?.label} reviewed={reviewed} onSelect={!editing && zones.length > 1 ? label => selectArea(zones.findIndex(z => z.label === label)) : undefined} onPoint={editing && !saving ? changePoint : undefined} corner={editing ? corner : undefined} onCorner={setCorner} />}
+    <ParcelInventory inventory={row.inventory} zones={row.zones}/>
+    <div className="space-tabs" role="group" aria-label="Operating layout"><button type="button" className={allAreas ? "segmented on":"segmented"} aria-pressed={allAreas} disabled={saving} onClick={()=>{setAllAreas(true);selectArea(0);}}>All areas</button>{(Object.keys(options) as Option[]).map(key =>
+      <button type="button" className={!allAreas && key === option ? "segmented on" : "segmented"} aria-pressed={!allAreas && key === option} disabled={saving} key={key}
+        onClick={() => { setAllAreas(false); setOption(key); selectArea(0); }}>{options[key]}</button>)}</div>
+    {row.image && <OptionAerial image={row.image} zones={painted} active={zone?.label} reviewed={reviewed} onSelect={!editing ? label=>{
+      const target=painted.find(z=>z.label===label);
+      const tab=target && kinds[target.kind].option;
+      if(tab){setOption(tab);setAllAreas(false);selectArea(optionZones(row,tab).findIndex(z=>z.label===label));}
+    } : undefined} onPoint={editing && !saving ? changePoint : undefined} corner={editing ? corner : undefined} onCorner={setCorner} />}
     {painted.length > 0 && <div className="space-legend">{visible.some(z => !reviewed.includes(z.label)) && <span><i className="draft-key" />Proposed area</span>}{reviewed.length > 0 && <span><i className="review-key" />Team outline</span>}{clear.length > 0 && <span><i className="clear-key" />Keep clear</span>}</div>}
     {zones.length > 1 && <label>Candidate area<select className="secondary" value={which} disabled={saving} onChange={e => selectArea(Number(e.target.value))}>{zones.map((z,i) => <option key={z.label} value={i}>{z.label}</option>)}</select></label>}
     {zone && <div className="space-actions" aria-label={zone.label}>
       {history.state === "ready" && status.enabled && canWrite(status.actionRole) && !editing && <button type="button" className="paper-btn" onClick={() => setEditing(true)}>Adjust outline</button>}
       <button type="button" className="paper-btn" aria-expanded={discussion} onClick={() => setDiscussion(open => !open)}>Comment</button>
     </div>}
-    {editing && activePoint && zone && <div className="space-edit"><strong>Adjust a corner</strong><p>Drag a corner, tap its new position, or enter its coordinates.</p>
-      <div className="layout-inputs"><label>Corner<select className="secondary" value={corner} disabled={saving} onChange={e=>setCorner(Number(e.target.value))}>{zone.points.map((_,i) => <option key={i} value={i}>{i+1}</option>)}</select></label>
+    {editing && activePoint && zone && <div className="space-edit"><OutlineTools points={draft || zone.points} corner={corner} frame={row.image} disabled={saving} onChange={(next,index)=>{setDraft(next);setCorner(index);}}/><strong>Adjust a corner</strong><p>Drag a corner, tap its new position, or enter its coordinates.</p>
+      <div className="layout-inputs"><label>Corner<select className="secondary" value={corner} disabled={saving} onChange={e=>setCorner(Number(e.target.value))}>{(draft || zone.points).map((_,i) => <option key={i} value={i}>{i+1}</option>)}</select></label>
       {(["Horizontal %", "Vertical %"] as const).map((n,i) => <label key={n}>{n}<input className="field" type="number" min={0} max={100} step={0.1} value={activePoint[i]} disabled={saving} onChange={e => { const v=e.target.valueAsNumber; if(Number.isFinite(v)&&v>=0&&v<=100) changePoint(i===0?[v,activePoint[1]]:[activePoint[0],v]); }} /></label>)}</div>
       <div className="space-actions"><button type="button" className="primary" disabled={!draft || saving} onClick={() => void saveOutline()}>{saving ? "Saving…" : "Save outline"}</button>
         <button type="button" className="text-link" disabled={saving} onClick={reset}>Cancel</button></div>
@@ -180,9 +192,9 @@ export default function SpaceOptions({ site, photos, compact, onOpen, onOverlay 
     <div className="space-heading"><Layers3 size={19} aria-hidden="true"/><h3 id={titleId}>Space options</h3></div>
     {row?.zones.some(z=>z.kind!=="clear") && <a className="paper-btn" href={spacesMapHref(site)}>Open spaces on main map</a>}
     {row && !open && <div className="space-top">
-      {row.image && <div className="space-thumb"><OptionAerial image={row.image} zones={first ? [first] : []}/><button type="button" className="text-link" aria-label="Open annotated layout" onClick={() => setOpen(true)} /></div>}
-      <div><strong>{first ? first.label : row.status === "hold" ? "Parcel or imagery check" : row.status === "needs-image" ? "Aerial needed" : "Layout needs measurement"}</strong>
-      <p>{summary}</p>{first && <small>{options[opt]} · {fitLabel}{compactFit && " in outline test"}</small>}</div>
+      {row.image && <div className="space-thumb"><OptionAerial image={row.image} zones={row.zones}/><button type="button" className="text-link" aria-label="Open annotated layout" onClick={() => setOpen(true)} /></div>}
+      <div><strong>{row.inventory ? "Whole-parcel assessment" : first ? first.label : row.status === "hold" ? "Parcel or imagery check" : row.status === "needs-image" ? "Aerial needed" : "Layout needs measurement"}</strong>
+      <p>{row.inventory ? row.summary : summary}</p>{first && !row.inventory && <small>{options[opt]} · {fitLabel}{compactFit && " in outline test"}</small>}</div>
     </div>}
     {open && row && <p className="space-recorded">{summary}</p>}
     {!row && <p>{error ? "Space review could not be loaded." : loaded === undefined ? "Loading space review…" : "No aerial assessment on file. A parcel-matched aerial or dimensioned site plan is needed."}</p>}
@@ -190,6 +202,6 @@ export default function SpaceOptions({ site, photos, compact, onOpen, onOverlay 
     {draftError && <p role="alert">{draftError}</p>}
     {error && <button type="button" className="text-link" onClick={() => setRetry(n=>n+1)}>Retry</button>}
     {row && <button type="button" className="text-link" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? "Close layout comparison" : "Compare space options"}</button>}
-    {open && !compact && loaded && <Workspace data={loaded} site={site} photos={photos} onOverlay={onOverlay} />}
+    {open && !compact && loaded && <Workspace key={site} data={loaded} site={site} photos={photos} onOverlay={onOverlay} />}
   </section>;
 }

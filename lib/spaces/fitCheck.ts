@@ -21,6 +21,7 @@ export function checkSpaceFit(zone: Zone, frame?: ScaleFrame) {
     ? edgeFitRange(...dimensions, reserve, 24, "stalls_90") : null;
   let check: FitCheck = "measure";
   if (zone.fitHold === "footprint") check = "footprint";
+  else if (zone.kind === "ground") check = "footprint";
   else if (zone.kind === "bay") check = "interior";
   else if (inside) {
     if (inside[0] >= 4) check = "inside";

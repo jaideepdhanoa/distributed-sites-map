@@ -79,3 +79,64 @@ test("what-if costs can be compared without creating a footprint or replacing a 
   assert.equal(listScreen({...d, charging:{...c,screenTenure:{rights:"unavailable",terms:"purchase",values:{rent:null}}}}).cost.amount,null);
   assert.equal(listSpace(d.chargingSpace).count,null);
 });
+
+import {screenLedger,scenarios} from "../../lib/charging/screenLedger";
+import {saveScreen,screenHistory,screenSaveSchema} from "../../lib/charging/screenStore";
+import {caseHistory,activeCases} from "../../lib/charging/store";
+import {randomUUID} from "node:crypto";
+import {migrate} from "../../lib/actions/migrate";
+import {memorySql} from "../helpers/sql";
+
+test("screening ledger sums to each list scenario and recalculates threshold costs",()=>{
+  const estimate=preliminaryCost(deal,assumptions);
+  assert.ok("layouts" in estimate);
+  const l=estimate.layouts[0];
+  for(const [i,scenario] of scenarios.entries()){
+    const r=screenLedger(l.ledger,{},i);
+    assert.equal(Object.values(r.costs).reduce((sum,n)=>sum+n,0),r.annualCost);
+    assert.equal(r.sessions,l.base.sessions*scenario.volume);
+    assert.equal(r.perCharge,r.annualCost/r.sessions);
+  }
+  assert.equal(screenLedger(l.ledger).perCharge,l.base.perCharge);
+  assert.equal(screenLedger(l.ledger,{},3).perCharge,l.downside.perCharge);
+  const trial=screenLedger(l.ledger,{stalls:3});
+  assert.equal(trial.posts,1);assert.equal(trial.chargers,2);assert.equal(trial.sessions,3000);
+  assert.equal(trial.costs.staffing,12000);
+  assert.equal(screenLedger(l.ledger,{stalls:0}).perCharge,null);
+  assert.equal(screenLedger(l.ledger,{volume:0}).perCharge,null);
+  assert.equal(l.ledger.inputs.stalls,4);
+});
+
+test("saved screening alternative is immutable, retries safely and stays out of selected and detailed cases",async()=>{
+  const sql=await memorySql();await migrate(sql);
+  const estimate=preliminaryCost(deal,assumptions);
+  assert.ok("layouts" in estimate);
+  const basis=estimate.layouts[0].ledger,site="PIPE-PHX-9997";
+  const request=screenSaveSchema.parse({kind:"screen",name:"Three stalls",id:randomUUID(),sourceRevision:"b".repeat(24),basis:JSON.parse(JSON.stringify(basis)),scenario:0,changes:{stalls:3}});
+  const saved=await saveScreen(sql,site,"reviewer",request,estimate);
+  assert.equal(saved.inputs.basis.inputs.stalls,4);
+  assert.equal(saved.inputs.changes.stalls,3);
+  assert.equal((await saveScreen(sql,site,"reviewer",request,estimate)).id,saved.id);
+  assert.equal((await screenHistory(sql,site)).length,1);
+  await assert.rejects(saveScreen(sql,site,"reviewer",{...request,name:"Other"},estimate),/another alternative/);
+  await assert.rejects(saveScreen(sql,site,"reviewer",{...request,basis:{}},estimate),/changed/);
+  assert.equal((await caseHistory(sql,site)).length,0);assert.equal((await activeCases(sql)).length,0);
+  assert.equal(screenSaveSchema.safeParse({...request,changes:{perPost:0}}).success,false);
+  assert.equal(screenSaveSchema.safeParse({...request,changes:{stalls:1.5}}).success,false);
+});
+
+test("a layout's conversion and displaced income reconcile when business credit is removed",()=>{
+  for(const lostAnnualCash of [1000,8000]){
+    const layout={stalls:4,condition:"Parking",parcel:true,conversionCost:10000,lostAnnualCash};
+    const site={...deal,chargingSpace:{count:4,value:"4 spaces",basis:"Conditional",layouts:[layout]}};
+    const result=preliminaryCost(site,assumptions,undefined,{hypothetical:false,assumptions:{...defaultListAssumptions,creditCash:false}});
+    assert.ok("layouts" in result);
+    const row=result.layouts[0];
+    assert.equal(row.layoutCash,Math.min(0,5000-lostAnnualCash));
+    const calc=screenLedger(row.ledger);
+    assert.equal(calc.costs.conversion,1000);
+    assert.equal(calc.costs.displaced+calc.costs.cash,Math.max(0,lostAnnualCash-5000));
+    assert.equal(calc.annualCost,row.base.annualCost);
+    assert.equal(row.base.annualCost,40600+5000+1100+Math.max(0,lostAnnualCash-5000));
+  }
+});

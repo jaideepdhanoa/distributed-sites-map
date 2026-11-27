@@ -98,9 +98,14 @@ test("filter layouts and reprice the pipeline from the list", async ({page}, inf
   await expect(rows.last()).toContainText("$14.43");
   await (phone ? rows.last().getByRole("button",{name:"View calculation"}) : rows.last().getByRole("button",{name:/\$14\.43/})).click();
   await expect(dialog).toContainText("What if this footprint fits?");
-  await dialog.getByText("How this range was calculated").click();
+
   await expect(dialog).toContainText("3,000 annual charges");
-  await page.keyboard.press("Escape");
+  await page.route("**/api/actions/charging?site=*",r=>r.fulfill({json:{site:deals[0].properties,history:[],source:"sample",canWrite:false}}));
+  await dialog.getByRole("link",{name:"Open unit economics ledger"}).click();
+  const ledger=page.getByRole("region",{name:"Preliminary site cost"});
+  await expect(ledger.locator(".screen-result")).toContainText("$14.43");
+  await expect(ledger).toContainText("3,000 annual charges");
+  await page.getByRole("link",{name:/Back to site review/}).click();
   await list.getByRole("button",{name:"Cost assumptions · edited"}).click();
   await dialog.getByRole("button",{name:"Restore defaults"}).click();
   await expect(rows.first()).toContainText("$7.22");

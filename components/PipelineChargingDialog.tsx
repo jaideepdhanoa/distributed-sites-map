@@ -5,7 +5,8 @@ import type { PurchaseAssumptions } from "@/lib/purchaseReview";
 import { defaultListAssumptions, type ListAssumptions } from "@/lib/charging/preliminary";
 import { amounts } from "@/lib/charging/model";
 import type { listScreen } from "@/lib/charging/listScreen";
-import { PreliminaryChargingCost } from "./PreliminaryChargingCost";
+import {listTrialHash} from "@/lib/charging/listTrial";
+import {explanationUrl} from "@/lib/charging/evidence";
 import { ChargingLink } from "./ChargingLink";
 
 export function PipelineChargingDialog({onClose, assumptions, workbook, apply, site}:{
@@ -29,11 +30,16 @@ export function PipelineChargingDialog({onClose, assumptions, workbook, apply, s
     <div className="popover-head"><h2 id="pipeline-cost-title">{site ? site.name : "Cost assumptions"}</h2>
       <button type="button" className="close" aria-label="Close cost assumptions" onClick={onClose}>×</button></div>
     {site ? <>
-      {site.screen.estimate && <PreliminaryChargingCost estimate={site.screen.estimate} hypothetical={site.screen.group === "scenario"}/>}
+      {site.screen.estimate && "layouts" in site.screen.estimate && <section className="preliminary-cost" aria-label="Preliminary site cost">
+        <h3>{site.screen.group==="scenario"?"What if this footprint fits?":"Preliminary site cost per completed charge"}</h3>
+        <p><b>{site.screen.cost.value}</b> per completed charge</p><p>{site.screen.cost.basis}</p>
+        <p>{amounts(site.screen.estimate.layouts[0].base.annualCost)} annual net cost ÷ {Math.round(site.screen.estimate.layouts[0].base.sessions).toLocaleString("en-US")} annual charges</p>
+        <a className="text-link" href={explanationUrl(site.id,undefined,window.location.pathname+window.location.search)+"&basis=list"+listTrialHash(assumptions)}>Open unit economics ledger</a>
+      </section>}
       {!site.screen.estimate && <p>{site.screen.cost.value} · {site.screen.cost.basis}</p>}
       {site.screen.proxy != null && <p>Workbook depot proxy · {amounts(site.screen.proxy,2)} per charge, excluding electricity.</p>}
       {site.next && <p><b>Next check</b> · {site.next}</p>}
-      <ChargingLink site={site.id} revision={site.revision}>Open detailed site case</ChargingLink>
+      <ChargingLink site={site.id} revision={site.revision} basis="detail">Open detailed site case</ChargingLink>
     </> : <form onSubmit={submit}>
       <p>Compare annual net cost divided by completed charges. Changes apply to list estimates and hypothetical layouts for this session. Selected case figures use their saved inputs.</p>
       <div className="pipeline-assumption-fields">

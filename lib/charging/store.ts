@@ -1,3 +1,4 @@
+import { screenVersion } from "./screenStore";
 import type { DealProps } from "../types";
 import {networkReference} from "./reference";
 import type { Sql } from "../actions/db";
@@ -9,7 +10,7 @@ const projection = `r.case_id AS id, r.revision, r.name,r.author,r.saved_at AS a
 const join = "LEFT JOIN charging_site_case s USING (site_id,case_id,revision)";
 export async function caseHistory(sql:Sql, site:string) {
   return (await sql.query<SavedCase>(`SELECT ${projection} FROM charging_case_revisions r ${join}
-    WHERE r.site_id=$1 ORDER BY r.saved_at DESC,r.revision DESC`,[site])).rows;
+    WHERE r.site_id=$1 AND r.model_version<>$2 ORDER BY r.saved_at DESC,r.revision DESC`,[site,screenVersion])).rows;
 }
 export async function activeCases(sql:Sql) {
   return (await sql.query<SavedCase & {site_id:string}>(`SELECT r.site_id,${projection} FROM charging_case_revisions r
@@ -25,7 +26,8 @@ export async function saveCase(sql:Sql,site:string,who:string,d:SaveRequest,deal
       const old=previous.rows[0];
       if(old.id!==d.id || old.author!==who || old.site!==site || !old.identical)throw new InputError("Save request conflicts with an earlier change.",409);
     } else {
-      const current=await sql.query<{revision:number}>("SELECT COALESCE(MAX(revision),0) AS revision FROM charging_case_revisions WHERE site_id=$1 AND case_id=$2",[site,d.id]);
+      const current=await sql.query<{revision:number;screen:boolean}>("SELECT COALESCE(MAX(revision),0) AS revision, bool_or(model_version=$3) AS screen FROM charging_case_revisions WHERE site_id=$1 AND case_id=$2",[site,d.id,screenVersion]);
+      if(current.rows[0].screen)throw new InputError("A screening alternative has its own ledger.",409);
       if(current.rows[0].revision!==d.base)throw new InputError("A newer revision is available. Reload before saving.",409);
       if(d.select){
         const selected=await sql.query<{key:string}>("SELECT case_id::text || ':' || revision::text AS key FROM charging_site_case WHERE site_id=$1",[site]);

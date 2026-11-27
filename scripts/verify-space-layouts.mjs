@@ -46,26 +46,39 @@ export async function verifySpaceLayouts(origin, file, credentials) {
       const portfolio = await portfolioResponse.json();
       const visible = new Set((portfolio.rows || []).map(row => row.id));
       if (!sites.every(([site]) => visible.has(site))) throw Error("The portfolio is missing assessment records.");
-      const modeled = sites.filter(([,row])=>row.parcelCases?.length);
-      if (modeled.length) {
-        const [dealsReply,mapReply] = await Promise.all([read("/api/data/deals"),read("/api/data/space-options?view=map")]);
-        if(!dealsReply.ok || !mapReply.ok) throw Error("Could not read the published layout and cost screens.");
-        const [deals,catalog]=await Promise.all([dealsReply.json(),mapReply.json()]);
-        const records=new Map(deals.features.map(f=>[f.properties.deal_id,f.properties]));
-        for(const [id,row] of modeled) {
-          const record=records.get(id);
-          const site=catalog.sites.find(s=>s.id===id);
-          if(!record || !site || !catalog.reviewsAvailable) throw Error("Whole-parcel readback could not resolve the current map.");
-          // A subsequent team edit can legitimately invalidate a filed sketch.
-          if(site.zones.some(z=>z.edited)) continue;
-          const expected=row.parcelCases.map(c=>c.rows.reduce((n,r)=>n+r.count,0));
-          const layouts=record.chargingSpace?.layouts || [];
-          if(!isDeepStrictEqual(layouts.map(l=>l.stalls),expected)) throw Error("The pipeline does not match its filed parcel layouts.");
-          const priced=record.charging?.preliminary;
-          if(priced && "layouts" in priced && !isDeepStrictEqual(priced.layouts.map(l=>l.stalls),expected))
+      const [dealsReply,mapReply] = await Promise.all([read("/api/data/deals"),read("/api/data/space-options?view=map")]);
+      if (!dealsReply.ok || !mapReply.ok) throw Error("Could not read the published layout and cost screens.");
+      const [deals,catalog]=await Promise.all([dealsReply.json(),mapReply.json()]);
+      if (!catalog.reviewsAvailable) throw Error("The current map outlines are unavailable.");
+      const records=new Map(deals.features.map(f=>[f.properties.deal_id,f.properties]));
+      let recommendations=0, assessedSites=0, activeSites=0, activeAssessed=0;
+      for (const site of catalog.sites) {
+        if (site.assessed) { assessedSites++; recommendations+=site.assessed.combinations; }
+        const record=records.get(site.id);
+        if (!record || record.kind!=="pipeline") continue;
+        if (site.cohort==="active") { activeSites++; if (site.assessed) activeAssessed++; }
+        const layouts=record.chargingSpace?.layouts || [];
+        const system=layouts.filter(l=>l.system);
+        if (system.length!==(site.assessed?.combinations??0)) throw Error("The map and pipeline disagree on the number of recommendations.");
+        if (site.assessed && (site.assessed.stalls!==system[0].stalls || record.chargingSpace.count!==system[0].stalls ||
+            site.assessed.maximum!==Math.max(...system.map(l=>l.stalls)) ||
+            system.some(l=>l.stalls!==l.parts.reduce((n,p)=>n+p.stalls,0)))) throw Error("The pipeline and map disagree on a recommended combination.");
+        const filed=file.sites[site.id]?.parcelCases;
+        if (filed?.length && !site.zones.some(z=>z.edited)) {
+          const original=layouts.filter(l=>l.parcel && !l.system);
+          if (!isDeepStrictEqual(original.map(l=>l.stalls),filed.map(c=>c.rows.reduce((n,r)=>n+r.count,0))))
+            throw Error("The pipeline does not match its filed parcel layouts.");
+        }
+        const priced=record.charging?.preliminary;
+        if (system.length && priced && "layouts" in priced) {
+          if (!isDeepStrictEqual(priced.layouts.map(l=>[l.stalls,l.condition]),layouts.map(l=>[l.stalls,l.condition])))
             throw Error("The charging explanation and parcel geometries disagree.");
+          const rate=priced.layouts[0].base.sessions/priced.layouts[0].stalls;
+          if (priced.layouts.some(l=>Math.abs(l.base.sessions/l.stalls-rate)>1e-6))
+            throw Error("Utilization differs between the assessed combinations.");
         }
       }
+      console.log("Published layout readback:",recommendations,"system combinations across",assessedSites,"mapped assessments;",activeAssessed,"of",activeSites,"mapped active records with source outlines.");
       return sites.length;
     }
     remaining = unresolved;

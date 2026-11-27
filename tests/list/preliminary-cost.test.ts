@@ -150,3 +150,20 @@ test("a parcel row includes documented conversion cost and income displacement o
   assert.equal(priced.layouts[0].build-prior.layouts[0].build,10000);
   assert.equal(priced.layouts[0].base.annualCost-prior.layouts[0].base.annualCost,2100);
 });
+
+test("combined cases retain equal utilization and remove unverified income from a conversion",()=>{
+  const layouts=[{stalls:8,condition:"Parking",system:true,parcel:true},
+    {stalls:12,condition:"Parking and bay refit",system:true,parcel:true,operatingConversion:true}];
+  const fit={value:"8 spaces",count:8,basis:"System estimate",layouts};
+  const estimate=preliminaryCost({...deal,chargingSpace:fit},assumptions);
+  assert.ok("layouts" in estimate);
+  const [parking,conversion]=estimate.layouts;
+  assert.equal(conversion.base.sessions,parking.base.sessions*1.5);
+  assert.equal(conversion.ledger.inputs.cash,0);
+  assert.equal(parking.ledger.inputs.cash,5000);
+  assert.equal(conversion.ledger.inputs.price,parking.ledger.inputs.price);
+  assert.equal(conversion.ledger.conversionRecorded,false);
+  const reduced=screenLedger(conversion.ledger,{stalls:4});
+  assert.ok(reduced.perCharge!=null && costRange(conversion,4).startsWith("$"+reduced.perCharge.toFixed(2)));
+  assert.equal(costRange(parking,parking.stalls),costRange(parking));
+});

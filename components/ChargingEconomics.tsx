@@ -30,7 +30,7 @@ export function ChargingSiteSection({deal}:{deal:DealProps}) {
     <p>{cost.value}{cost.amount!=null && " per charge"} · {amounts(c.result.depot,2)} {c.comparator==="workbook"?"depot proxy":"depot"}</p>
     <small>{cost.basis}</small><p>{c.merit.next}</p>{!c.selected && <p className="layer-meta">{filedScreenLabel(c.screen)}</p>}<ChargingLink site={deal.deal_id} basis={screenBasis(c)} revision={c.selected}/></section>;
 }
-export function ChargingEditor({site,revision,explain=false,screenId,basis,layoutName}:{site:string;revision?:string|null;explain?:boolean;screenId?:string|null;basis?:string|null;layoutName?:string|null}) {
+export function ChargingEditor({site,revision,explain=false,screenId,basis,layoutName,omitted}:{site:string;revision?:string|null;explain?:boolean;screenId?:string|null;basis?:string|null;layoutName?:string|null;omitted?:string[]}) {
   const [payload,setPayload]=useState<Payload|null>(null),[failed,setFailed]=useState(false),[attempt,retry]=useState(0);
   useEffect(()=>{
     const ac=new AbortController();
@@ -53,11 +53,12 @@ export function ChargingEditor({site,revision,explain=false,screenId,basis,layou
   const alternatives=!!payload.screens?.length && <section><h3>Saved screening alternatives</h3>{payload.screens.map(row=>{
     const params=new URLSearchParams(window.location.search);params.delete("case");params.delete("basis");params.set("screen",row.id);
     return <p key={row.id}><a className="text-link" href={"?"+params}>{row.name}</a> · {new Date(row.at).toLocaleDateString()}</p>;})}</section>;
+  if(basis==="screen" && layoutName && !showScreen)return <section><h3>Combination cost per charge</h3><p>{estimate && "reason" in estimate ? estimate.reason : "Current cost inputs are unavailable for this combination."}</p></section>;
   if(basis==="list" && !showScreen)return <p role="status">The pipeline inputs have changed. <a className="text-link" href={explanationUrl(site)}>Open the current calculation</a></p>;
   if(showScreen){
     const href=new URLSearchParams(window.location.search);href.delete("screen");href.set("basis","detail");if(!href.has("case") && c?.selected)href.set("case",c.selected);
     return <section className="charging-editor" aria-label="Charging economics editor"><p className="eyebrow">Charging economics</p><h2 className="charging-title">{payload.site.name??site}</h2>
-      <PreliminaryChargingCost estimate={estimate??{reason:"Current site estimate unavailable"}} initial={saved} layoutName={layoutName}
+      <PreliminaryChargingCost estimate={estimate??{reason:"Current site estimate unavailable"}} initial={saved} layoutName={layoutName} omitted={omitted}
         hypothetical={!!(estimate && "layouts" in estimate && estimate.layouts[0]?.ledger?.hypothetical)} saveContext={{site,source:payload.source,canWrite:payload.canWrite && !saved,listTrial}}/>
       {alternatives}
       <a className="text-link" href={"?"+href}>Open detailed operating case</a></section>;

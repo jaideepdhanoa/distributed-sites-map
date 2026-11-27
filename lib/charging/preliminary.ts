@@ -38,7 +38,7 @@ export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?
   const wholeProperty = research ? research.basis === "Public whole-property ask" ||
     (research.basis === "Workbook asking price" && /real estate included/i.test(research.scope)) : /^yes$/i.test(w?.ownership ?? "");
   // A filed sensitivity can have explicit test terms while the actual offer still needs confirmation.
-  const matchedCases = d.chargingSpace?.layouts?.filter(l=>l.parcel).map(l=>
+  const matchedCases = d.chargingSpace?.layouts?.filter(l=>l.parcel && !l.system).map(l=>
     d.opportunityReview?.coverage?.cases.find(c=>c.stalls===l.stalls && c.price!=null && c.base!=null));
   const sharedTerms = matchedCases?.[0];
   const parcelTerms = !lease && option?.disposition==="Shortlist" && !trial?.hypothetical && sharedTerms &&
@@ -76,8 +76,10 @@ export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?
   const space=fit?.value ?? "unmeasured";
   const costed: LayoutCost[] = [];
   for (const layout of layouts) {
+    const incomeUnverified=layout.operatingConversion && layout.lostAnnualCash==null && (credited??0)>0;
+    const layoutIncome=incomeUnverified ? 0 : credited??0;
     const ledger:LedgerBasis = {
-      terms, creditCash:trial?.assumptions.creditCash, condition:layout.condition, space, priceBasis, cashBasis, hypothetical:trial?.hypothetical??false,
+      terms, creditCash:trial?.assumptions.creditCash, condition:layout.condition, space:layout.system ? layout.stalls+" assessed stalls" : space, priceBasis, cashBasis:incomeUnverified ? "Positive business income excluded until conversion losses are quantified" : cashBasis, hypothetical:trial?.hypothetical??false,
       parcel:layout.parcel, conversionRecorded:layout.conversionCost!=null, displacedRecorded:layout.lostAnnualCash!=null,
       workbookDefaults:trial ? {volume:100,unitBuild:c.unitBuild,postCost:c.attendant,upgrade:c.upgrade,cash:credited??0} : undefined,
       source:lease || filed ? null : research?.source, date:lease || filed ? null : research?.reviewedOn,
@@ -85,7 +87,7 @@ export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?
       inputs:{stalls:layout.stalls, volume:trial?.assumptions.volume??100, benchmark:c.charges, referenceYears:a.horizon, referenceStalls:a.demand,
         price, years:a.horizon, rate:a.capital*100, closing:a.closing*100, unitBuild:trial?.assumptions.unitBuild??c.unitBuild, upgrade,
         tax:c.tax*100, postCost:trial?.assumptions.attendant??c.attendant, perPost:c.perPost, fixed:c.fixed, insurance:c.insurance,
-        ports:c.ports, perCharger:c.perCharger, cash:credited??0, conversion:layout.conversionCost??0, displaced:lease?0:layout.lostAnnualCash??0},
+        ports:c.ports, perCharger:c.perCharger, cash:layoutIncome, conversion:layout.conversionCost??0, displaced:lease?0:layout.lostAnnualCash??0},
     };
     const base=screenLedger(ledger), downside=screenLedger(ledger,{},3);
     if(base.perCharge==null || downside.perCharge==null) continue;

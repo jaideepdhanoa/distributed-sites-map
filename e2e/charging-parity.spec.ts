@@ -203,3 +203,33 @@ test("open released charging ranges from the Phoenix list",async({page},info)=>{
   const panel=page.getByRole("region",{name:"Preliminary site cost"});
   expect((await panel.textContent())?.includes(label)).toBe(true);
 });
+
+test("open released charging combinations at equal utilization",async({page})=>{
+  test.skip(process.env.MAP_PRODUCTION_CHECK!=="1","Reads the released private assessment catalog.");
+  const [mapReply,dealsReply]=await Promise.all([
+    page.request.get("/api/data/space-options?view=map"),page.request.get("/api/data/deals"),
+  ]);
+  expect(mapReply.ok() && dealsReply.ok()).toBe(true);
+  const catalog=await mapReply.json() as import("../lib/spaces/mapCatalog").SpaceCatalog;
+  const {features}=await dealsReply.json() as {features:{properties:import("../lib/types").DealProps}[]};
+  const deals=new Map(features.map(f=>[f.properties.deal_id,f.properties]));
+  let count=0,priced=0;
+  for (const site of catalog.sites) {
+    const deal=deals.get(site.id);
+    if (!site.assessed || deal?.kind!=="pipeline") continue;
+    const mixes=deal.chargingSpace?.layouts?.filter(l=>l.system)??[];
+    expect(mixes.length===site.assessed.combinations && mixes[0]?.stalls===site.assessed.stalls &&
+      Math.max(...mixes.map(l=>l.stalls))===site.assessed.maximum).toBe(true);
+    count+=mixes.length;
+    const estimate=deal.charging?.preliminary;
+    if (estimate && "layouts" in estimate) {
+      const prices=estimate.layouts.filter(l=>l.system);
+      const rate=prices[0]?.base.sessions/prices[0]?.stalls;
+      expect(prices.length===mixes.length && prices.every((l,i)=>l.stalls===mixes[i].stalls &&
+        l.condition===mixes[i].condition && Math.abs(l.base.sessions/l.stalls-rate)<1e-6)).toBe(true);
+      priced+=prices.length;
+    }
+  }
+  expect(catalog.reviewsAvailable && count>0 && priced>0).toBe(true);
+  console.log("Reconciled",count,"system combinations on linked pipeline records, including",priced,"priced combinations.");
+});

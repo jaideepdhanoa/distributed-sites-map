@@ -46,6 +46,26 @@ export async function verifySpaceLayouts(origin, file, credentials) {
       const portfolio = await portfolioResponse.json();
       const visible = new Set((portfolio.rows || []).map(row => row.id));
       if (!sites.every(([site]) => visible.has(site))) throw Error("The portfolio is missing assessment records.");
+      const modeled = sites.filter(([,row])=>row.parcelCases?.length);
+      if (modeled.length) {
+        const [dealsReply,mapReply] = await Promise.all([read("/api/data/deals"),read("/api/data/space-options?view=map")]);
+        if(!dealsReply.ok || !mapReply.ok) throw Error("Could not read the published layout and cost screens.");
+        const [deals,catalog]=await Promise.all([dealsReply.json(),mapReply.json()]);
+        const records=new Map(deals.features.map(f=>[f.properties.deal_id,f.properties]));
+        for(const [id,row] of modeled) {
+          const record=records.get(id);
+          const site=catalog.sites.find(s=>s.id===id);
+          if(!record || !site || !catalog.reviewsAvailable) throw Error("Whole-parcel readback could not resolve the current map.");
+          // A subsequent team edit can legitimately invalidate a filed sketch.
+          if(site.zones.some(z=>z.edited)) continue;
+          const expected=row.parcelCases.map(c=>c.rows.reduce((n,r)=>n+r.count,0));
+          const layouts=record.chargingSpace?.layouts || [];
+          if(!isDeepStrictEqual(layouts.map(l=>l.stalls),expected)) throw Error("The pipeline does not match its filed parcel layouts.");
+          const priced=record.charging?.preliminary;
+          if(priced && "layouts" in priced && !isDeepStrictEqual(priced.layouts.map(l=>l.stalls),expected))
+            throw Error("The charging explanation and parcel geometries disagree.");
+        }
+      }
       return sites.length;
     }
     remaining = unresolved;

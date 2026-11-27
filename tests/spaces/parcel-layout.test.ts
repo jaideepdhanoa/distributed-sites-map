@@ -29,3 +29,13 @@ test("angled stalls use one-way depth and geometry stays inside the footprint",(
   assert.equal(sketchCase(proposal,[{...lot,fitHold:"aisle"}],frame),null);
   assert.equal(sketchCase(proposal,[lot],undefined),null);
 });
+
+test("a trial on another edge does not displace an assessed adjacent-aisle option",async()=>{
+  const {pipelineFit}=await import("../../lib/spaces/pipelineFit");
+  const pad: Zone={kind:"pad",label:"Pad",points:[[0,0],[48,0],[48,30],[0,30]]};
+  const site={zones:[pad],frame} as import("../../lib/spaces/mapCatalog").MapSpaceSite;
+  const assessment={inventory:{parking:"Reviewed",ground:"Reviewed",operations:"Verify the shared drive",bays:"Check clearance"}} as import("../../lib/spaces/options").Assessment;
+  const result=pipelineFit(site,assessment,true,0);
+  assert.match(result.layouts!.at(-1)!.condition,/shared aisle/);
+  assert.equal(result.layouts!.at(-1)!.stalls,5);
+});

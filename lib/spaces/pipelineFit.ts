@@ -1,4 +1,4 @@
-import { bestRow, sketchCase } from "./parcelLayout";
+import { sketchCase } from "./parcelLayout";
 import { checkSpaceFit } from "./fitCheck";
 import type { MapSpaceSite } from "./mapCatalog";
 import { kinds, type Assessment } from "./options";
@@ -29,15 +29,6 @@ export function pipelineFit(site: MapSpaceSite | undefined, assessment: Assessme
       const counts=checked.map(c=>c.stalls);
       return {value:rangeText([Math.min(...counts),Math.max(...counts)]),basis:"Conditional whole-parcel layouts · verify availability and access",
         count:Math.min(...counts),layouts:checked};
-    }
-    if (assessment?.inventory) {
-      const blocked=site.zones.filter(z=>z.kind==="clear").map(z=>z.points);
-      const rowOptions = options.filter(z=>z.kind!=="ground" && !z.fitHold).flatMap(zone=>{
-        const best=bestRow(zone,site.frame,blocked);
-        return best?.stalls ? [{stalls:best.stalls,condition:zone.label+" · "+best.angle+"° row with an internal aisle. "+(zone.check || kinds[zone.kind].check),parcel:true}] : [];
-      }).sort((a,b)=>b.stalls-a.stalls);
-      if(rowOptions.length) return {value:rangeText([rowOptions[0].stalls,rowOptions[0].stalls]),count:rowOptions[0].stalls,
-        basis:"Sketched row · verify access and peak use",layouts:rowOptions};
     }
     const layouts = options.filter(zone=>zone.kind!=="ground").map(zone => ({ zone, fit: checkSpaceFit(zone, site.frame) }))
       .filter(layout => layout.fit.inside != null)

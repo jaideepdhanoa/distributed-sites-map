@@ -1,7 +1,7 @@
 import type { DealProps } from "../types";
 import type { PipelineFit } from "../spaces/pipelineFit";
 import { amounts } from "./model";
-import { pipelineCost, costRange } from "./pipelineCost";
+import { pipelineCost, costRange, displayedPriceDelta } from "./pipelineCost";
 import { defaultListAssumptions, preliminaryCost, type ListAssumptions, type PreliminaryCost } from "./preliminary";
 
 export function listSpace(fit?: PipelineFit) {
@@ -43,8 +43,11 @@ export function hasListChanges(a:ListAssumptions, includeStalls = true) {
 export function proxyReading(screen: ReturnType<typeof listScreen>) {
   if (screen.proxy == null || !screen.estimate || !("layouts" in screen.estimate)) return "";
   const {base, downside} = screen.estimate.layouts[0];
-  const gap = downside.perCharge - screen.proxy;
+  const gap = displayedPriceDelta(downside.perCharge,screen.proxy);
+  if (gap===0) return "Matches depot proxy in downside to the cent";
   if (gap <= 0) return amounts(-gap,2) + " below depot proxy in downside";
-  if (base.perCharge <= screen.proxy) return "Below depot proxy in base only";
-  return amounts(base.perCharge - screen.proxy,2) + " above depot proxy in base";
+  const baseGap=displayedPriceDelta(base.perCharge,screen.proxy);
+  if (baseGap===0) return "Matches depot proxy in base to the cent";
+  if (baseGap<0) return "Below depot proxy in base only";
+  return amounts(baseGap,2) + " above depot proxy in base";
 }

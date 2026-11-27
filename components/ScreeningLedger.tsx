@@ -1,6 +1,7 @@
 "use client";
 import {useRef,useState, type FormEvent} from "react";
 import type {ListAssumptions} from "@/lib/charging/preliminary";
+import {displayedPriceDelta} from "@/lib/charging/pipelineCost";
 import {amounts} from "@/lib/charging/model";
 import {ledgerFields,scenarios,screenLedger,validChange,type Changes,type LedgerBasis,type LedgerKey,type SavedScreen} from "@/lib/charging/screenLedger";
 import "./screening-ledger.css";
@@ -68,7 +69,7 @@ export function ScreeningLedger({basis,saveContext,initial}:{
     {key:"construction",label:"Stall construction",fact:v.stalls+" stalls × "+amounts(v.unitBuild)+" per stall × annual recovery",fields:["unitBuild","years","rate"],test:{unitBuild:tenPct(v.unitBuild)},testLabel:v.unitBuild?"10% higher build":"$10k more per stall"},
     {key:"upgrade",label:"Utility upgrade",fact:amounts(r.upgrade)+" × annual recovery",fields:["upgrade"],test:{upgrade:v.upgrade+100000},testLabel:"$100k more before stress"},
     {key:"tax",label:"Infrastructure tax",fact:num(v.tax)+"% × "+amounts(r.build+r.upgrade)+" infrastructure",fields:["tax"],test:{tax:v.tax+.5},testLabel:"0.5 points higher"},
-    {key:"staffing",label:"Round-the-clock attendants",fact:r.posts+" staffed posts × "+amounts(v.postCost)+"/year · "+num(v.perPost)+" stalls per post",fields:["postCost","perPost"],test:{postCost:tenPct(v.postCost)},testLabel:v.postCost?"10% higher post cost":"$10k more per post"},
+    {key:"staffing",label:"Round-the-clock attendants",fact:r.posts+(r.posts===1?" staffed post × ":" staffed posts × ")+amounts(v.postCost)+"/year · "+num(v.perPost)+" stalls per post",fields:["postCost","perPost"],test:{postCost:tenPct(v.postCost)},testLabel:v.postCost?"10% higher post cost":"$10k more per post"},
     {key:"upkeep",label:"Upkeep and insurance",fact:amounts(v.fixed)+" fixed + "+amounts(v.insurance)+" insurance + "+r.chargers+" chargers × "+amounts(v.perCharger)+" · "+v.ports+" stalls per charger",fields:["fixed","insurance","perCharger","ports"],test:{fixed:v.fixed+10000},testLabel:"$10k more per year"},
     {key:"conversion",label:"Additional conversion works",fact:amounts(v.conversion)+" × annual recovery",fields:["conversion"],test:{conversion:v.conversion+100000},testLabel:"$100k more in works"},
     ...(!lease?[{key:"cash" as const,label:"Less retained operating cash",fact:basis.creditCash===false?basis.cashBasis+" · income offsets displacement only":basis.cashBasis,fields:["cash" as const],test:{cash:v.cash+100000},testLabel:"$100k more retained"},
@@ -92,22 +93,22 @@ export function ScreeningLedger({basis,saveContext,initial}:{
   const fewer=v.stalls>1?screenLedger(basis,{...changes,stalls:v.stalls-1},scenario):null;
   const sensitivities=lines.map(line=>{
     const tested=screenLedger(basis,{...changes,...line.test},scenario);
-    return {label:line.label,test:line.testLabel,impact:tested.perCharge!=null && r.perCharge!=null?tested.perCharge-r.perCharge:0};
+    return {label:line.label,test:line.testLabel,impact:tested.perCharge!=null && r.perCharge!=null?displayedPriceDelta(tested.perCharge,r.perCharge):0};
   });
-  if(fewer?.perCharge!=null && r.perCharge!=null)sensitivities.push({label:"Operating layout",test:"One fewer stall",impact:fewer.perCharge-r.perCharge});
+  if(fewer?.perCharge!=null && r.perCharge!=null)sensitivities.push({label:"Operating layout",test:"One fewer stall",impact:displayedPriceDelta(fewer.perCharge,r.perCharge)});
   const lowerVolume=screenLedger(basis,{...changes,volume:v.volume*.75},scenario);
-  if(lowerVolume.perCharge!=null && r.perCharge!=null)sensitivities.push({label:"Charge volume",test:"25% fewer completions",impact:lowerVolume.perCharge-r.perCharge});
+  if(lowerVolume.perCharge!=null && r.perCharge!=null)sensitivities.push({label:"Charge volume",test:"25% fewer completions",impact:displayedPriceDelta(lowerVolume.perCharge,r.perCharge)});
   const noIncome=basis.parcel && !lease && basis.creditCash!==false && v.cash>v.displaced?screenLedger({...basis,creditCash:false},changes,scenario):null;
   const ranked=sensitivities.filter(s=>Math.abs(s.impact)>=.005).sort((a,b)=>Math.abs(b.impact)-Math.abs(a.impact)).slice(0,3);
   return <div className="screen-ledger">
     <div className="screen-result" aria-live="polite"><div><span>{initial?"Saved screening alternative":custom?"Screening trial":basis.hypothetical?"Hypothetical layout":"Preliminary site estimate"} · {stress.label}</span>
       <strong>{priced?amounts(r.perCharge,2):"No completed charges"}</strong></div>
       <p>{priced?amounts(r.annualCost)+" annual net cost ÷ "+count(r.sessions)+" annual charges":"A cost per charge needs an operating layout and positive volume."}</p>
-      <small>Electricity and utility demand charges excluded{custom && base.perCharge!=null && priced?" · "+delta(r.perCharge!-base.perCharge)+" vs original base":""}</small></div>
+      <small>Electricity and utility demand charges excluded{custom && base.perCharge!=null && priced?" · "+delta(displayedPriceDelta(r.perCharge!,base.perCharge))+" vs original base":""}</small></div>
     <h3>What changes the result?</h3>
     <div className="screen-scenarios">{cases.map((c,i)=><button type="button" className="paper-btn screen-scenario" aria-pressed={scenario===i} key={i}
       onClick={()=>{setScenario(i);setSaved(null);setStatus("");}}><span>{scenarios[i].label}</span><b>{c.perCharge==null?"—":amounts(c.perCharge,2)}</b>
-      <small>{i===0?"Per charge":c.perCharge!=null && cases[0].perCharge!=null?delta((Math.round(c.perCharge*100)-Math.round(cases[0].perCharge*100))/100)+" vs base":"No volume"}</small></button>)}</div>
+      <small>{i===0?"Per charge":c.perCharge!=null && cases[0].perCharge!=null?delta(displayedPriceDelta(c.perCharge,cases[0].perCharge))+" vs base":"No volume"}</small></button>)}</div>
     {cases[0].perCharge!=null && cases[1].perCharge!=null && cases[2].perCharge!=null && Math.abs(Math.abs(cases[1].perCharge-cases[0].perCharge)-Math.abs(cases[2].perCharge-cases[0].perCharge))>=.005 &&
       <p className="screen-insight"><b>{Math.abs(cases[1].perCharge-cases[0].perCharge)>=Math.abs(cases[2].perCharge-cases[0].perCharge)?"Volume has the larger effect in these tests.":"The utility upgrade has the larger effect in these tests."}</b> Verify the layout and access before relying on either case.</p>}
     <h3>Completed charges</h3>
@@ -124,7 +125,7 @@ export function ScreeningLedger({basis,saveContext,initial}:{
           <span>{amounts(r.costs[line.key])}</span><span>{priced?amounts(r.costs[line.key]/r.sessions,2):"—"}</span></div>
           <p>{line.fact}</p>{line.key==="property" && basis.source?.startsWith("https://") && <a className="text-link" href={basis.source} target="_blank" rel="noopener noreferrer">Open source document ↗</a>}
           <div className="screen-tools">{editButton(line.key,"Edit "+line.label.toLowerCase())}
-          {priced && trial.perCharge!=null && <span>{line.testLabel} · <b>{delta(trial.perCharge-r.perCharge!)}/charge</b></span>}</div>
+          {priced && trial.perCharge!=null && <span>{line.testLabel} · <b>{delta(displayedPriceDelta(trial.perCharge,r.perCharge!))}/charge</b></span>}</div>
           {editor(line.key,line.fields)}</div>;})}
       <div className="screen-line screen-total"><b>Net site cost</b><b>{amounts(r.annualCost)}</b><b>{priced?amounts(r.perCharge,2):"—"}</b></div></div>
     {noIncome?.perCharge!=null && <p>Without credit for positive business income · <b>{amounts(noIncome.perCharge,2)}/charge</b> in this scenario.</p>}
@@ -136,7 +137,7 @@ export function ScreeningLedger({basis,saveContext,initial}:{
       <li><b>Layout and access.</b> Confirm the stall count, circulation and written operating rights for {basis.condition.toLowerCase()}.</li>
       <li><b>Charge volume.</b> Confirm fleet arrivals and available utility power can sustain {count(r.sessions/365)} completions per day, including the peak shift.
         {basis.proxy!=null && basis.proxy>0 && r.annualCost>0 && <> At the {amounts(basis.proxy,2)} workbook depot proxy, these costs require {count(Math.ceil(r.annualCost/basis.proxy))} completions a year.</>}</li>
-      <li><b>Staff and power costs.</b> Confirm the staffing plan for {r.posts} round-the-clock posts and obtain a utility quote against the {amounts(r.upgrade)} allowance.</li></ol>
+      <li><b>Staff and power costs.</b> Confirm the staffing plan for {r.posts} round-the-clock {r.posts===1?"post":"posts"} and obtain a utility quote against the {amounts(r.upgrade)} allowance.</li></ol>
     {(custom || scenario!==0 || initial) && <div className="screen-tools"><button className="text-link" type="button" onClick={()=>{change({});setScenario(0);}}>Reset to starting estimate</button></div>}
     {saveContext?.canWrite && priced && (custom || scenario!==0) && <form className="screen-save" onSubmit={save}><label>Alternative name<input className="field" required maxLength={80} value={name} onChange={e=>{setName(e.target.value);setSaved(null);}}/></label>
       <button type="submit" className="paper-btn" disabled={saving||!!saved||!name.trim()}>{saving?"Saving…":"Save screening alternative"}</button></form>}

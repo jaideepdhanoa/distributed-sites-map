@@ -10,7 +10,11 @@ const primary = {route:"Operating acquisition",disposition:"Shortlist",rank:1,ra
 const visitPlan = {decision:"Confirm access",reason:"Outdoor stalls do not fit. Test whether a service bay can be converted.",
   beforeVisit:"Confirm access during peak hours.", commercial:"Confirm current earnings.", power:"Ask for a service reading.",
   fieldwork:"Measure the aisle.",scenario:"Compare the layouts.",basis:"Illustrative inputs.",beforeLoi:"Confirm the property rights."};
-const review = {name:"Example service yard", primary, alternatives:[], visitPlan};
+const coverage = {reviewedOn:"2026-01-01",countyStatus:"Address matched",county:"The example address matches the parcel.",
+  countySource:"https://example.org/parcel",spaceStatus:"Needs measurement",space:"Measure the example aisle.",
+  layoutSource:"/space-review",financeStatus:"Terms needed",finance:"Confirm the lease terms.",
+  next:"Measure the aisle.",source:"https://example.org/evidence",cases:[]};
+const review = {name:"Example service yard", primary, alternatives:[], visitPlan, coverage};
 const sites = [{id:first,city:"PHX",name:review.name},{id:other,city:"LAS",name:"Example repair shop"}];
 
 async function fixtures(page: Page) {
@@ -102,6 +106,8 @@ test("read the action and open the bounded site-fit thumbnail",async({page},info
   await expect(drawer.getByText("Charging spaces", {exact:true}).first()).toBeVisible();
   await mkdir("review-shots",{recursive:true});
   await brief.screenshot({path:"review-shots/"+info.project.name+"-acquisition-brief.png"});
+  await drawer.getByText("Parcel, space and charging evidence",{exact:true}).click();
+  await expect(drawer.getByText(coverage.county,{exact:true})).toBeVisible();
   await drawer.getByRole("tab",{name:"Site fit"}).click();
   const thumb=drawer.locator(".space-thumb");
   await expect(thumb).toBeVisible();

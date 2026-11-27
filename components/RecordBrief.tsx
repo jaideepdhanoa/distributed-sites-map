@@ -5,6 +5,7 @@ import { currentSearch, rememberSearch } from "@/lib/navSearch";
 import { pipelineCost } from "@/lib/charging/pipelineCost";
 import { ChargingLink } from "./ChargingLink";
 import OpportunityReview from "./OpportunityReview";
+import SiteCoverageReview from "./SiteCoverageReview";
 import FinancialsEntry from "./FinancialsEntry";
 import { screeningEvidence } from "@/lib/screeningEvidence";
 import { financialsCard } from "@/lib/pnl/cue";
@@ -85,6 +86,7 @@ export default function RecordBrief({ target, pnl, power, ...input }: BriefProps
           active={Boolean(input.deal.stage) && !/dropped|off[ -]?market/i.test(input.deal.stage || "") && input.deal.stage_group !== "dropped"}/>
         <p><b>Deal stage</b> <span className={`stage-pill tone-${stageTone(input.deal)}`}>{status === "Desk screen" ? "Initial review" : status}</span></p>
         {metrics && <dl>{metrics}</dl>}
+        {opportunity.coverage && <SiteCoverageReview evidence={opportunity.coverage}/>}
         <details className="disclosure"><summary className="disclosure">Screening facts and follow-up</summary>{supporting}</details>
       </> : <>
         <div className="brief-decision"><span>{input.deal ? "Deal stage" : "Screening status"}</span><h3 className={input.deal ? `stage-pill tone-${stageTone(input.deal)}` : undefined}>{status}</h3></div>

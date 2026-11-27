@@ -28,7 +28,6 @@ export default function OpportunityReview({review, matched, active, charging, re
     {primary.dropReason && <p><b>Reason</b> · {primary.dropReason}</p>}
     <p><b>{visit ? "Visit decision" : ["Dropped","Archive listing","Outside mandate","Watch availability","Off-market prospect"].includes(primary.disposition) ? "Reconsider when" : "Next step"}</b> {nextDecision(review, primary)}</p>
     <small>{primary.owner ? "Owner · " + primary.owner : "Decision owner unassigned"}{primary.revisitOn && <> · Review <time dateTime={primary.revisitOn}>{primary.revisitOn}</time></>}</small>
-    {review.coverage && <SiteCoverageReview evidence={review.coverage}/>}
     <details className="disclosure"><summary className="disclosure">Review notes and sources</summary>
       {active && primary.disposition === "Shortlist" && <VisitDecision option={primary} plan={review.visitPlan} charging={charging}/>}
       {visit && <p><b>Before booking</b> {visit.beforeVisit}</p>}

@@ -115,9 +115,15 @@ export default function MainMapSpaces({
   const [angle,setAngle] = useState<Angle>(90);
   const cases = useMemo(() => site && assessment?.image?.id===site.frame.id && catalog?.reviewsAvailable
     ? assessedCases(site.zones,site.frame,assessment) : [],[site,assessment,catalog?.reviewsAvailable]);
-  const namedCase=params.get("mix");
-  const exclusions=params.getAll("omit");
+  const [localMix,setLocalMix]=useState<{site:string;from:string;name:string;omitted:string[]}|null>(null);
+  const query=params.toString();
+  // Render a checkbox immediately while the router commits the shareable URL.
+  const pending=localMix?.site===id && localMix.from===query ? localMix : null;
+  useEffect(()=>{setLocalMix(prev=>prev && (prev.site!==id || prev.from!==query) ? null : prev);},[id,query]);
+  const namedCase=pending?.name??params.get("mix");
+  const exclusions=useMemo(()=>pending?.omitted??params.getAll("omit"),[pending,params]);
   const writeMix=(name:string, omitted:string[])=>{
+    setLocalMix({site:id,from:query,name,omitted});
     const url=new URL(window.location.href);
     url.searchParams.set("mix",name);
     url.searchParams.delete("omit");
@@ -129,9 +135,9 @@ export default function MainMapSpaces({
   const parts=selectedCase ? areaCounts(selectedCase.rows) : [];
   const omitted=selectedCase?.name===namedCase ? parts.filter(p=>exclusions.includes(p.area)).map(p=>p.area) : [];
   const filtered=useMemo(()=>selectedCase && ({...selectedCase,
-    rows:selectedCase.rows.filter(r=>!(selectedCase.name===namedCase && params.getAll("omit").includes(r.area))),
-    approach:selectedCase.name===namedCase && params.has("omit") ? undefined : selectedCase.approach
-  }),[selectedCase,namedCase,params]);
+    rows:selectedCase.rows.filter(r=>!(selectedCase.name===namedCase && exclusions.includes(r.area))),
+    approach:selectedCase.name===namedCase && exclusions.length>0 ? undefined : selectedCase.approach
+  }),[selectedCase,namedCase,exclusions]);
   const matchingCase=omitted.length && filtered ? cases.find(c=>JSON.stringify(c.rows)===JSON.stringify(filtered.rows)) : undefined;
   const canTestRow = active && !active.fitHold && active.kind !== "bay" && active.kind !== "clear";
   const rowTrial = study === "row" && canTestRow;

@@ -112,7 +112,7 @@ export function ScreeningLedger({basis,saveContext,initial,startingStalls}:{
     {cases[0].perCharge!=null && cases[1].perCharge!=null && cases[2].perCharge!=null && Math.abs(Math.abs(cases[1].perCharge-cases[0].perCharge)-Math.abs(cases[2].perCharge-cases[0].perCharge))>=.005 &&
       <p className="screen-insight"><b>{Math.abs(cases[1].perCharge-cases[0].perCharge)>=Math.abs(cases[2].perCharge-cases[0].perCharge)?"Volume has the larger effect in these tests.":"The utility upgrade has the larger effect in these tests."}</b> Verify the layout and access before relying on either case.</p>}
     <h3>Completed charges</h3>
-    <p><b>{v.stalls} operating stalls</b> · {basis.condition}{v.stalls!==basis.inputs.stalls?" · trial layout":""}. {basis.hypothetical?"Recorded layout":basis.parcel?"Filed layouts":"Assessed footprint"} · {basis.space}.</p>
+    <p><b>{v.stalls} operating stalls</b> · {basis.condition}{v.stalls!==basis.inputs.stalls?" · trial layout":""}. {basis.hypothetical?"Recorded layout":basis.parcel?"Whole-parcel layout":"Assessed footprint"} · {basis.space}.</p>
     <p>{v.stalls} × {num(r.perStall)} charges/stall/year × {num(v.volume*stress.volume)}% = <b>{count(r.sessions)} per year</b> · {count(r.sessions/365)} per day.</p>
     <small>Workbook benchmark · {count(v.benchmark)} completions over {v.referenceYears} years across {v.referenceStalls} stalls. Fleet demand and power need site confirmation.</small>
     <div className="screen-tools">{editButton("volume","Test layout and volume")}

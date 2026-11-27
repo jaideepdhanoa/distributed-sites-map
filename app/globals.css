@@ -4695,7 +4695,8 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 .parcel-sketch label { display:grid; gap:.25rem; }
 .parcel-sketch select { max-width:100%; }
 .assessed-mix { display:grid; gap:.2rem; margin:.6rem 0; }
-.parcel-sketch .assessed-mix label { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:.45rem; min-height:34px; border-bottom:1px solid #e7dfd2; }
+.parcel-sketch .assessed-mix label { display:grid; grid-template-columns:18px minmax(0,1fr) auto; align-items:center; gap:.45rem; min-height:34px; border-bottom:1px solid #e7dfd2; }
+.assessed-mix input.check { width:18px; height:18px; margin:0; }
 .assessed-mix small { color:var(--ink-3); margin-top:.3rem; }
 .assessed-mix .text-link { justify-self:start; }
 @media(max-width:700px) { .parcel-sketch .assessed-mix label { min-height:44px; } }

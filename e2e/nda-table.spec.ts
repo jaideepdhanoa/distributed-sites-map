@@ -35,6 +35,9 @@ test("a site card opens its NDA and can come back", async ({ page }, info) => {
     await card.screenshot({ path: "review-shots/nda-card-hover.png" });
   }
   await card.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(card).toBeFocused();
   const ring = await card.evaluate((node) => getComputedStyle(node).outlineStyle);
   expect(ring).not.toBe("none");
   await card.click();

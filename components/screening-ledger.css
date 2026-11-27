@@ -72,3 +72,13 @@
   .ledger-presets .paper-btn { flex-direction:column; justify-content:center; gap:.12rem; white-space:normal; border-radius:.4rem; padding:.1rem .18rem; }
   .ledger-presets .paper-btn small { white-space:nowrap; }
 }
+@media(max-width:380px){
+  .preliminary-cost:has(.screen-ledger) { padding-inline:.65rem; }
+  .ledger-terms { column-gap:.3rem; }
+  .screen-item .screen-line { row-gap:0; }
+  .screen-item .screen-line>div { display:contents; }
+  .screen-item .screen-line>div>b { grid-area:1 / 1; }
+  .screen-item .screen-line>div>small { grid-area:2 / 1 / 3 / -1; }
+  .screen-item .screen-line>span { grid-area:1 / 2; }
+  .screen-item .screen-line>b { grid-area:1 / 3; }
+}

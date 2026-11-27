@@ -224,6 +224,11 @@ test("explain a preliminary range with a conditional aisle on desktop and phone"
   await test.info().attach("Ledger row heights",{body:JSON.stringify({purchase:rowHeights[0],utility:rowHeights[1]}),contentType:"application/json"});
   expect(rowHeights[0]).toBeLessThan(info.project.name==="mobile"?300:210);
   await page.screenshot({path:"review-shots/"+info.project.name+"-charging-ledger-rows.png",animations:"disabled"});
+  if (info.project.name === "mobile") {
+    await page.setViewportSize({width:320,height:730});
+    expect((await purchase.boundingBox())!.height).toBeLessThan(300);
+    expect(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  }
 });
 
 test("open released charging ranges from the Phoenix list",async({page},info)=>{

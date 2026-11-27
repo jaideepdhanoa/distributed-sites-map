@@ -36,7 +36,7 @@ export function listScreen(d: DealProps, assumptions = defaultListAssumptions) {
 }
 
 export function hasListChanges(a:ListAssumptions, includeStalls = true) {
-  return (includeStalls && a.stalls !== defaultListAssumptions.stalls) || a.volume !== 100 || !a.creditCash ||
+  return (includeStalls && a.stalls !== defaultListAssumptions.stalls) || !a.creditCash ||
     a.upgrade != null || a.unitBuild != null || a.attendant != null;
 }
 

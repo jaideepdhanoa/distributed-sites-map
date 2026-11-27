@@ -20,7 +20,7 @@ test("site range reconciles separate site costs and scaled completed charges", (
   assert.equal(estimate.space,"0 spaces");
   assert.match(layout.condition,/shared aisle/);
   assert.deepEqual(layout.base,{sessions:4000,upgrade:20000,annualCost:40600,perCharge:10.15});
-  assert.deepEqual(layout.downside,{sessions:3000,upgrade:30000,annualCost:41700,perCharge:13.9});
+  assert.deepEqual(layout.downside,{sessions:4000,upgrade:30000,annualCost:41700,perCharge:10.425});
   const summary = {result:{siteCost:null},screen:[],preliminary:estimate} as unknown as ChargingSummary;
   assert.equal(pipelineCost(summary).value,costRange(layout));
   assert.equal(pipelineCost({...summary,stale:true}).amount,null);
@@ -69,7 +69,7 @@ test("what-if costs can be compared without creating a footprint or replacing a 
   assert.equal(screen.group,"scenario");
   assert.match(screen.cost.basis,/If 6 spaces fit/);
   assert.equal(screen.cost.amount,43300/6000);
-  assert.equal(listScreen(d,{...defaultListAssumptions,volume:50}).cost.amount,43300/3000);
+  assert.equal(listScreen(d,{...defaultListAssumptions,volume:50}).cost.amount,43300/6000);
   const trial = listScreen(d,{...defaultListAssumptions,upgrade:0,attendant:0,unitBuild:0,creditCash:false});
   assert.equal(trial.cost.amount,15500/6000);
   assert.equal(listScreen({...d,charging:{...c,selected:"case:1",result:{...c.result,siteCost:8}}}).cost.amount,8);
@@ -80,7 +80,7 @@ test("what-if costs can be compared without creating a footprint or replacing a 
   assert.equal(listSpace(d.chargingSpace).count,null);
 });
 
-import {screenLedger,scenarios} from "../../lib/charging/screenLedger";
+import {screenLedger,savedChanges} from "../../lib/charging/screenLedger";
 import {saveScreen,screenHistory,screenSaveSchema} from "../../lib/charging/screenStore";
 import {caseHistory,activeCases} from "../../lib/charging/store";
 import {randomUUID} from "node:crypto";
@@ -91,14 +91,16 @@ test("screening ledger sums to each list scenario and recalculates threshold cos
   const estimate=preliminaryCost(deal,assumptions);
   assert.ok("layouts" in estimate);
   const l=estimate.layouts[0];
-  for(const [i,scenario] of scenarios.entries()){
-    const r=screenLedger(l.ledger,{},i);
+  for(const upgrade of [0,20000,30000]){
+    const r=screenLedger(l.ledger,{upgrade});
     assert.equal(Object.values(r.costs).reduce((sum,n)=>sum+n,0),r.annualCost);
-    assert.equal(r.sessions,l.base.sessions*scenario.volume);
+    assert.equal(r.sessions,l.base.sessions);
     assert.equal(r.perCharge,r.annualCost/r.sessions);
   }
   assert.equal(screenLedger(l.ledger).perCharge,l.base.perCharge);
-  assert.equal(screenLedger(l.ledger,{},3).perCharge,l.downside.perCharge);
+  assert.equal(screenLedger(l.ledger,{upgrade:30000}).perCharge,l.downside.perCharge);
+  const archived=savedChanges({id:"archive",author:"Reviewer",at:"2025-01-01",name:"Historic",inputs:{basis:l.ledger,changes:{},scenario:3}});
+  assert.equal(screenLedger(l.ledger,archived).perCharge,13.9);
   const trial=screenLedger(l.ledger,{stalls:3});
   assert.equal(trial.posts,1);assert.equal(trial.chargers,2);assert.equal(trial.sessions,3000);
   assert.equal(trial.costs.staffing,12000);
@@ -120,6 +122,7 @@ test("saved screening alternative is immutable, retries safely and stays out of 
   assert.equal((await screenHistory(sql,site)).length,1);
   await assert.rejects(saveScreen(sql,site,"reviewer",{...request,name:"Other"},estimate),/another alternative/);
   await assert.rejects(saveScreen(sql,site,"reviewer",{...request,basis:{}},estimate),/changed/);
+  await assert.rejects(saveScreen(sql,site,"reviewer",{...request,changes:{volume:75}},estimate),/shared across/);
   assert.equal((await caseHistory(sql,site)).length,0);assert.equal((await activeCases(sql)).length,0);
   assert.equal(screenSaveSchema.safeParse({...request,changes:{perPost:0}}).success,false);
   assert.equal(screenSaveSchema.safeParse({...request,changes:{stalls:1.5}}).success,false);
@@ -161,6 +164,10 @@ test("combined cases retain equal utilization and remove unverified income from 
   assert.equal(conversion.base.sessions,parking.base.sessions*1.5);
   assert.equal(conversion.ledger.inputs.cash,0);
   assert.equal(parking.ledger.inputs.cash,5000);
+  assert.equal(conversion.ledger.withheldOperatingCash,5000);
+  assert.equal(screenLedger(conversion.ledger,{displaced:1250}).costs.cash,-5000);
+  assert.equal(screenLedger(conversion.ledger,{displaced:1250,cash:0}).costs.cash,0);
+  assert.equal(screenLedger(conversion.ledger,{displaced:1250}).annualCost,conversion.base.annualCost-3750);
   assert.equal(conversion.ledger.inputs.price,parking.ledger.inputs.price);
   assert.equal(conversion.ledger.conversionRecorded,false);
   const reduced=screenLedger(conversion.ledger,{stalls:4});

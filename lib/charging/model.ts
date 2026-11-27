@@ -178,7 +178,7 @@ export function calculate(c:Inputs, trace?:CalculationTrace) {
 // This is a one-input-at-a-time range, with all other case assumptions held fixed.
 export function diligenceDrivers(c:Inputs, baseline=calculate(c)) {
   if(baseline.difference==null)return [];
-  const drivers:Key[]=["demand","supply","load","stalls","uptime","dwell","energy","wage","hostFee","build","upgrade","conversion","loss","cash","fixed","depot"];
+  const drivers:Key[]=[c.terms==="lease"?"rent":"ask","stalls","build","upgrade","conversion","loss","cash","wage","hostFee","fixed"];
   return drivers.flatMap(key=>{
     const value=c.values[key];
     if(value==null || value===0 || c.evidence[key]?.status==="verified")return [];

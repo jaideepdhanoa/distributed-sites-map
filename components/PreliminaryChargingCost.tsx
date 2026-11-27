@@ -4,13 +4,13 @@ import { costRange } from "@/lib/charging/pipelineCost";
 
 const count = (n: number) => Math.round(n).toLocaleString("en-US");
 
-export function PreliminaryChargingCost({ estimate }: { estimate: PreliminaryCost }) {
+export function PreliminaryChargingCost({ estimate, hypothetical = false }: { estimate: PreliminaryCost; hypothetical?: boolean }) {
   return <section className="preliminary-cost" aria-label="Preliminary site cost">
-    <h3>Preliminary site cost per completed charge</h3>
+    <h3>{hypothetical ? "What if this footprint fits?" : "Preliminary site cost per completed charge"}</h3>
     {"reason" in estimate ? <p>{estimate.reason}.</p> : <>
       {estimate.layouts.map(layout => <div key={layout.condition}>
         <strong>{costRange(layout)}</strong>
-        <p>{layout.stalls} {layout.stalls === 1 ? "space" : "spaces"} · {layout.condition}. The footprint alone was assessed at {estimate.space}.</p>
+        <p>{layout.stalls} {layout.stalls === 1 ? "space" : "spaces"} · {layout.condition}. {hypothetical ? "Recorded layout: " : "Footprint on its own: "}{estimate.space}.</p>
         <details className="disclosure cost-section"><summary className="disclosure">How this range was calculated</summary>
           <dl>
             <dt>Base estimate</dt><dd>{amounts(layout.base.annualCost)} annual net cost ÷ {count(layout.base.sessions)} annual charges = {amounts(layout.base.perCharge, 2)} per charge.</dd>
@@ -19,7 +19,7 @@ export function PreliminaryChargingCost({ estimate }: { estimate: PreliminaryCos
             <dt>Construction and power</dt><dd>{amounts(layout.build)} for the stalls. The utility upgrade is {amounts(layout.base.upgrade)} in the base case and {amounts(layout.downside.upgrade)} in the downside. Capital is recovered over {estimate.years} years at {(estimate.capital * 100).toFixed(1)}%, plus annual infrastructure tax of {(estimate.tax * 100).toFixed(1)}%.</dd>
             <dt>Annual operations</dt><dd>{amounts(layout.staffing)} for round-the-clock Moove attendants and {amounts(layout.upkeep)} for upkeep and insurance. {estimate.cashBasis} · {amounts(estimate.cash)} per year.</dd>
           </dl>
-          <p>Charge volume uses the workbook’s completed charges per stall, scaled to this layout. It assumes enough fleet demand and power from the utility. Confirm peak demand, power and access before relying on it.</p>
+          <p>Charge volume is scaled to the stalls in this layout. It assumes enough fleet demand and power from the utility. Confirm peak demand, power and access before relying on it.</p>
           <p>Excludes electricity, demand charges, additional conversion work, interrupted business income and shared management overhead.</p>
         </details>
       </div>)}

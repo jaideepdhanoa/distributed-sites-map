@@ -46,3 +46,12 @@ test("site costs keep zero, missing figures, hypothetical network cases and stal
   assert.equal(example.amount,null);
   assert.match(example.basis,/Network example: \$9.00\/charge at 4 assumed spaces/);
 });
+
+test("a conditional one-to-three-stall layout is counted below the four-stall screening threshold", () => {
+  const site = {frame:{width:100,height:100,metersPerPixel:.3048},
+    zones:[{kind:"parking",label:"Example strip",points:[[0,0],[29,0],[29,20],[0,20]]}]} as MapSpaceSite;
+  const fit = pipelineFit(site,undefined,true,null);
+  assert.equal(fit.count,0);
+  assert.deepEqual(fit.layouts,[{stalls:3,condition:"Parking with shared aisle access"}]);
+  assert.match(fit.basis,/up to 3 with a shared aisle/);
+});

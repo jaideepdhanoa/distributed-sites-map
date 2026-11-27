@@ -43,7 +43,7 @@ test("reach the all-market shortlist from home and keyboard search", async ({pag
   await expect(page.getByRole("heading",{name:"Phoenix pipeline"})).toBeVisible();
   await nav.getByRole("link",{name:"Acquisition shortlist"}).click();
   await expect(page).toHaveURL(url=>url.pathname+url.search===acquisitionShortlist);
-  await expect(page.getByText(/2 of 2 active sites/)).toBeVisible();
+  await expect(page.getByRole("heading", {name:"Example repair shop"})).toBeVisible();
   await page.goBack();
   await page.getByTestId("scope-search").filter({visible:true}).click();
   const query=page.getByRole("textbox",{name:"Search everything"});
@@ -58,10 +58,10 @@ test("open a scoped Spaces catalog and restore the original map camera",async({p
   await mapReady();
   await page.getByRole("button",{name:"Zoom in",exact:true}).click();
   const camera=()=>page.evaluate(()=>{
-    const m=(window as Window & {__sitesMap:SiteMap}).__sitesMap;
+    const m=(window as unknown as Window & {__sitesMap:SiteMap}).__sitesMap;
     return m ? [...m.getCenter().toArray(),m.getZoom()].map(x=>Number(x.toFixed(3))) : null;
   });
-  await page.waitForFunction(()=>!(window as Window & {__sitesMap:SiteMap}).__sitesMap.isMoving());
+  await page.waitForFunction(()=>!(window as unknown as Window & {__sitesMap:SiteMap}).__sitesMap.isMoving());
   const before=await camera();
   await page.getByRole("group",{name:"Map tools"}).getByRole("button",{name:"Spaces"}).click();
   await expect(page.getByText("1 space across 1 site")).toBeVisible();

@@ -94,8 +94,11 @@ test("save review screenshots from the local build", async ({ page }, info) => {
   await page.goto("/?funnel=pipeline&city=PHX&view=list", { waitUntil: "domcontentloaded" });
   await page.waitForSelector(".pipeline-list");
   if (name !== "mobile") {
-    await expect(page.locator(".pipeline-list thead th")).toHaveCount(10);
-    await expect(page.locator(".pipeline-list thead")).toContainText("County check");
+    const header = page.locator(".pipeline-list thead");
+    await expect(header).toContainText("Charging spaces");
+    await expect(header).toContainText("Cost per charge");
+    await expect(header).not.toContainText(/Historical score|County check|Open land/);
+    expect((await header.boundingBox())!.height).toBeLessThanOrEqual(44);
     const overflow = await page.locator(".pipeline-list .list-scroll").evaluate((node) => node.scrollWidth - node.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   } else {

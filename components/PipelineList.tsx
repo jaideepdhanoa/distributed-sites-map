@@ -1,5 +1,9 @@
 "use client";
 
+import { compareAttention, matchingOption } from "@/lib/selection/opportunity";
+import { recommendation, recommendationNote } from "@/lib/selection/opportunityDisplay";
+import { pipelineCost } from "@/lib/charging/pipelineCost";
+import { ChargingLink } from "./ChargingLink";
 import { dropReasons } from "@/lib/selection/dropReasons";
 import { useSearchParams } from "next/navigation";
 import { reviewLink, rememberReviewPosition, restoreReviewPosition, setReviewFilter } from "@/lib/reviewNavigation";
@@ -20,7 +24,6 @@ import {
   checkedShort,
   compactMoney,
   depotLine,
-  isOpenLandBlank,
   fullMoney,
   capacitySummary,
   listScoreText,
@@ -31,9 +34,8 @@ import {
   openLandText,
   vehiclesPerDay,
   summaryOf,
-  acresTotal,
 } from "@/lib/keyNumbers";
-import { basisBadge, compMedianOf } from "@/lib/pricing";
+import { basisBadge } from "@/lib/pricing";
 import { storedScoreView } from "@/lib/scoreDisplay";
 import { marketBucket } from "@/lib/counts";
 import { stripPlace, stripStats, stripTip, type StripDirection, type StripStats } from "@/lib/rangeStrip";
@@ -94,13 +96,16 @@ function scoreInput(row: PipelineRow) {
   };
 }
 
+function priceQualifier(deal: DealProps) {
+  return deal.listing_removed || ["Watch availability", "Archive listing"].includes(deal.opportunityReview?.primary.disposition ?? "")
+    ? "last advertised" : "asking";
+}
+
 function phoneFacts(row: PipelineRow, signedIn: boolean): string[] {
   const deal = row.deal;
-  const asking = signedIn && deal.asking_price != null ? `${compactMoney(deal.asking_price)} asking` : "";
+  const asking = signedIn && deal.asking_price != null ? `${compactMoney(deal.asking_price)} ${priceQualifier(deal)}` : "";
   const party = shownFirm(deal) || shownBroker(deal) || shownPriceSource(deal);
-  const land = openLandLabel(deal.open_land_sqft, deal.open_land_basis);
-  const openLand = isOpenLandBlank(land) ? "" : `${land} open`;
-  return [asking, party, openLand].map(phoneFact).filter(Boolean);
+  return [asking, party].map(phoneFact).filter(Boolean);
 }
 
 function dealChips(deal: DealProps, signedIn: boolean) {
@@ -111,6 +116,12 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   const deal = row.deal;
   if (id === "site") return deal.name || deal.address || deal.deal_id;
   if (id === "stage") return stageChipLabel(deal.stage, deal.stage_group);
+  if (id === "priority") return signedIn ? (deal.opportunityReview ? recommendation(deal.opportunityReview.primary) : "Awaiting review") : "";
+  if (id === "spaces" || id === "chargeCost") {
+    if (!signedIn || deal.kind === "land") return "";
+    const fact = id === "spaces" ? deal.chargingSpace : pipelineCost(deal.charging);
+    return fact ? [fact.value, fact.basis].filter(Boolean).join(" · ") : "No layout estimate";
+  }
   if (id === "merit") return signedIn ? deal.charging?.merit.action ?? deal.screening?.priority ?? "—" : "";
   if (id === "county") return row.countyLabel || "—";
   if (id === "score") {
@@ -131,7 +142,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
     if (!signedIn) return "—";
     if (!deal.asking_price_display) return "—";
     const source = shownPriceSource(deal);
-    return source ? `${deal.asking_price_display} · ${source}` : deal.asking_price_display;
+    return [deal.asking_price_display, priceQualifier(deal) === "last advertised" ? "Last advertised" : "", source].filter(Boolean).join(" · ");
   }
   if (id === "acres") return acresText(deal.land_acres) || "—";
   if (id === "perAcre") return signedIn ? (deal.price_per_acre_display || "—") : "—";
@@ -193,6 +204,8 @@ function stageFilterCode(deal: DealProps): string {
 
 function sortValue(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   const deal = row.deal;
+  if (id === "spaces") return signedIn ? deal.chargingSpace?.count ?? null : null;
+  if (id === "chargeCost") return signedIn ? pipelineCost(deal.charging).amount : null;
   if (id === "merit") return deal.charging?.merit.order ?? null;
   if (id === "asking") return signedIn ? deal.asking_price : null;
   if (id === "score") return typeof deal.score === "number" ? deal.score : null;
@@ -302,7 +315,7 @@ export default function PipelineList({
   const fallback = useMemo(() => {
     const optional = PIPELINE_COLUMNS.filter((column) => "optional" in column && column.optional).map((column) => column.id);
     const base=defaultLayout(allowed, ["site"], optional);
-    if(signedIn)base.sort={id:"merit",desc:false};
+    if(signedIn)base.sort={id:"priority",desc:false};
     return base;
   }, [allowed,signedIn]);
   const seed = useMemo(() => (columnSeed?.length ? defaultLayout(allowed, ["site"], allowed.filter((id) => id !== "site" && !columnSeed.includes(id))) : null), [allowed, columnSeed]);
@@ -342,6 +355,7 @@ export default function PipelineList({
       label: PIPELINE_COLUMNS.find((column) => column.id === id)?.label || id,
       className: id === "capacity" ? "power-col" : id === "stage" ? "stage-col" : undefined,
       customTip: id === "stage" || id === "score" || id === "county" || id === "type",
+      compare: id === "priority" ? (a, b) => compareAttention(a.deal.opportunityReview?.primary, b.deal.opportunityReview?.primary) : undefined,
       text: (row) => cell(row, id as PipelineColumnId, signedIn),
       choices,
       hasValues: choices ? rows.some((row) => Boolean(codeOf(row))) : undefined,
@@ -371,11 +385,6 @@ export default function PipelineList({
     }
   },[ordered.length,origin,phone]);
   const summary = useMemo(() => summaryOf(ordered.map((row) => row.deal)), [ordered]);
-  const compMedian = useMemo(() => compMedianOf(ordered.map((row) => row.deal)), [ordered]);
-  const marketComps = new Map<string, number>();
-  for (const { deal } of ordered) {
-    if (signedIn && deal.city && deal.comp_median_per_acre != null) marketComps.set(deal.city, deal.comp_median_per_acre);
-  }
   const strips = useMemo(() => ({
     asking: stripStats(ordered.map((row) => (signedIn ? row.deal.asking_price : null))),
     acres: stripStats(ordered.map((row) => row.deal.land_acres)),
@@ -506,10 +515,11 @@ export default function PipelineList({
   }
 
   const summaryBar = (
-    <ShortlistSummary title={title} count={ordered.length} commonStage={commonStage}>
+    <ShortlistSummary noun="pipeline" title={title} count={ordered.length} commonStage={commonStage}>
       <div><span className="only-desktop">Median asking</span><span className="only-mobile">Median asking</span><strong title={summary.medianAsking == null ? "Not on file" : undefined}>{summary.medianAsking == null ? "—" : fullMoney(summary.medianAsking)}</strong><small>{summary.withAsking} of {summary.count} reported</small></div>
-      <div><span className="only-desktop">Land listed</span><span className="only-mobile">Land</span><strong>{summary.count === 0 ? "No matching sites" : summary.withAcres ? acresTotal(summary.totalAcres) : "Acreage unknown"}</strong>{summary.withAcres > 0 && <small>{summary.withAcres} of {summary.count} reported</small>}</div>
-      <div><span className="only-desktop">Market land comps / acre</span><span className="only-mobile">Land comps / acre</span><strong title={signedIn ? compMedian.tip : "Signed out"}>{!signedIn || compMedian.value == null ? "—" : compactMoney(compMedian.value)}</strong>{signedIn && <details className="disclosure"><summary className="disclosure">Market basis</summary><p>{compMedian.tip}</p>{Array.from(marketComps, ([market, value]) => <p key={market}>{market} · {fullMoney(value)} per acre</p>)}</details>}</div>
+      {signedIn && <div><span>Acquisition shortlist</span><strong>{ordered.filter(({deal}) => matchingOption(deal.opportunityReview, "Shortlist", "")).length}</strong>
+        <a className="text-link" onClick={() => rememberReviewPosition(listScroller(), "", picked)} href={reviewLink("/selection-review", {scope, disposition:"Shortlist"}, origin)}>Review shortlisted sites</a></div>}
+      {signedIn && <div><span>Space estimates</span><strong>{ordered.filter(({deal}) => deal.chargingSpace?.count != null).length} of {ordered.length}</strong><small>sites with a stall count</small></div>}
     </ShortlistSummary>
   );
   const outside = outsideRow ? (
@@ -558,7 +568,7 @@ export default function PipelineList({
           columns={PIPELINE_COLUMNS.filter((column) => allowed.includes(column.id)).map((column) => ({ id: column.id, label: column.label }))}
           hidden={activeLayout.hidden}
           onToggle={(id) => toggleColumn(id as PipelineColumnId)}
-          onReset={() => { update(defaultLayout(allowed)); onResetColumns(); }}
+          onReset={() => { update(fallback); onResetColumns(); }}
         />
         <SortControl
           columns={visible.flatMap((id) => {
@@ -575,7 +585,7 @@ export default function PipelineList({
           <button type="button" className="paper-btn" aria-expanded={moreOpen} aria-haspopup="menu" aria-label="More list actions" onClick={() => setMoreOpen((value) => !value)}>More</button>
           {moreOpen ? (
             <div className="menu" role="menu" aria-label="List actions">
-              {signedIn && <a className="menu-item" role="menuitem" onClick={()=>rememberReviewPosition(listScroller(),"",picked)} href={reviewLink("/selection-review",{scope},origin)}>Screen pipeline</a>}
+              {signedIn && <a className="menu-item" role="menuitem" onClick={()=>rememberReviewPosition(listScroller(),"",picked)} href={reviewLink("/selection-review",{scope,disposition:"Shortlist"},origin)}>Review shortlisted sites</a>}
               {signedIn && <a className="menu-item" role="menuitem" onClick={()=>rememberReviewPosition(listScroller(),"",picked)} href={reviewLink("/space-review",{scope},origin)}>Review layouts</a>}
               {<button type="button" className="menu-item" role="menuitem" onClick={() => { toggleAll(); setMoreOpen(false); }}>{allOn ? "Clear selection" : "Select all shown"}</button>}
               <button type="button" className="menu-item" role="menuitem" onClick={() => { setMoreOpen(false); download(ordered); }}>Export CSV</button>
@@ -601,8 +611,11 @@ export default function PipelineList({
               stageNote: droppedDecisionLine(row.deal),
               tone: stageTone(row.deal),
               facts: phoneFacts(row, signedIn),
-              actionLabel: signedIn ? row.deal.charging?.merit.action : undefined,
-              action: signedIn ? row.deal.charging?.merit.next || plainNextStep(row.deal.next_step || "").line || undefined : undefined,
+              actionLabel: signedIn && row.deal.opportunityReview ? "Review priority" : undefined,
+              action: signedIn ? (row.deal.opportunityReview ? recommendation(row.deal.opportunityReview.primary) : plainNextStep(row.deal.next_step || "").line || undefined) : undefined,
+              measures: signedIn && row.deal.kind === "pipeline" ? [
+                ["Charging spaces", cell(row, "spaces", true)], ["Cost per charge", cell(row, "chargeCost", true)],
+              ] : undefined,
               chips: (() => {
                 if (row.deal.kind === "land") return <LandPausedChip />;
                 if (row.deal.next_step && signedIn) return null;
@@ -638,6 +651,16 @@ export default function PipelineList({
         ) : null}
         renderCell={(row, column) => {
           const id = row.deal.deal_id;
+          if (column === "priority" && row.deal.opportunityReview) return <span title={recommendationNote(row.deal.opportunityReview.primary)}>{recommendation(row.deal.opportunityReview.primary)}</span>;
+          if (column === "spaces" || column === "chargeCost") {
+            if (!signedIn || row.deal.kind === "land") return "—";
+            const cost = column === "chargeCost";
+            const fact = cost ? pipelineCost(row.deal.charging) : row.deal.chargingSpace;
+            return <span className="pipeline-measure">{cost && row.deal.charging
+              ? <ChargingLink site={id} revision={row.deal.charging.selected}>{fact?.value}</ChargingLink>
+              : <strong>{fact?.value || "No layout estimate"}</strong>}
+              {fact?.basis && <small>{fact.basis}</small>}</span>;
+          }
           if (column === "openLand") return <NumberCell label={cell(row, "openLand", signedIn)} value={openLandMeasured(row.deal.open_land_sqft, row.deal.open_land_basis) ? row.deal.open_land_sqft : null} stats={strips.openLand} direction="higher" format={openLandText} />;
           if (column === "asking") return <AskingCell deal={row.deal} stats={strips.asking} onBroker={onBroker} signedIn={signedIn} />;
           if (column === "acres") return <NumberCell label={cell(row, "acres", signedIn)} value={row.deal.land_acres} stats={strips.acres} format={(value) => acresText(value) || String(value)} />;
@@ -694,9 +717,6 @@ export default function PipelineList({
                   {cell(row, "site", signedIn)}
                   {row.noPin ? <span className="no-pin"> No pin</span> : null}
                 </span>
-                {signedIn && row.deal.opportunityReview && <small className="site-address" title={row.deal.opportunityReview.primary.next}>
-                  {row.deal.opportunityReview.primary.disposition}{row.deal.opportunityReview.primary.dropReason && " · " + row.deal.opportunityReview.primary.dropReason}{row.deal.opportunityReview.primary.rank != null && " #" + row.deal.opportunityReview.primary.rank}
-                </small>}
                 {signedIn && onFinancials && row.deal.kind==="pipeline" && <button type="button" className="text-link" onClick={e=>{e.stopPropagation();onFinancials(id);}}>Financials</button>}
                 <span className="site-meta">
                   {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== String(row.deal.name || "").trim() ? (
@@ -705,7 +725,7 @@ export default function PipelineList({
                   <NearMark deal={row.deal} />
                   {signedIn ? (() => {
                     const drop = dealChips(row.deal, signedIn).find((chip) => chip.family === "drop_reason") || suggestedDropChip(String(row.deal.suggested_drop || ""));
-                    if (!drop) return null;
+                    if (!drop || (drop.source === "suggested_drop" && row.deal.opportunityReview && row.deal.opportunityReview.primary.disposition !== "Suggest drop")) return null;
                     return <span data-testid={drop.source === "suggested_drop" ? "suggested-drop" : undefined}><TagChip chip={drop} compact /></span>;
                   })() : null}
                 </span>
@@ -716,7 +736,7 @@ export default function PipelineList({
           return cell(row, column as PipelineColumnId, signedIn);
         }}
         flexIds={["site", "asking", "capacity", "traffic", "cashFlow"]}
-        wrapIds={["site", "stage", "asking", "cashFlow"]}
+        wrapIds={["priority", "chargeCost", "spaces", "site", "stage", "asking", "cashFlow"]}
         trailing={(row) => (
           <button type="button" className={row.noPin ? "text-link no-pin" : "text-link"} onClick={(event) => { event.stopPropagation(); onShowMap(row.deal.deal_id); }}>{row.noPin ? "No pin" : "Show on map"}</button>
         )}
@@ -863,7 +883,7 @@ function AskingCell({ deal, stats, onBroker, signedIn }: { deal: DealProps; stat
   );
   return (
     <span className="metric">
-      <span className="metric-label" title={full}>{price}{sourceNode ? <> · {sourceNode}</> : null}</span>
+      <span className="metric-label" title={full}>{price}{priceQualifier(deal) === "last advertised" && <small> Last advertised</small>}{sourceNode ? <> · {sourceNode}</> : null}</span>
       <Strip value={deal.asking_price} stats={stats} format={fullMoney} />
     </span>
   );

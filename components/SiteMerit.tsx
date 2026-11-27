@@ -8,7 +8,7 @@ export function MeritCard({deal}:{deal:DealProps}) {
   if(!c)return null;
   const m=c.merit;
   return <section className="charging-preview" aria-label="Site decision">
-    <strong style={{color:actionColors[m.action]}}>{m.action}</strong><p>{m.next}</p>
+    <small>Charging assessment</small><strong style={{color:actionColors[m.action]}}>{m.action}</strong><p>{m.next}</p>
     {m.netValue!=null && <small>{amounts(m.netValue)} downside network value · {m.servedPeak} peak charges</small>}
     <ChargingLink site={deal.deal_id} revision={c.selected}>Review site case</ChargingLink>
   </section>;

@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { GripVertical, ListFilter } from "lucide-react";
+import { Ellipsis } from "lucide-react";
 import {
   clampWidth,
   columnWidth,
@@ -58,6 +58,7 @@ export default function SheetGrid<Row>({
   const [paneWidth, setPaneWidth] = useState(0);
   const [menu, setMenu] = useState<string | null>(null);
   const [menuPlace, setMenuPlace] = useState<{ top: number; left: number; maxHeight: number } | null>(null);
+  const dragged = useRef<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [focus, setFocus] = useState({ row: 0, col: 0 });
   const focusRef = useRef(focus);
@@ -157,8 +158,22 @@ export default function SheetGrid<Row>({
       if (target?.closest(".col-menu, .col-filter")) return;
       setMenu(null);
     }
+    const trigger = scrollRef.current?.querySelector<HTMLButtonElement>(`th[data-col="${CSS.escape(menu)}"] .col-filter`);
+    const frame = requestAnimationFrame(() => document.querySelector<HTMLElement>(".col-menu input, .col-menu button")?.focus());
+    function onEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setMenu(null);
+      trigger?.focus();
+    }
     window.addEventListener("pointerdown", onPointer);
-    return () => window.removeEventListener("pointerdown", onPointer);
+    window.addEventListener("keydown", onEscape, true);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("pointerdown", onPointer);
+      window.removeEventListener("keydown", onEscape, true);
+    };
   }, [menu]);
 
   function moveFocus(rowDelta: number, colDelta: number) {
@@ -200,27 +215,6 @@ export default function SheetGrid<Row>({
   function reorder(from: string, to: string) {
     if (!to || from === to) return;
     onLayout({ ...layout, order: moveColumn(layout.order, from, to), touched: true });
-  }
-
-  function onGripDown(event: React.PointerEvent<HTMLButtonElement>, id: string) {
-    event.preventDefault();
-    event.stopPropagation();
-    const pointer = event.pointerId;
-    event.currentTarget.setPointerCapture(pointer);
-    let over = id;
-    function move(next: PointerEvent) {
-      const hit = document.elementFromPoint(next.clientX, next.clientY)?.closest<HTMLElement>("[data-col]");
-      over = hit?.dataset.col || over;
-      setDragOver(over);
-    }
-    function up() {
-      reorder(id, over);
-      setDragOver(null);
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    }
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
   }
 
   function onResizeDown(event: React.PointerEvent<HTMLButtonElement>, id: string) {
@@ -281,6 +275,19 @@ export default function SheetGrid<Row>({
                 <th
                   key={column.id}
                   role="columnheader"
+                  onDragOver={event => {
+                    if (!dragged.current) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    setDragOver(column.id);
+                  }}
+                  onDrop={event => {
+                    if (!dragged.current) return;
+                    event.preventDefault();
+                    reorder(dragged.current, column.id);
+                    dragged.current = null;
+                    setDragOver(null);
+                  }}
                   data-col={column.id}
                   data-pinned={pinned ? "true" : "false"}
                   className={`${pinned ? "is-pinned" : ""} ${dragOver === column.id ? "col-over" : ""} ${column.className || ""}`.trim()}
@@ -295,29 +302,30 @@ export default function SheetGrid<Row>({
                     {headerExtra?.(column.id)}
                     <button
                       type="button"
-                      tabIndex={-1} aria-hidden="true" className="sort-header col-grip"
-                      aria-label={`Reorder ${column.label}`}
-                      onPointerDown={(event) => onGripDown(event, column.id)}
-                    >
-                      <GripVertical aria-hidden="true" />
-                    </button>
-                    <button
-                      type="button"
-                      className="sort-header"
+                      draggable
+                      className="sort-header col-label"
+                      title={column.label + " · Click to sort, drag to reorder"}
+                      onDragStart={event => {
+                        dragged.current = column.id;
+                        event.dataTransfer.setData("text/plain", column.id);
+                        event.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragEnd={() => { dragged.current = null; setDragOver(null); }}
                       onClick={() => onLayout({ ...layout, sort: cycleSort(layout.sort, column.id), touched: true })}
                     >
                       {column.label}
-                      {active ? (layout.sort?.desc ? " ↓" : " ↑") : ""}
+                      {active && <span className="sort-direction" aria-hidden="true">{layout.sort?.desc ? " ↓" : " ↑"}</span>}
                     </button>
-                    <span className={`col-tools ${pinned || filtered ? "has-active" : ""}`}>
+                    <span className={`col-tools ${filtered || menu === column.id ? "has-active" : ""}`}>
                       <button
                         type="button"
                         className="sort-header col-filter"
-                        aria-label={`Filter ${column.label}`}
+                        aria-label={`Column options for ${column.label}`}
+                        title={`Filter or arrange ${column.label}`}
                         aria-expanded={menu === column.id}
                         onClick={() => setMenu((current) => (current === column.id ? null : column.id))}
                       >
-                        <ListFilter aria-hidden="true" />
+                        <Ellipsis aria-hidden="true" />
                       </button>
                     </span>
                     <button

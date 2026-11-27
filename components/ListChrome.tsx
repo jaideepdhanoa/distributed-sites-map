@@ -2,9 +2,10 @@
 
 import { useId, useState, type ReactNode } from "react";
 
-export function ShortlistSummary({ title, count, commonStage, children }: {
+export function ShortlistSummary({ title, count, commonStage, children, noun = "sites" }: {
   title: string;
   count: number;
+  noun?: string;
   commonStage: string;
   children: ReactNode;
 }) {
@@ -12,8 +13,8 @@ export function ShortlistSummary({ title, count, commonStage, children }: {
   const figuresId = useId();
   const showStage = commonStage && !title.toLowerCase().endsWith(" · " + commonStage.toLowerCase());
   return (
-    <section className="summary-row shortlist-summary" data-testid="summary-row" aria-label={`${title}, ${count} sites, shortlist figures`}>
-      <div className="shortlist-title"><h2>{title.split(" · ")[0]} shortlist</h2><p>{count.toLocaleString()} {count === 1 ? "site" : "sites"} · {title.split(" · ").slice(1).join(" · ") || commonStage}</p>{showStage && <span className="shortlist-stage">{commonStage}</span>}</div>
+    <section className="summary-row shortlist-summary" data-testid="summary-row" aria-label={`${title}, ${count} sites, summary figures`}>
+      <div className="shortlist-title"><h2>{title.split(" · ")[0]} {noun}</h2><p>{count.toLocaleString()} {count === 1 ? "site" : "sites"} · {title.split(" · ").slice(1).join(" · ") || commonStage}</p>{showStage && <span className="shortlist-stage">{commonStage}</span>}</div>
       <button className="paper-btn figures-toggle" type="button" aria-expanded={expanded} aria-controls={figuresId} onClick={() => setExpanded(value => !value)}>Figures</button>
       <div className="shortlist-figures" id={figuresId} data-expanded={expanded}>{children}</div>
     </section>
@@ -24,7 +25,7 @@ export function EmptyShortlist({ clearFilters, clearArea }: { clearFilters?: () 
   return <p role="status" className="note empty-filter" data-testid="empty-filter">
     {clearFilters ? <>No sites match these column filters. <button type="button" className="text-link" onClick={clearFilters}>Clear column filters</button></>
       : clearArea ? <>No matching sites in this map area. <button type="button" className="text-link" onClick={clearArea}>Clear map area</button></>
-      : "No sites match this shortlist. Choose another market or stage."}
+      : "No sites match these filters. Choose another market or stage."}
   </p>;
 }
 

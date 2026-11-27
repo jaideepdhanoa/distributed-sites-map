@@ -2,6 +2,8 @@ import type { PowerRecords } from "@/lib/powerLinkIndex";
 import { PowerFollowUp } from "./PowerEvidence";
 import { useRouter } from "next/navigation";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
+import { pipelineCost } from "@/lib/charging/pipelineCost";
+import { ChargingLink } from "./ChargingLink";
 import OpportunityReview from "./OpportunityReview";
 import FinancialsEntry from "./FinancialsEntry";
 import { screeningEvidence } from "@/lib/screeningEvidence";
@@ -26,6 +28,8 @@ function FigureRow({ fact }: { fact: Figure }) {
 export default function RecordBrief({ target, pnl, power, ...input }: BriefProps) {
   const router = useRouter();
   const { status, reason, origin, review, evidence, check, missing, figures } = screeningEvidence(input);
+  const opportunity = input.signedIn && input.deal?.opportunityReview;
+  const cost = pipelineCost(input.deal?.charging);
   const financial = check === "financials" && input.signedIn;
   const coverage = financial && pnl?.statement ? financialsCard(pnl.statement, pnl.sample)?.coverage : "";
   const land = check === "space";
@@ -42,12 +46,18 @@ export default function RecordBrief({ target, pnl, power, ...input }: BriefProps
   const source = evidence?.kind === "county" ? evidence.href : financial && coverage ? `Financial statement · ${coverage}` : land && first?.label === "Open land" ? first.source : "";
   return (
     <section className="record-brief" aria-label="Screening decision">
-      <div className="brief-decision"><span>{input.deal ? "Pipeline stage" : "Screening status"}</span><h3>{status}</h3></div>
-      {input.signedIn && input.deal?.opportunityReview && <OpportunityReview review={input.deal.opportunityReview}
+      {opportunity && input.deal && <OpportunityReview record review={opportunity}
         charging={input.deal.charging} active={Boolean(input.deal.stage) && !/dropped|off[ -]?market/i.test(input.deal.stage!) && input.deal.stage_group !== "dropped"}/>}
-      {reason && reason !== status && <p>{reason}</p>}
+      {opportunity ? <p><b>Deal stage</b> · {status === "Desk screen" ? "Initial review" : status}</p>
+        : <div className="brief-decision"><span>{input.deal ? "Deal stage" : "Screening status"}</span><h3>{status}</h3></div>}
+      {!opportunity && reason && reason !== status && <p>{reason}</p>}
       <dl>
-        <div><dt>{origin}</dt><dd>{evidence?.kind === "county"
+        {input.signedIn && input.deal?.kind === "pipeline" && <>
+          <div><dt>Charging spaces</dt><dd>{input.deal.chargingSpace?.value ?? "No layout estimate"}<small>{input.deal.chargingSpace?.basis}</small></dd></div>
+          <div><dt>Cost per charge</dt><dd>{input.deal.charging
+            ? <ChargingLink site={input.deal.deal_id} revision={input.deal.charging.selected}>{cost.value}</ChargingLink> : cost.value}<small>{cost.basis}</small></dd></div>
+        </>}
+        <div><dt>{opportunity ? "Recorded site check" : origin}</dt><dd>{evidence?.kind === "county"
           ? <a href={evidence.href} target="_blank" rel="noopener noreferrer">{review} <span aria-hidden="true">↗</span><span className="sr"> (opens in a new tab)</span></a>
           : evidence?.kind === "space" || evidence?.kind === "layout" ? <button type="button" className="text-link" onClick={() => {
             const query = new URLSearchParams(currentSearch());

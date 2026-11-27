@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Start here
 
-Distributed Sites is the private team map at `distributedsites.com` (public GitHub repo `jaideepdhanoa/distributed-sites-map`). Neon is the record. The Pipeline workbook is a mirror. Code, schema, sync, and verification are shared; Muse still owns broker comms and capture. ChatGPT has its own app bearer with both the capture and verification permissions. Events record `chatgpt`. Full guide: `docs/agent-onboarding.md`.
+Distributed Sites is the private team map at `distributedsites.com` (public GitHub repo `jaideepdhanoa/distributed-sites-map`). Neon is the record. The Pipeline workbook is a mirror. Code, schema, sync, and verification are shared; Muse still owns broker comms and capture. ChatGPT has its own app bearer with both the capture and verification permissions. Events record `chatgpt`. Start with [the current decision workflow](docs/agent-onboarding.md#site-decisions). The signed-in Selection Review and the private operating manual and Rules & Decisions ledger carry the team’s working guidance.
 
 As of 24 Nov 2026 Jaideep does not require an Indie review. Open a PR, get the checks below green, and squash-merge it yourself. Production data and Vercel secret env vars still need Jaideep's explicit approval.
 
@@ -79,7 +79,7 @@ Read `DESIGN.md` before changing components, `app/globals.css`, or any button, s
 
 ## Workbook
 
-The Pipeline workbook is a read-only mirror. Neon is the record. Write stage, activity, comms, and site changes through `POST /api/changes` or the signed-in site. Do not edit mirrored cells, and do not add a script that writes the sheet. The workbook mirror is the only writer. It overwrites a hand edit with the database value and reports counts and hashed ids.
+The Pipeline workbook mirrors operational records and selected charging cases. The separate commercial opportunity register supplies route decisions and visit plans. See [Site decisions](docs/agent-onboarding.md#site-decisions) for write ownership. Neon is the operational record. Write stage, activity, comms, and site changes through `POST /api/changes` or the signed-in site. Do not edit mirrored cells, and do not add a script that writes the sheet. The workbook mirror is the only writer. It overwrites a hand edit with the database value and reports counts and hashed ids.
 
 The quarantined pipeline row and row 10 on Pipeline and Land Sites stay untouched. Do not write, link, or include that row. Rules & Decisions and Run Log stay writable. Workbook protect is shipped off: dry run is the default, and apply needs the confirm phrase `protect-workbook-readonly` plus dry run turned off. Do not run that apply against the live workbook unless Jaideep has asked for it.
 

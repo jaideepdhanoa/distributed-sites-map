@@ -57,3 +57,18 @@ test("analysis footprints keep their source and acquire an edit only from a matc
   const url = new URL(spacesMapHref(site, outlineId(clean)), "http://localhost");
   assert.equal(url.searchParams.get("spaceArea"), outlineId(clean));
 });
+
+test("an explicit use-rights decision follows only the same revision and footprint",()=>{
+  const id="PIPE-PHX-9998",points:Point[]=[[10,10],[40,10],[40,40],[10,40]];
+  const row={revision:"current",image:{id:"aerial"},zones:[{kind:"parking",label:"West",points}]} as Assessment;
+  const review={disposition:"Keep for diligence",option:"outdoor",area:"West",frame:"aerial",revision:"current",reason:"Lease exhibit",useRight:{status:"documented",detail:"Signed exhibit includes the drive aisle."}} as const;
+  const note=(body:string)=>({target_id:id,body});
+  const grant=note(reviewBody(review));
+  assert.equal(mapZones(id,row,[grant])[0].useRight?.status,"documented");
+  const changed:Point[]=[[11,11],...points.slice(1)];
+  const edit=note(reviewBody({...review,useRight:undefined,disposition:"Adjust outline",points:changed}));
+  assert.equal(mapZones(id,row,[edit,grant])[0].useRight?.status,"unconfirmed");
+  assert.equal(mapZones(id,{...row,revision:"updated"},[grant])[0].useRight,undefined);
+  const denied=note(reviewBody({...review,useRight:{status:"unavailable",detail:"Access withdrawn."}}));
+  assert.equal(mapZones(id,row,[denied,grant])[0].useRight?.status,"unavailable");
+});

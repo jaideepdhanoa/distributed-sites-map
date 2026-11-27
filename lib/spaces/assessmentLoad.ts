@@ -14,6 +14,8 @@ export const assessmentSchema = z.object({
   zones: z.array(z.object({
     kind: z.enum(["ground", "pad", "parking", "vacuum", "apron", "storage", "bay", "clear"]), label: z.string().max(100),
     points: z.array(z.tuple([percent, percent])).min(3).max(40), check: z.string().max(600).optional(),
+    driveAisle: z.array(z.tuple([percent,percent])).min(3).max(40).optional(),
+    useRight: z.object({status:z.enum(["documented","unconfirmed","unavailable"]),detail:z.string().trim().min(1).max(600)}).optional(),
     fitHold: z.enum(["footprint", "aisle"]).optional(),
   })).max(30),
   segment: z.string().max(120), cohort: z.enum(["active", "off-market", "dropped"]), revision: z.string().regex(/^[a-f0-9]{12}$/),

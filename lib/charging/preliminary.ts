@@ -79,7 +79,7 @@ export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?
     const incomeUnverified=layout.operatingConversion && layout.lostAnnualCash==null && (credited??0)>0;
     const layoutIncome=incomeUnverified ? 0 : credited??0;
     const ledger:LedgerBasis = {
-      terms, siteDrivers:true, withheldOperatingCash:incomeUnverified?credited??undefined:undefined, parts:layout.parts, businessType:d.business_type, creditCash:trial?.assumptions.creditCash, condition:layout.condition, space:layout.system ? layout.stalls+" assessed stalls" : space, priceBasis, cashBasis:incomeUnverified ? "Positive business income excluded until conversion losses are quantified" : cashBasis, hypothetical:trial?.hypothetical??false,
+      terms, siteDrivers:true, withheldOperatingCash:incomeUnverified?credited??undefined:undefined, parts:layout.parts, rightsByArea:layout.rightsByArea, businessType:d.business_type, creditCash:trial?.assumptions.creditCash, condition:layout.condition, space:layout.system ? layout.stalls+" assessed stalls" : space, priceBasis, cashBasis:incomeUnverified ? "Positive business income excluded until conversion losses are quantified" : cashBasis, hypothetical:trial?.hypothetical??false,
       parcel:layout.parcel, conversionRecorded:layout.conversionCost!=null, displacedRecorded:layout.lostAnnualCash!=null,
       workbookDefaults:trial ? {volume:100,unitBuild:c.unitBuild,postCost:c.attendant,upgrade:c.upgrade,cash:credited??0} : undefined,
       source:lease || filed ? null : research?.source, date:lease || filed ? null : research?.reviewedOn,

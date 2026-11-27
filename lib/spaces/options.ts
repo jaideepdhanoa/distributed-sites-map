@@ -20,7 +20,9 @@ export const kinds = {
   bay: { option: "bays", label: "Service or wash bay", protect: "Retain service access and account for displaced servicing work.", check: "Obtain the interior plan, pits, clear height and approach dimensions. Compare lost shop contribution and fleet-service value." },
   clear: { option: null, label: "Keep clear", protect: "", check: "" },
 } as const;
-export type Zone = { kind: keyof typeof kinds; label: string; points: Point[]; check?: string; fitHold?: "footprint" | "aisle" };
+export type Zone = { kind: keyof typeof kinds; label: string; points: Point[]; check?: string; driveAisle?: Point[];
+  useRight?: { status: "documented" | "unconfirmed" | "unavailable"; detail: string };
+  fitHold?: "footprint" | "aisle" };
 export type Aerial = { kind?: "site-plan" | "site-photo"; metersPerPixel?: number; documentUrl?: string; id: string; src: string; source: string; date: string; width: number; height: number; bounds?: Bounds };
 export type Assessment = {
   reviewedOn?:string; inventory?: import("./parcelLayout").Inventory; parcelCases?: import("./parcelLayout").ParcelCase[];

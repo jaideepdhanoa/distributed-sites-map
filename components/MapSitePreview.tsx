@@ -74,7 +74,7 @@ export default function MapSitePreview(props: PreviewProps) {
       </div>}
       {!showingPower && props.marketMode && !listing && <MarketEvidence metric={props.marketMode} deal={powerDeal} site={site} inspection={props.washInspection} expanded={Boolean(props.washInspection?.radius)} />}
       {showingPower ? <MapPowerCard deal={props.powerDeal} site={props.powerSite} grid={props.grid} onGrid={props.onGrid}/> : <dl className="preview-facts">
-        {commercial && <div><dt>Team recommendation</dt><dd>{recommendation(commercial.primary)}<small className="preview-missing">{offeredTransaction(commercial.primary, powerDeal?.selectionResearch?.scope)}</small></dd></div>}
+        {commercial && <div><dt>Opportunity register recommendation</dt><dd>{recommendation(commercial.primary)}<small className="preview-missing">{offeredTransaction(commercial.primary, powerDeal?.selectionResearch?.scope)}</small></dd></div>}
         {commercial && powerDeal?.pendingDrop && <div><dt>Drop proposal</dt><dd>Awaiting approval</dd></div>}
         {asking && <div><dt>Asking price</dt><dd>{asking.value}{asking.source && <small className="preview-missing">{asking.source}</small>}</dd></div>}
         {fit ? <div><dt>Charging spaces</dt><dd>{fit.value}<small className="preview-missing">{fit.basis}</small></dd></div> : fact ? <div><dt>{fact.label}</dt><dd>{fact.value}{fact.date && ` · ${fact.date}`}{fact.source && <small className="preview-missing">{fact.source}</small>}</dd></div> : <div><dt>Site fit</dt><dd>{props.loading ? "Checking…" : "No site-fit figure on file"}</dd></div>}

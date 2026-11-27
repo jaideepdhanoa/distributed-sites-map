@@ -1,9 +1,9 @@
-import { areaCounts, assessedCases } from "./assessedMix";
+import { areaCounts, assessedCases, layoutRights, rightsSummary } from "./assessedMix";
 import { checkSpaceFit } from "./fitCheck";
 import type { MapSpaceSite } from "./mapCatalog";
 import { kinds, type Assessment } from "./options";
 
-export type ChargingFootprint = { stalls: number; condition: string; parcel?:boolean; conversionCost?:number; lostAnnualCash?:number; system?:boolean; operatingConversion?:boolean; parts?:{area:string;stalls:number}[] };
+export type ChargingFootprint = { stalls: number; condition: string; rights?:ReturnType<typeof layoutRights>; rightsByArea?:Record<string,boolean>; parcel?:boolean; conversionCost?:number; lostAnnualCash?:number; system?:boolean; operatingConversion?:boolean; parts?:{area:string;stalls:number}[] };
 export type PipelineFit = { value: string; basis: string; count: number | null; layouts?: ChargingFootprint[] };
 
 function rangeText([low, high]: readonly number[]) {
@@ -15,21 +15,25 @@ export function pipelineFit(site: MapSpaceSite | undefined, assessment: Assessme
   recorded: number | null | undefined): PipelineFit {
   const pending = (basis: string): PipelineFit => ({ value: "Needs measurement", basis, count: null });
   if (site && !current) return pending("Check the latest outline");
-  if (assessment?.status === "hold") return pending("Confirm the parcel and image");
+  if (assessment?.status === "hold") return pending(assessment.inventory ? assessment.summary : "Confirm the parcel and image");
   if (site) {
-    const options = site.zones.filter(zone => zone.kind !== "clear");
+    const options = site.zones.filter(zone => zone.kind !== "clear" && zone.useRight?.status !== "unavailable");
+    if (!options.length && site.zones.some(zone=>zone.useRight?.status==="unavailable"))
+      return {value:"Use unavailable",basis:"Reviewed rights exclude the mapped areas. Their physical outlines remain in Spaces.",count:null};
     if (assessment?.status === "reviewed") {
       const cases = assessedCases(site.zones,site.frame,assessment);
       const assessed = cases.map(c => {
         const parts=areaCounts(c.rows);
         return {stalls:parts.reduce((total,p)=>total+p.stalls,0),condition:c.name+". "+c.condition,
-          system:!!c.system,parcel:true,parts,operatingConversion:!!c.system && parts.some(p=>site.zones.some(z=>z.label===p.area && ["bay","vacuum","apron","storage"].includes(z.kind))),conversionCost:c.conversionCost,lostAnnualCash:c.lostAnnualCash};
+          rights:layoutRights(c.rows,site.zones),rightsByArea:Object.fromEntries(parts.map(p=>[p.area,site.zones.find(z=>z.label===p.area)?.useRight?.status==="documented"])),system:!!c.system,parcel:true,parts,operatingConversion:!!c.system && parts.some(p=>site.zones.some(z=>z.label===p.area && ["bay","vacuum","apron","storage"].includes(z.kind))),conversionCost:c.conversionCost,lostAnnualCash:c.lostAnnualCash};
       });
       if (assessed.length) {
         const first=assessed[0];
-        return {value:rangeText([first.stalls,first.stalls]),basis:"System estimate · "+cases[0].name,
+        return {value:rangeText([first.stalls,first.stalls]),basis:"System estimate · "+cases[0].name+" · "+rightsSummary(first.rights),
           count:first.stalls,layouts:assessed};
       }
+      if (options.length && options.every(zone=>zone.fitHold || zone.driveAisle))
+        return pending("No stall and usable aisle fit the tested outlines");
       if (assessment.parcelCases?.length) return pending("Recheck the filed rows and their aisles against the latest outlines");
     }
     const layouts = options.filter(zone=>zone.kind!=="ground").map(zone => ({ zone, fit: checkSpaceFit(zone, site.frame) }))

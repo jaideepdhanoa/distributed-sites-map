@@ -55,7 +55,7 @@ export default function OptionReview({ site, option, area, row, prior, dimension
   const [inputs, setInputs] = useState(emptyInputs);
   const [mode, setMode] = useState<Disposition | null>(null);
   const [why, setWhy] = useState("");
-  const [rights, setRights] = useState("Unconfirmed");
+  const [rights, setRights] = useState("");
   const [hours, setHours] = useState("Unconfirmed");
   const [measuredStalls, setMeasuredStalls] = useState("");
   const [measurementSource, setMeasurementSource] = useState("");
@@ -72,7 +72,8 @@ export default function OptionReview({ site, option, area, row, prior, dimension
     const measured = measuredStalls.trim() !== "" ? { stalls: Number(measuredStalls), source: measurementSource.trim(), predicted: predicted ? [predicted[0], predicted[1]] as [number, number] : undefined } : undefined;
     if (measured && (!/^\d{1,4}$/.test(measuredStalls) || !measured.source)) { setError("Enter a whole stall count and identify its plan or site measurement."); return; }
     const body = reviewBody({ disposition: mode, option, area, revision: row.revision, frame: currentFrame,
-      points: geometry, reason: why + " · Rights: " + rights + " · Operating availability: " + hours, assumptions: describeInputs(inputs), measured });
+      points: geometry, reason: why + " · Operating availability: " + hours,
+      useRight:rights ? {status:rights==="Supported by evidence" ? "documented" : rights==="Unavailable" ? "unavailable" : "unconfirmed",detail:why.trim()} : undefined, assumptions: describeInputs(inputs), measured });
     if (body.length > 2000) { setError("Shorten the reason or measurement citation so this decision fits in a team note."); return; }
     busy.current = true; setPending(true); setError("");
     try {
@@ -90,7 +91,7 @@ export default function OptionReview({ site, option, area, row, prior, dimension
     {ready && status.enabled && canWrite(status.actionRole) && <div className="space-decisions">
       {mode ? <form onSubmit={e => { e.preventDefault(); void submit(); }}>
         <strong>{mode}</strong>
-        <div className="layout-inputs"><label>Rights to use area<select className="secondary" value={rights} onChange={e => setRights(e.target.value)}>{["Unconfirmed","Supported by evidence","Conditional or shared","Unavailable"].map(x => <option key={x}>{x}</option>)}</select></label>
+        <div className="layout-inputs"><label>Rights to use area and aisle<select className="secondary" value={rights} onChange={e => setRights(e.target.value)}><option value="">Keep existing validation</option>{["Unconfirmed","Supported by evidence","Conditional or shared","Unavailable"].map(x => <option key={x}>{x}</option>)}</select></label>
         <label>Operating availability<select className="secondary" value={hours} onChange={e => setHours(e.target.value)}>{["Unconfirmed","All operating hours","Limited hours","Unavailable at peak"].map(x => <option key={x}>{x}</option>)}</select></label></div>
         <details className="disclosure"><summary className="disclosure">Record a dimensioned plan or site measurement</summary>
           <label>Measured stalls for this layout<input className="field" type="number" min="0" max="9999" step="1" value={measuredStalls} onChange={e=>setMeasuredStalls(e.target.value)} /></label>

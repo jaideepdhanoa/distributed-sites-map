@@ -91,11 +91,29 @@ export function areaCounts(rows:RowSpec[]) {
   for (const row of rows) parts.set(row.area,(parts.get(row.area)??0)+row.count);
   return Array.from(parts,([area,stalls])=>({area,stalls}));
 }
+/** An aerial establishes fit. Documented use covers both the stalls and the necessary vehicle access. */
+export function layoutRights(rows: RowSpec[], zones: Zone[]) {
+  let documented = 0, pending = 0;
+  const checks = new Set<string>();
+  for (const part of areaCounts(rows)) {
+    const right = zones.find(z => z.label === part.area)?.useRight;
+    if (right?.status === "documented") documented += part.stalls;
+    else {
+      pending += part.stalls;
+      if (right?.detail) checks.add(right.detail);
+    }
+  }
+  return {documented, pending, checks:[...checks]};
+}
+export function rightsSummary(rights: ReturnType<typeof layoutRights>) {
+  if (!rights.pending) return "Use and access documented for all " + rights.documented;
+  return (rights.documented ? rights.documented + " with documented use · " : "") + rights.pending + " pending use-rights validation";
+}
 export function assessedCases(zones:Zone[], frame:ScaleFrame, assessment:Assessment):ParcelCase[] {
   if (assessment.status!=="reviewed" || !(frame.bounds || frame.metersPerPixel)) return [];
-  const filed=(assessment.parcelCases??[]).filter(c=>sketchCase(c,zones,frame));
+  const filed=(assessment.parcelCases??[]).filter(c=>!c.rows.some(r=>zones.find(z=>z.label===r.area)?.useRight?.status==="unavailable") && sketchCase(c,zones,frame));
   const blocked=zones.filter(z=>z.kind==="clear").map(z=>z.points);
-  const full=zones.filter(z=>z.kind!=="clear" && !z.fitHold && zones.filter(other=>other.label===z.label).length===1)
+  const full=zones.filter(z=>z.kind!=="clear" && z.useRight?.status!=="unavailable" && !z.fitHold && zones.filter(other=>other.label===z.label).length===1)
     .map(z=>choices(z,frame,blocked,adjacentObstacles(z,zones),filed.flatMap(c=>c.rows.filter(r=>r.area===z.label))))
     .filter(g=>g.length);
   const groups=full.map((group,i)=>{

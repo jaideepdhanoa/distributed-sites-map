@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import {amounts,diligenceDrivers,fields,groups,keys,type CalculationLine,type CalculationTrace,type Evidence,type Inputs,type Key,type Result} from "@/lib/charging/model";
+import {LedgerNumber} from "./LedgerNumber";
 import {planning,sourceValue} from "@/lib/charging/evidence";
 import type {networkReference} from "@/lib/charging/reference";
 
@@ -69,6 +70,10 @@ export function ChargingExplanation({draft,seed,result:r,trace,reference,referen
     <div className="cost-sections">
       <details className="disclosure cost-section" open><summary className="disclosure">How this site is calculated</summary>
         <div className="calc-equation"><div><span>Annual net cost</span><b>{money(trace.total,0)}</b></div><i>÷</i><div><span>Annual completed charges</span><b>{number(r.sessions,0)}</b></div><i>=</i><div><span>Cost per charge</span><b>{money(r.siteCost)}</b></div></div>
+        <section className="detailed-site-trials"><h3>Site assumptions</h3><p className="layer-meta">{draft.layout || "Detailed layout"} · Changes update this working case.</p>
+          <div className="ledger-controls">{(["stalls",draft.terms==="lease"?"rent":"ask","upgrade","build","conversion",...(draft.terms==="purchase"?["cash","loss"]:[])] as Key[]).map(k=><div key={k}>
+            <LedgerNumber label={fields[k].label+" · trial"} value={draft.values[k]} valid={n=>Number.isFinite(n) && n>=fields[k].min && n<=fields[k].max && (k!=="stalls" || Number.isInteger(n))} onValue={n=>onTrial(k,n)}/>
+            <small>{status(sourceValue(draft,k).value,sourceValue(draft,k).evidence)}</small></div>)}</div></section>
         <details className="disclosure calc-group" open><summary className="disclosure">Annual costs and retained cash</summary>
           <p className="layer-meta">Annual dollars. Purchase and construction use capital recovery over the case horizon. Retained cash reduces cost.</p>{trace.annual.map(row=>line(row))}</details>
         <details className="disclosure calc-group" open><summary className="disclosure">What limits completed charges?</summary>

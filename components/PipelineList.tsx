@@ -331,7 +331,7 @@ export default function PipelineList({
       setAssumptions(saved && Number.isInteger(saved.stalls) && saved.stalls >= 1 && saved.stalls <= 200 &&
         Number.isFinite(saved.volume) && saved.volume >= 1 && saved.volume <= 200 && typeof saved.creditCash === "boolean" &&
         ["unitBuild", "attendant", "upgrade"].every(k => saved[k] == null || (Number.isFinite(saved[k]) && saved[k] >= 0 && saved[k] <= 1e9))
-        ? saved : defaultListAssumptions);
+        ? {...saved,volume:100} : defaultListAssumptions);
     } catch { setAssumptions(defaultListAssumptions); }
   }, [sessionKey, signedIn]);
   function applyAssumptions(next:ListAssumptions) {

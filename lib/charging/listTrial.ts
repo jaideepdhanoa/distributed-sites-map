@@ -14,5 +14,5 @@ export function listTrialHash(a:ListAssumptions){
 export function readListTrial(hash:string){
   const raw=new URLSearchParams(hash.slice(1)).get("trial");
   if(!raw)return defaultListAssumptions;
-  try{const data:unknown=JSON.parse(raw);return validListTrial(data)?data:null;}catch{return null;}
+  try{const data:unknown=JSON.parse(raw);return validListTrial(data)?{...data,volume:100}:null;}catch{return null;}
 }

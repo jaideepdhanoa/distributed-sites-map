@@ -9,7 +9,7 @@ import { ledgerFields, screenLedger, validChange, type LedgerKey, type SavedScre
 export const screenVersion="preliminary-ledger/1";
 const key=z.enum(Object.keys(ledgerFields) as [LedgerKey,...LedgerKey[]]);
 export const screenSaveSchema=z.strictObject({kind:z.literal("screen"),id:z.uuid(),name:z.string().trim().min(1).max(80),
-  basis:z.unknown(),listTrial:z.custom<ListAssumptions>(validListTrial).optional(),scenario:z.number().int().min(0).max(3),sourceRevision:z.string().regex(/^[a-f0-9]{24}$/),
+  basis:z.unknown(),listTrial:z.custom<ListAssumptions>(validListTrial).optional(),omitted:z.array(z.string()).optional(),scenario:z.literal(0),sourceRevision:z.string().regex(/^[a-f0-9]{24}$/),
   changes:z.partialRecord(key,z.number().finite()).refine(changes=>
     Object.entries(changes).every(([k,v])=>validChange(k as LedgerKey,v)),"Review the trial values.")});
 const projection="case_id AS id,name,author,saved_at AS at,inputs";
@@ -24,8 +24,13 @@ export async function saveScreen(sql:Sql,site:string,author:string,request:z.inf
   if (!basis) throw new InputError("The screening inputs changed. Reload the ledger before saving.",409);
   if (basis.terms==="lease" && (request.changes.cash!=null || request.changes.displaced!=null))
     throw new InputError("Retained seller cash is outside this lease screen.",400);
-  const inputs={basis,changes:request.changes,scenario:request.scenario};
-  const result=screenLedger(basis,request.changes,request.scenario);
+  const omitted=request.omitted;
+  if (omitted?.length && (!basis.parts || omitted.some(area=>!basis.parts!.some(p=>p.area===area)) ||
+    !basis.parts.some(p=>!omitted.includes(p.area)))) throw new InputError("Review the selected layout areas.",400);
+  if (["volume","benchmark","referenceYears","referenceStalls"].some(k=>k in request.changes))
+    throw new InputError("Utilization is shared across site configurations.",400);
+  const inputs={basis,changes:request.changes,scenario:request.scenario,...(omitted?.length?{omitted}:{})};
+  const result=screenLedger(basis,request.changes);
   if(result.perCharge==null) throw new InputError("A priced alternative needs completed charges.",400);
   // A screen is an immutable snapshot. Its UUID also makes retrying the insert idempotent.
   const values=[site,request.id,request.name,author,screenVersion,request.sourceRevision,JSON.stringify(inputs),JSON.stringify(result)];

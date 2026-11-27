@@ -133,27 +133,37 @@ test("open released charging assumptions from the portfolio",async({page})=>{
 test("explain a preliminary range with a conditional aisle on desktop and phone", async ({page}, info) => {
   const a={horizon:10,demand:10,hub:1000000,capital:0,closing:.1,charging:{charges:100000,perPost:3,ports:2,
     unitBuild:10000,upgrade:20000,attendant:12000,fixed:2000,insurance:1000,perCharger:500,tax:.01}} as PurchaseAssumptions;
-  const site={deal_id:"PIPE-PHX-9997",name:"Example service lot",kind:"pipeline",asking_price:100000,
-    purchase:{inputs:{cash:5000,ownership:"Yes"},assumptions:a},chargingSpace:{count:0,value:"0 spaces",layouts:[{stalls:4,condition:"Parking with shared aisle access"}]}} as DealProps;
+  const site={deal_id:"PIPE-PHX-9997",name:"Example car wash",business_type:"Car wash",kind:"pipeline",asking_price:100000,
+    purchase:{inputs:{cash:5000,ownership:"Yes"},assumptions:a},chargingSpace:{count:0,value:"0 spaces",layouts:[{stalls:4,condition:"Parking with shared aisle access",parts:[{area:"Rear parking",stalls:3},{area:"Side parking",stalls:1}]},{stalls:6,condition:"Convert two wash bays",operatingConversion:true,conversionCost:25000,lostAnnualCash:2000,parts:[{area:"Existing parking",stalls:4},{area:"Wash bays",stalls:2}]}]}} as DealProps;
   site.charging={preliminary:preliminaryCost(site,a),result:{siteCost:null},stale:false} as NonNullable<DealProps["charging"]>;
   let saved:unknown;
   await page.route("**/api/actions/charging?site=*",route=>{
     if(route.request().method()==="POST"){
-      const d=route.request().postDataJSON();saved={...d,inputs:{basis:d.basis,changes:d.changes,scenario:d.scenario},author:"Reviewer",at:"2026-11-01"};
+      const d=route.request().postDataJSON();saved={...d,inputs:{basis:d.basis,changes:d.changes,scenario:d.scenario,omitted:d.omitted},author:"Reviewer",at:"2026-11-01"};
       return route.fulfill({json:{saved}});
     }
     return route.fulfill({json:{site,history:[],screens:saved?[saved]:[],source:"aaaaaaaaaaaaaaaaaaaaaaaa",canWrite:true}});
   });
   await page.goto("/charging?site="+site.deal_id+"&view=explain");
   const panel=page.getByRole("region",{name:"Preliminary site cost"});
-  await expect(panel).toContainText("$10.15–$13.90");
+  await expect(panel).toContainText("$10.15–$10.43");
   await expect(panel).toContainText("shared aisle access");
   await expect(page.getByText("Parity comparison pending")).toHaveCount(0);
   await expect(panel).toContainText("4,000 annual charges");
-  await panel.getByRole("button",{name:/Both changes/}).click();
-  await expect(panel.locator(".screen-result")).toContainText("$13.90");
-  await panel.getByRole("button",{name:/^Base /}).click();
-  await panel.getByRole("button",{name:/Try 3 stalls/}).click();
+  const utility=panel.getByRole("group",{name:"Utility upgrade ($) scenarios"});
+  await utility.getByRole("button",{name:/^\+50%/}).click();
+  await expect(panel.locator(".screen-result")).toContainText("$10.43");
+  await utility.getByRole("button",{name:/^Base/}).click();
+  const layout=panel.getByRole("region",{name:"Stall configuration"});
+  await layout.getByRole("button",{name:/Convert two wash bays/}).click();
+  await expect(panel.getByLabel("Additional works ($)",{exact:true})).toHaveValue("25000");
+  await expect(panel.getByLabel("Displaced cash ($/year)",{exact:true})).toHaveValue("2000");
+  await panel.getByLabel("Purchase price ($)",{exact:true}).fill("90000");
+  await layout.getByRole("button",{name:/Parking with shared aisle/}).click();
+  await expect(panel.getByLabel("Purchase price ($)",{exact:true})).toHaveValue("90000");
+  await expect(panel.getByLabel("Additional works ($)",{exact:true})).toHaveValue("0");
+  await panel.getByRole("button",{name:"Reset to starting estimate"}).click();
+  await layout.getByLabel("Side parking · 1").uncheck();
   await expect(panel.locator(".screen-result")).toContainText("$9.17");
   await panel.getByLabel("Alternative name").fill("Three-stall trial");
   await panel.getByRole("button",{name:"Save screening alternative"}).click();
@@ -164,6 +174,7 @@ test("explain a preliminary range with a conditional aisle on desktop and phone"
   expect(await panel.evaluate(el=>el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   await mkdir("review-shots",{recursive:true});
   await expect(panel.getByRole("heading",{name:"Largest changes in the tested assumptions"})).toBeVisible();
+  await panel.getByRole("heading",{name:"Stall configuration"}).evaluate(el=>el.scrollIntoView({block:"start"}));
   await page.screenshot({path:"review-shots/"+info.project.name+"-preliminary-charging.png",animations:"disabled"});
   await panel.getByRole("heading",{name:"Annual cost ledger"}).evaluate(el=>el.scrollIntoView({block:"start"}));
   await page.screenshot({path:"review-shots/"+info.project.name+"-charging-ledger-rows.png",animations:"disabled"});

@@ -29,7 +29,9 @@ export function mapZones(site: string, row: Assessment, notes: OutlineNote[]): M
   }
   return row.zones.map(zone => {
     const points = edits.get(outlineId(zone));
-    return {...zone, points:points || zone.points, edited:Boolean(points)};
+    const moved = !!points && JSON.stringify(points) !== JSON.stringify(zone.points);
+    return {...zone, points:points || zone.points, edited:Boolean(points), ...(moved && zone.useRight?.status==="documented"
+      ? {useRight:{status:"unconfirmed" as const,detail:"Check that the recorded rights cover the edited footprint and its drive aisle."}} : {})};
   });
 }
 

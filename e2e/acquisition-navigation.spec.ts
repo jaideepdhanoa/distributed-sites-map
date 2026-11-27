@@ -156,7 +156,7 @@ test("the record keeps its identity while each section shows its own evidence", 
     await card.getByRole("tab", {name:tab,exact:true}).click();
     const section = card.getByRole("tabpanel", {name:tab,exact:true});
     await expect(section).toBeVisible();
-    await expect(card.getByRole("region",{name:"Team recommendation"})).toHaveCount(0);
+    await expect(card.getByRole("region",{name:"Opportunity register recommendation"})).toHaveCount(0);
     await expect(card.getByRole("tabpanel")).toHaveCount(1);
     await expect(heading).toBeInViewport();
     expect(await section.evaluate(el=>el.scrollWidth <= el.clientWidth + 1)).toBe(true);

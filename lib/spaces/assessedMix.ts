@@ -91,6 +91,24 @@ export function areaCounts(rows:RowSpec[]) {
   for (const row of rows) parts.set(row.area,(parts.get(row.area)??0)+row.count);
   return Array.from(parts,([area,stalls])=>({area,stalls}));
 }
+/** An aerial establishes fit. Documented use covers both the stalls and the necessary vehicle access. */
+export function layoutRights(rows: RowSpec[], zones: Zone[]) {
+  let documented = 0, pending = 0;
+  const checks = new Set<string>();
+  for (const part of areaCounts(rows)) {
+    const right = zones.find(z => z.label === part.area)?.useRight;
+    if (right?.status === "documented") documented += part.stalls;
+    else {
+      pending += part.stalls;
+      if (right?.detail) checks.add(right.detail);
+    }
+  }
+  return {documented, pending, checks:[...checks]};
+}
+export function rightsSummary(rights: ReturnType<typeof layoutRights>) {
+  if (!rights.pending) return "Use and access documented for all " + rights.documented;
+  return (rights.documented ? rights.documented + " with documented use · " : "") + rights.pending + " pending use-rights validation";
+}
 export function assessedCases(zones:Zone[], frame:ScaleFrame, assessment:Assessment):ParcelCase[] {
   if (assessment.status!=="reviewed" || !(frame.bounds || frame.metersPerPixel)) return [];
   const filed=(assessment.parcelCases??[]).filter(c=>sketchCase(c,zones,frame));

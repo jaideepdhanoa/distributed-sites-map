@@ -40,3 +40,16 @@ test("retains a filed lower count without adding alternative uses of the same co
   assert.equal(all.at(-2)?.name,"Lower");
   for(const c of all) assert.equal(sketchCase(c,zones,frame)?.stalls.length,c.rows.reduce((n,r)=>n+r.count,0));
 });
+
+test("physical fit survives unconfirmed rights while the drawn shared lane must fit",()=>{
+  const band=rect("Parking","parking",20,30,20,10);
+  const aisle=[[19,17],[43,17],[43,30],[19,30]] as Zone["points"];
+  const pending={...band,driveAisle:aisle,useRight:{status:"unconfirmed" as const,detail:"Confirm parking allocation."}};
+  const fit=(zones:Zone[])=>pipelineFit({frame,zones} as MapSpaceSite,reviewed,true,null);
+  assert.equal(fit([pending]).count,4);
+  assert.deepEqual(fit([pending]).layouts?.[0].rights,{documented:0,pending:4,checks:["Confirm parking allocation."]});
+  const documented={...pending,useRight:{status:"documented" as const,detail:"Signed parking and access exhibit."}};
+  assert.equal(fit([documented]).layouts?.[0].rights?.documented,4);
+  const narrow={...pending,driveAisle:rect("Lane","clear",20,22,22,8).points};
+  assert.equal(assessedCases([narrow],frame,reviewed).length,0);
+});

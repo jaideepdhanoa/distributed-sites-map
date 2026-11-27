@@ -30,7 +30,7 @@ import { checkSpaceFit, fitChecks, type FitCheck } from "@/lib/spaces/fitCheck";
 import MapSpaceFit from "./MapSpaceFit";
 import OptionAerial from "./OptionAerial";
 import { bestRow, sketchCase, sketchRow, type Angle } from "@/lib/spaces/parcelLayout";
-import { areaCounts, assessedCases } from "@/lib/spaces/assessedMix";
+import { areaCounts, assessedCases, layoutRights, rightsSummary } from "@/lib/spaces/assessedMix";
 import OutlineTools from "./OutlineTools";
 import ParcelInventory from "./ParcelInventory";
 import SpaceGeography from "./SpaceGeography";
@@ -142,6 +142,7 @@ export default function MainMapSpaces({
     rows:selectedCase.rows.filter(r=>!(selectedCase.name===namedCase && exclusions.includes(r.area))),
     approach:selectedCase.name===namedCase && exclusions.length>0 ? undefined : selectedCase.approach
   }),[selectedCase,namedCase,exclusions]);
+  const rights = filtered?.rows.length && site ? layoutRights(filtered.rows,site.zones) : null;
   const matchingCase=omitted.length && filtered ? cases.find(c=>JSON.stringify(c.rows)===JSON.stringify(filtered.rows)) : undefined;
   const canTestRow = active && !active.fitHold && active.kind !== "bay" && active.kind !== "clear";
   const rowTrial = study === "row" && canTestRow;
@@ -597,6 +598,8 @@ export default function MainMapSpaces({
               </div>}
               {(selectedCase || rowTrial) && <p aria-live="polite"><strong>{sketch ? sketch.stalls.length+" stalls sketched" : selectedCase && !filtered?.rows.length ? "0 stalls selected" : "Layout needs measurement"}</strong>
                 {sketch && " · Blue stalls and amber drive aisle."} {sketch?.approach && "Dashed line shows the proposed entry route."} {selectedCase?.condition || (rowTrial && (angle===90 ? "Verify the two-way approach and peak availability." : "Verify one-way entry, exit and peak availability."))} {rowTrial && active?.kind === "ground" && "Development scenario. Verify buildable limits, drainage and paving cost."}</p>}
+              {sketch && rights && <div className="space-gate"><strong>Right to use</strong><p>{rightsSummary(rights)}</p>
+                {rights.checks.map(check=><p key={check}>{check}</p>)}</div>}
               {selectedCase && sketch && price && <p className="mix-price"><b>{costRange(price,sketch.stalls.length)}</b> per completed charge
                 <small>Base to downside · excludes electricity{price.operatingConversion && !price.ledger.conversionRecorded ? " and unquoted conversion works" : ""}.</small></p>}
               {selectedCase && sketch && <a className="text-link" href={"/charging?"+new URLSearchParams([

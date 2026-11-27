@@ -78,7 +78,7 @@ export function sketchRow(zone: Zone, frame: Frame | undefined, edge: number, an
     // the source image and avoid all mapped keep-clear areas.
     const laneFits = assumedShared ? lane.every(p=>p.every(n=>n>=-1e-8 && n<=100+1e-8)) &&
       ![...excluded,...adjacentObstacles].some(hole=>overlaps(lane,hole)) : fits(zone.points,lane,excluded);
-    if (!fits(zone.points,stall,excluded) || !laneFits) { group=[]; continue; }
+    if (!fits(zone.points,stall,excluded) || !laneFits || (zone.driveAisle && !fits(zone.driveAisle,lane,[]))) { group=[]; continue; }
     first=candidateFirst;
     group.push(stall);
     if (group.length>sketch.stalls.length) { sketch.stalls=[...group]; sketch.aisles=[lane]; sketch.firstSlot=slot-group.length+1; }

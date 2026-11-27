@@ -146,6 +146,7 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
           {!initial && stress.perCharge!=null && <small>+50% utility · {amounts(stress.perCharge,2)}/charge</small>}
           {!!b.parts?.length && <small>{b.parts.filter(p=>!(areas[i]??[]).includes(p.area)).map(p=>p.area+" ("+p.stalls+")").join(" + ")}</small>}
         </button>;})}</div>
+      {currentParts?.length && basis.rightsByArea && v.stalls===layoutCount ? <p><b>Right to use</b> · {currentParts.reduce((n,p)=>n+(basis.rightsByArea?.[p.area]?p.stalls:0),0)} of {layoutCount} stalls have documented use and access.</p> : null}
       {basis.condition!==nameOf(basis) && <p>{basis.condition.slice(nameOf(basis).length+2)}</p>}
       {!!basis.parts?.length && !initial && <fieldset className="ledger-areas"><legend>Included areas</legend>{basis.parts.map(part=><label key={part.area}>
         <input type="checkbox" className="check" checked={!omitted.includes(part.area)} disabled={currentParts?.length===1 && !omitted.includes(part.area)} onChange={e=>{

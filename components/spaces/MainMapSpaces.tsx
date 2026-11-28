@@ -158,6 +158,7 @@ export default function MainMapSpaces({
     if (rowTrial && active) return sketchRow(active,site.frame,edge,angle,100,site.zones.filter(z=>z.kind==="clear").map(z=>z.points));
     return null;
   },[active,angle,draft,edge,rowTrial,filtered,site]);
+  const conditional=estimate && "layouts" in estimate && estimate.layouts[0]?.ledger.validation ? estimate.layouts[0] : undefined;
   const costCase=matchingCase || selectedCase;
   const price=costCase && estimate && "layouts" in estimate ? estimate.layouts.find(l=>
     l.mixId ? l.mixId===costCase.mixId : l.condition===costCase.name+". "+costCase.condition && l.stalls===costCase.rows.reduce((n,r)=>n+r.count,0)) : undefined;
@@ -580,6 +581,7 @@ export default function MainMapSpaces({
               </>
             )}
             {site && filter==="all" && !area && !draft && assessment && !cases.length && <p className="layer-meta">{catalog?.reviewsAvailable ? "No system combination fits the currently usable, scaled outlines." : "Latest outline edits are unavailable."}</p>}
+            {site && !draft && conditional && <p className="layer-meta"><b>Conditional site estimate</b> · {conditional.stalls} {conditional.ledger.hypothetical ? "assumed" : "drawn"} stalls · {costRange(conditional)}/charge. {conditional.ledger.validation} <a className="text-link" href={"/charging?"+new URLSearchParams({site:site.id,view:"explain",basis:"screen"})}>Compare assumptions</a></p>}
             {site && filter==="all" && !draft && <ParcelInventory inventory={assessment?.inventory} zones={site.zones}/>}
             {site && !draft && (filter==="all" && !area && cases?.length || rowTrial || canTestRow) ? <div className="parcel-sketch">
               {charging?.selected && <p><b>Selected site case</b> · {charging.name} · {charging.selectedStalls??"Unknown"} stalls · {charging.stale?"Needs recalculation":amounts(charging.result.siteCost,2)+"/charge"} <a className="text-link" href={"/charging?"+new URLSearchParams({site:site.id,case:charging.selected,view:"explain",basis:"detail"})}>Open saved case</a></p>}

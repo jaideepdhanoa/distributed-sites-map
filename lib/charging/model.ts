@@ -67,6 +67,10 @@ export function initialCase(d: Pick<DealProps,"purchase"|"selectionResearch"|"as
   if(research?.quote!=null && research.source && research.reviewedOn && /^public (whole-property ask|quote\b)/i.test(research.basis)){
     evidence.ask={status:"quoted",source:research.basis,url:research.source,date:research.reviewedOn};
   }
+  if(source?.ledger.validation){
+    evidence.ask={status:"assumed",source:source.ledger.priceBasis.slice(0,400),url:source.ledger.source??undefined,date:""};
+    if(source.ledger.hypothetical) evidence.stalls={status:"assumed",source:source.condition.slice(0,400),date:""};
+  }
   return {values,evidence,sourceValues:{},mixId:mix?.mixId,layout:mix?.condition.split(". ")[0] ?? (assessed ? assessed.basis.slice(0,240) : "Workbook footprint"),rights:"unknown",rightsSource:"",rightsDate:"",comparable:false,sensitivityPct:10,terms:source?.ledger.terms??"purchase",comparator:"workbook",energyScope:"excluded",openEarly:"",openLate:"",depotDate:"",allOptionsReviewed:false,peakDay:"weekday",temporaryEnd:"",temporarySource:""};
 }
 export const decisions=["Evidence needed","Verify a condition","Reprice","Advance diligence","Suggest drop"] as const;
@@ -75,6 +79,10 @@ export type CalculationLine = {label:string; keys:Key[]; value:number|null; excl
 export type CalculationTrace = {annual:CalculationLine[]; throughput:CalculationLine[]; total:number|null; hours:number|null; perHour:number|null};
 export function annualRecovery(rate: number, years: number) {
   return rate === 0 ? 1 / years : rate / (1 - Math.pow(1 + rate, -years));
+}
+export function verifiedZeroFit(c:Inputs) {
+  const stalls=c.evidence.stalls;
+  return c.values.stalls===0 && c.allOptionsReviewed && stalls?.status==="verified" && Boolean(stalls.source.trim() && stalls.date);
 }
 export function calculate(c:Inputs, trace?:CalculationTrace) {
   const v=c.values, missing:string[]=[];
@@ -156,7 +164,9 @@ export function calculate(c:Inputs, trace?:CalculationTrace) {
   const upgradeLimit=budgetAtAsk!=null && v.upgrade!=null && recovery+tax>0?v.upgrade+budgetAtAsk/(recovery+tax):null;
   let decision:Decision="Evidence needed", next="";
   const confirmed=(key:Key)=>Boolean(c.evidence[key]?.source.trim() && c.evidence[key]?.date && c.evidence[key]?.status!=="assumed");
-  if(c.rights==="unavailable"){
+  if(verifiedZeroFit(c)){
+    decision="Suggest drop";next="The site-wide review found no usable charging layout. Submit the source and reason for drop approval.";
+  }else if(c.rights==="unavailable"){
     decision=c.allOptionsReviewed && c.rightsSource.trim() && c.rightsDate?"Suggest drop":"Verify a condition";next="Check an alternative controlled footprint or document why every layout is unavailable.";
   }else if(c.rights!=="controlled" || !c.rightsSource.trim() || !c.rightsDate){
     next="Obtain the measured layout and written rights to the stalls, aisle and hours.";decision="Verify a condition";

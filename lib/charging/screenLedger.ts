@@ -13,7 +13,7 @@ export type LedgerBasis = {
   inputs:LedgerInputs; terms:"purchase"|"lease"; condition:string; space:string;
   priceBasis:string; cashBasis:string; source?:string|null; date?:string|null; proxy?:number|null;
   // The layout may be a conditional screen rather than a proven fit.
-  hypothetical?:boolean; creditCash?:boolean; workbookDefaults?:Changes;
+  validation?:string; hypothetical?:boolean; creditCash?:boolean; workbookDefaults?:Changes;
   rightsByArea?:Record<string,boolean>; parts?:{area:string;stalls:number}[]; businessType?:string; siteDrivers?:boolean; withheldOperatingCash?:number;
   parcel?:boolean; conversionRecorded?:boolean; displacedRecorded?:boolean;
 };
@@ -35,6 +35,7 @@ export function remainingBasis(parent:LedgerBasis, omitted:string[], available:L
   const parts=parent.parts.filter(p=>!omitted.includes(p.area));
   const components=parts.map(p=>parent.componentIds?.[p.area]);
   const exact=components.length && components.every(Boolean) && available.find(b=>
+    b.inputs.price===parent.inputs.price && b.terms===parent.terms && b.validation===parent.validation &&
     b.parts?.length===parts.length && parts.every((p,i)=>b.componentIds?.[p.area]===components[i]));
   if(exact) return exact;
   const stalls=parts.reduce((n,p)=>n+p.stalls,0);

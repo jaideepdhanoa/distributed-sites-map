@@ -1,5 +1,5 @@
 import type { DealProps } from "../types";
-import { calculate, fields, type Inputs, type Key } from "./model";
+import { calculate, fields, verifiedZeroFit, type Inputs, type Key } from "./model";
 
 export const meritVersion = "site-merit/1";
 export const downsideKeys = ["stalls","supply","load","demand","dwell","uptime","conversion","interruption","loss","cash","upgrade","build","fixed","hostWeek","hostEnd","ownWeek","ownEnd","hostFee","posts","wage","energyRate","demandRate","billedPeak"] as const;
@@ -93,6 +93,7 @@ export function siteMerit(deal:DealProps,c:Inputs,selected:boolean,stale:boolean
       return result("Dropped", commercial.next, 8);
     if(siteHold || (closed && routeApplies))return result("Verify a condition",commercial.next,2);
   }
+  if(selected && !stale && verifiedZeroFit(c)) return result("Suggest drop",r.next,7);
   if(deal.suggested_drop || deal.listing_removed)return result("Suggest drop",deal.suggested_drop || "Reconcile the offering and current disposition.",7);
   const blocker=deal.stage_blocker?.trim();
   if(blocker && !/^(?:—|-|unknown|n\/a|none|not on file)$/i.test(blocker))return result("Verify a condition",blocker,2);

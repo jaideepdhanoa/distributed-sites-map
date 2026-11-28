@@ -146,11 +146,12 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
       <p className="layout-legend">Cost per charge with an upfront utility upgrade of <b>{amounts(r.upgrade)}</b>{!initial && r.upgrade>0 && <> → <b>{amounts(higherUpgrades[index].upgrade)}</b> (+50%)</>}</p>
       <div className="layout-choices" style={{"--layout-columns":columns} as CSSProperties}>{bases.map((b,i)=>{
         const c=comparisons[i],higher=higherUpgrades[i],stalls=locals[i]?.stalls??projected[i].inputs.stalls;
-        const content=<><b className="layout-count">{stalls} {stalls===1?"stall":"stalls"}</b><span className="layout-name">{nameOf(b)}</span>
+        const content=<><b className="layout-count">{stalls} {stalls===1?"stall":"stalls"}</b><span className="layout-name">{nameOf(b)}</span>{b.validation && <span>{b.priceBasis} · {amounts(b.inputs.price)}</span>}
           <span className="layout-price">{c.perCharge==null?"Unpriced":amounts(c.perCharge,2)}{!initial && c.upgrade>0 && higher.perCharge!=null && <> → {amounts(higher.perCharge,2)}</>}</span></>;
         return bases.length===1?<div className="layout-only" key={i}>{content}</div>:
           <button type="button" className="paper-btn layout-choice" key={i} aria-pressed={index===i} onClick={()=>{setIndex(i);clearStatus();}}>{content}</button>;
       })}</div>
+      {basis.validation && <p role="status"><b>Conditional estimate · validate</b> {basis.validation}</p>}
       {initial && !!currentParts?.length && <p><b>Included areas</b> · {currentParts.map(p=>p.area+" ("+p.stalls+")").join(" + ")}</p>}
       {currentParts?.length && basis.rightsByArea && v.stalls===layoutCount ? <p><b>Right to use</b> · {currentParts.reduce((n,p)=>n+(basis.rightsByArea?.[p.area]?p.stalls:0),0)} of {layoutCount} stalls have documented use and access.</p> : null}
       {basis.condition!==nameOf(basis) && <p>{basis.condition.slice(nameOf(basis).length+2)}</p>}

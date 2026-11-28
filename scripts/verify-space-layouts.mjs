@@ -71,7 +71,7 @@ export async function verifySpaceLayouts(origin, file, credentials) {
         }
         const priced=record.charging?.preliminary;
         if (system.length && priced && "layouts" in priced) {
-          if (!isDeepStrictEqual(priced.layouts.map(l=>[l.stalls,l.condition]),layouts.map(l=>[l.stalls,l.condition])))
+          if (!isDeepStrictEqual(priced.layouts.map(l=>[l.mixId,l.stalls,l.condition]).sort(),layouts.map(l=>[l.mixId,l.stalls,l.condition]).sort()))
             throw Error("The charging explanation and parcel geometries disagree.");
           const rate=priced.layouts[0].base.sessions/priced.layouts[0].stalls;
           if (priced.layouts.some(l=>Math.abs(l.base.sessions/l.stalls-rate)>1e-6))

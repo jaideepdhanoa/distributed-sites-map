@@ -109,6 +109,18 @@ export function rightsSummary(rights: ReturnType<typeof layoutRights>) {
   if (!rights.pending) return "Use and access documented for all " + rights.documented;
   return (rights.documented ? rights.documented + " with documented use · " : "") + rights.pending + " pending use-rights validation";
 }
+// A case link keeps pointing at the same rows after names or display order change.
+function geometryKey(value: unknown) {
+  const bytes=JSON.stringify(value);
+  let a=2166136261, b=5381;
+  for (let i=0;i<bytes.length;i++) {
+    const n=bytes.charCodeAt(i);
+    a=Math.imul(a^n,16777619);
+    b=Math.imul(b,33)^n;
+  }
+  return (a>>>0).toString(36)+"-"+(b>>>0).toString(36);
+}
+
 export function assessedCases(zones:Zone[], frame:ScaleFrame, assessment:Assessment):ParcelCase[] {
   if (assessment.status!=="reviewed" || !(frame.bounds || frame.metersPerPixel)) return [];
   const filed=(assessment.parcelCases??[]).filter(c=>!c.rows.some(r=>zones.find(z=>z.label===r.area)?.useRight?.status==="unavailable") && sketchCase(c,zones,frame));
@@ -139,5 +151,16 @@ export function assessedCases(zones:Zone[], frame:ScaleFrame, assessment:Assessm
       condition:exact?.condition??conditions(mix.flags) });
   }
   // Keep original named cases and their economic terms addressable, including saved links.
-  return [...result,...filed];
+  return [...result,...filed].map(c => {
+    const componentIds=Object.fromEntries(areaCounts(c.rows).map(({area})=>{
+      const zone=zones.find(z=>z.label===area)!;
+      const component=geometryKey([assessment.image?.id,zone.kind,zone.points,zone.driveAisle,
+        signature(c.rows.filter(r=>r.area===area).map(r=>({...r,area:""})))]);
+      return [area,component];
+    }));
+    const mask=c.rows.reduce((n,r)=>n|uses(zones.find(z=>z.label===r.area)!)|(r.sharedAisle?shared:0),0);
+    const mixId=(c.system?"mix-":"filed-")+geometryKey([Object.values(componentIds).sort(),c.approach,
+      ...(c.system?[]:[c.conversionCost,c.lostAnnualCash])]);
+    return {...c,mixId,componentIds,operatingScope:String(mask)};
+  });
 }

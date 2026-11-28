@@ -215,7 +215,12 @@ test("review a whole parcel, switch parking geometry and inspect its aisles", as
   await expect(workspace.getByText("6 pending use-rights validation")).toBeVisible();
   const ledgerLink = new URL((await workspace.getByRole("link", { name:"See cost per charge" }).getAttribute("href"))!, page.url());
   expect(ledgerLink.searchParams.get("basis")).toBe("screen");
-  expect(ledgerLink.searchParams.get("layout")).toBe("Existing parking and pads");
+  const mix=ledgerLink.searchParams.get("layout");
+  expect(mix).toMatch(/^mix-[a-z0-9]+-[a-z0-9]+$/);
+  await page.goto("/?spaces=1&spaceSite="+id+"&mix="+encodeURIComponent("Existing parking and pads"));
+  await expect(workspace.getByText("6 stalls sketched")).toBeVisible();
+  const legacy=new URL((await workspace.getByRole("link",{name:"See cost per charge"}).getAttribute("href"))!,page.url());
+  expect(legacy.searchParams.get("layout")).toBe(mix);
   await workspace.getByRole("checkbox",{name:/North court/}).uncheck();
   await expect(workspace.getByText("0 stalls selected")).toBeVisible();
   await page.reload();

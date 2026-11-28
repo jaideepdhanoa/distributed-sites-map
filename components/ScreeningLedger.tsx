@@ -3,7 +3,7 @@ import {useRef,useState, type CSSProperties, type FormEvent} from "react";
 import type {ListAssumptions} from "@/lib/charging/preliminary";
 import {displayedPriceDelta} from "@/lib/charging/pipelineCost";
 import {amounts} from "@/lib/charging/model";
-import {higherUpgradeCase,ledgerFields,savedChanges,screenLedger,validChange,type Changes,type LedgerBasis,type LedgerKey,type SavedScreen} from "@/lib/charging/screenLedger";
+import {remainingBasis,higherUpgradeCase,ledgerFields,savedChanges,screenLedger,validChange,type Changes,type LedgerBasis,type LedgerKey,type SavedScreen} from "@/lib/charging/screenLedger";
 import {LedgerNumber} from "./LedgerNumber";
 import "./screening-ledger.css";
 
@@ -30,22 +30,25 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
   const [name,setName]=useState(""),[status,setStatus]=useState(""),[saving,setSaving]=useState(false);
   const [saved,setSaved]=useState<SavedScreen|null>(null);
   const retry=useRef<{body:string;id:string}|null>(null);
-  const changes={...common,...locals[index]},basis=bases[index];
+  const changes={...common,...locals[index]};
   const omitted=areas[index]??[];
+  const projected=bases.map((b,i)=>initial ? b : remainingBasis(b,areas[i]??[],bases));
+  const basis=projected[index];
   const r=screenLedger(basis,changes),base=screenLedger(first,subset);
   const v={...basis.inputs,...changes,cash:r.operatingCash};
   const lease=basis.terms==="lease",priced=r.perCharge!=null,custom=Object.keys(changes).length>0 || index!==0 || omitted.length>0;
   function clearStatus(){setSaved(null);setStatus("");}
   function change(k:LedgerKey,n:number){
+    if(k==="stalls" && omitted.length && n!==basis.inputs.stalls) return;
     if(!validChange(k,n))return;
-    function updated(old:Changes){const next={...old,[k]:n};if(n===basis.inputs[k] && !(basis.withheldOperatingCash!=null && (k==="cash" || k==="displaced")))delete next[k];return next;}
+    function updated(old:Changes){const next={...old,[k]:n};if(n===basis.inputs[k] && !basis.allocationNeeded?.some(key=>key===k) && !(basis.withheldOperatingCash!=null && (k==="cash" || k==="displaced")))delete next[k];return next;}
     if(localFields.has(k))setLocals(old=>({...old,[index]:updated(old[index]??{})}));
     else setCommon(updated);
     clearStatus();
   }
   async function save(event:FormEvent){
     event.preventDefault();if(!saveContext || saving)return;
-    const draft={kind:"screen",listTrial:saveContext.listTrial,name:name.trim(),sourceRevision:saveContext.source,basis,changes,omitted,scenario:0};
+    const draft={kind:"screen",listTrial:saveContext.listTrial,name:name.trim(),sourceRevision:saveContext.source,basis:bases[index],changes,omitted,scenario:0};
     const body=JSON.stringify(draft);
     if(retry.current?.body!==body)retry.current={id:crypto.randomUUID(),body};
     setSaving(true);setStatus("");
@@ -94,8 +97,8 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
   const currentParts=basis.parts?.filter(p=>!omitted.includes(p.area));
   const layoutCount=currentParts?.length?currentParts.reduce((n,p)=>n+p.stalls,0):basis.inputs.stalls;
   const nameOf=(b:LedgerBasis)=>b.condition.split(". ")[0];
-  const comparisons=bases.map((b,i)=>screenLedger(b,{...common,...locals[i]}));
-  const higherUpgrades=bases.map((b,i)=>higherUpgradeCase(b,{...common,...locals[i]}));
+  const comparisons=projected.map((b,i)=>screenLedger(b,{...common,...locals[i]}));
+  const higherUpgrades=projected.map((b,i)=>higherUpgradeCase(b,{...common,...locals[i]}));
   const columns=Math.ceil(bases.length/Math.ceil(bases.length/4));
   const diff=(n:number|null)=>n==null || r.perCharge==null?null:displayedPriceDelta(n,r.perCharge);
   const stallTrials=[-1,1].map(step=>{
@@ -133,14 +136,16 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
   const linesByPriority=(["property","upgrade","construction","conversion","cash","displaced","staffing","upkeep","tax"] as const).flatMap(key=>lines.filter(l=>l.key===key));
   return <div className="screen-ledger">
     <div className="screen-result" aria-live="polite"><div><span>{initial?"Saved alternative":custom?"Site trial":"Starting estimate"} · {v.stalls} operating stalls</span>
-      <strong>{priced?amounts(r.perCharge,2):"No completed charges"}{priced && <small> / charge</small>}</strong></div>
+      <strong>{priced?amounts(r.perCharge,2):r.sessions>0?"Allocate remaining costs":"No completed charges"}{priced && <small> / charge</small>}</strong></div>
       <p>{amounts(r.annualCost)} annual net cost ÷ {count(r.sessions)} annual charges{priced && base.perCharge!=null && custom?" · "+delta(displayedPriceDelta(r.perCharge!,base.perCharge))+" vs starting estimate":""}</p>
       <small>Electricity and utility demand charges excluded</small></div>
+    {!!basis.allocationNeeded?.length && <p>Enter the amounts for the retained areas: {basis.allocationNeeded.map(k=>ledgerFields[k]).join(", ")}.</p>}
+    {v.stalls>20 && <p>Above the 20-stall costing assumption. Verify site-specific build and utility costs.</p>}
     {initial && !basis.siteDrivers && <p>Historical case · original utilization of {num(v.volume)}% of the workbook benchmark.</p>}
     <section className="layout-ledger" aria-label="Stall configuration"><h3>Stall configuration</h3>
       <p className="layout-legend">Cost per charge with an upfront utility upgrade of <b>{amounts(r.upgrade)}</b>{!initial && r.upgrade>0 && <> → <b>{amounts(higherUpgrades[index].upgrade)}</b> (+50%)</>}</p>
       <div className="layout-choices" style={{"--layout-columns":columns} as CSSProperties}>{bases.map((b,i)=>{
-        const c=comparisons[i],higher=higherUpgrades[i],stalls=locals[i]?.stalls??b.inputs.stalls;
+        const c=comparisons[i],higher=higherUpgrades[i],stalls=locals[i]?.stalls??projected[i].inputs.stalls;
         const content=<><b className="layout-count">{stalls} {stalls===1?"stall":"stalls"}</b><span className="layout-name">{nameOf(b)}</span>
           <span className="layout-price">{c.perCharge==null?"Unpriced":amounts(c.perCharge,2)}{!initial && c.upgrade>0 && higher.perCharge!=null && <> → {amounts(higher.perCharge,2)}</>}</span></>;
         return bases.length===1?<div className="layout-only" key={i}>{content}</div>:
@@ -149,17 +154,19 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
       {initial && !!currentParts?.length && <p><b>Included areas</b> · {currentParts.map(p=>p.area+" ("+p.stalls+")").join(" + ")}</p>}
       {currentParts?.length && basis.rightsByArea && v.stalls===layoutCount ? <p><b>Right to use</b> · {currentParts.reduce((n,p)=>n+(basis.rightsByArea?.[p.area]?p.stalls:0),0)} of {layoutCount} stalls have documented use and access.</p> : null}
       {basis.condition!==nameOf(basis) && <p>{basis.condition.slice(nameOf(basis).length+2)}</p>}
-      {!!basis.parts?.length && !initial && <fieldset className="ledger-areas"><legend>Included areas</legend>{basis.parts.map(part=><label key={part.area}>
+      {!!bases[index].parts?.length && !initial && <fieldset className="ledger-areas"><legend>Included areas</legend>{bases[index].parts!.map(part=><label key={part.area}>
         <input type="checkbox" className="check" checked={!omitted.includes(part.area)} disabled={currentParts?.length===1 && !omitted.includes(part.area)} onChange={e=>{
           const next=e.target.checked?omitted.filter(a=>a!==part.area):[...omitted,part.area];
-          setAreas(old=>({...old,[index]:next}));change("stalls",basis.parts!.reduce((n,p)=>n+(next.includes(p.area)?0:p.stalls),0));
+          const remaining=remainingBasis(bases[index],next,bases);
+          setAreas(old=>({...old,[index]:next}));
+          setLocals(old=>({...old,[index]:next.length?{stalls:remaining.inputs.stalls}:{}}));clearStatus();
         }}/>{part.area} · {part.stalls}</label>)}</fieldset>}
-      <div className="ledger-control"><LedgerNumber label="Operating stalls" caption="Stalls" unit="count" scale={{base:Math.max(layoutCount,...bases.map(b=>b.inputs.stalls)),factor:1,fallback:12,limit:200}} value={v.stalls} valid={n=>validChange("stalls",n)} onValue={n=>change("stalls",n)}/>
+      {!omitted.length && <div className="ledger-control"><LedgerNumber label="Operating stalls" caption="Stalls" unit="count" scale={{base:Math.max(layoutCount,...bases.map(b=>b.inputs.stalls)),factor:1,fallback:12,limit:200}} value={v.stalls} valid={n=>validChange("stalls",n)} onValue={n=>change("stalls",n)}/>
         <div className="ledger-presets" role="group" aria-label="Stall count scenarios">
           {stallTrials.map(t=><button type="button" key={t.step} className="paper-btn" disabled={!t.valid} onClick={()=>change("stalls",t.stalls)}>{t.step<0?"−1 stall":"+1 stall"}{t.impact!=null && <small>{delta(t.impact)}/charge</small>}</button>)}
-          <button type="button" className="paper-btn" onClick={()=>change("stalls",layoutCount)}>Restore {layoutCount} stalls</button></div></div>
+          <button type="button" className="paper-btn" onClick={()=>change("stalls",layoutCount)}>Restore {layoutCount} stalls</button></div></div>}
       <p><b>{v.stalls===layoutCount?(basis.hypothetical?"Assumed layout":omitted.length?"Selected areas":"Assessed layout"):"Manual stall trial"}</b> · {v.stalls} × {num(r.perStall*v.volume/100)} charges per stall per year = {count(r.sessions)} annual charges.</p>
-      <small>Same utilization per stall across layouts. Confirm circulation, aisle access and operating rights. {omitted.length>0 && "Selected areas retain the full site and conversion allowances."}</small>
+      <small>Same utilization per stall across layouts. Confirm circulation, aisle access and operating rights. {omitted.length>0 && "Costs reflect the retained areas."}</small>
     </section>
     {ranked.length>0 && <p className="screen-insight"><b>Largest tested change</b> · {ranked[0].label} · {ranked[0].test} · <b>{delta(ranked[0].impact!)}/charge</b></p>}
     <h3>Annual cost ledger</h3><p className="layer-meta">Drag to try a value. Click the amount to enter an exact figure, even outside the slider range. Upfront costs use {recovery}.</p>
@@ -187,7 +194,7 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
 
     {(custom || initial || index!==initialIndex) && <button className="text-link" type="button" onClick={()=>{setIndex(initialIndex);setAreas({[initialIndex]:excluded});setCommon(selectFields(start,false));setLocals({[initialIndex]:selectFields(start,true)});clearStatus();}}>Reset to starting estimate</button>}
     {saveContext?.canWrite && !initial && priced && custom && <form className="screen-save" onSubmit={save}><label>Alternative name<input className="field" required maxLength={80} value={name} onChange={e=>{setName(e.target.value);setSaved(null);}}/></label>
-      <button type="submit" className="paper-btn" disabled={saving||!!saved||!name.trim()}>{saving?"Saving…":"Save screening alternative"}</button></form>}
+      <button type="submit" className="paper-btn" disabled={saving||!!saved||!priced||!name.trim()}>{saving?"Saving…":"Save screening alternative"}</button></form>}
     <p role="status">{status}{saved && <> <a className="text-link" href={savedLink(saved.id)}>Reopen saved ledger</a></>}</p>
   </div>;
 }

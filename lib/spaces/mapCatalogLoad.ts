@@ -1,3 +1,5 @@
+import { pipelineTrack } from "../selection/pipelineTrack";
+import { opportunityRegister } from "../selection/opportunityLoad";
 import { actionsEnabled, withSql } from "@/lib/actions/db";
 import type { Point } from "./options";
 import { assessedCases } from "./assessedMix";
@@ -10,6 +12,7 @@ type Deal = {
 };
 
 export async function mapCatalog(deals: Deal[], rows = assessedLayouts(), withCounts=false): Promise<SpaceCatalog> {
+  const reviews=opportunityRegister()?.sites;
   const ids = rows.map(([id]) => id);
   let reviewsAvailable = true;
   let notes: OutlineNote[] = [];
@@ -57,7 +60,7 @@ export async function mapCatalog(deals: Deal[], rows = assessedLayouts(), withCo
       id,
       name: String(props?.name || props?.address || row.segment || id),
       market: id.split("-")[1],
-      cohort,
+      cohort,pipelineTrack:pipelineTrack(reviews?.[id]?.primary.disposition),
       revision: row.revision,
       frame: { id: frameId, bounds, date, source, kind, width, height, metersPerPixel },
       center: bounds ? [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2] : pin,

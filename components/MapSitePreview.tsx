@@ -1,5 +1,5 @@
 import { nextDecision, offeredTransaction, recommendation } from "@/lib/selection/opportunityDisplay";
-import { pipelineCost, screenBasis } from "@/lib/charging/pipelineCost";
+import { displayedDepot, displayedFit, pipelineCost, screenBasis } from "@/lib/charging/pipelineCost";
 import {ChargingLink} from "@/components/ChargingLink";
 import { filedScreenLabel } from "@/lib/charging/summary";
 import MapPanelGrip from "./MapPanelGrip";
@@ -54,8 +54,9 @@ export default function MapSitePreview(props: PreviewProps) {
   const powerDeal = deal || props.linkedDeal;
   const commercial = props.signedIn && !listing ? powerDeal?.opportunityReview : undefined;
   const asking = commercial && figures.find(figure => figure.label === "Asking price");
-  const fit = props.signedIn && !listing ? powerDeal?.chargingSpace : undefined;
+  const fit = props.signedIn && !listing ? displayedFit(powerDeal?.chargingSpace,powerDeal?.charging) : undefined;
   const cost = pipelineCost(powerDeal?.charging);
+  const depot=powerDeal?.charging && displayedDepot(powerDeal.charging);
   const power = props.signedIn && !listing && access.enabled && !evidence && /power|utility|electrical/i.test(review) && powerDeal?.kind !== "land" && !site?.land_only && powerDeal?.stage_group !== "dropped";
   const address = displayAddress(record.address);
   return (
@@ -84,7 +85,7 @@ export default function MapSitePreview(props: PreviewProps) {
       {!showingPower && props.signedIn && powerDeal?.charging && !site?.land_only && <section className="charging-preview">
         <strong>Charging economics</strong><span>{powerDeal.charging.merit.action === "Suggest drop" ? "Set this charging case aside" : powerDeal.charging.merit.action}</span>
         <p>{cost.amount == null ? cost.value : cost.value + " / charge"}
-          {powerDeal.charging.result.depot!=null && " · $"+powerDeal.charging.result.depot.toFixed(2)+" depot"+(powerDeal.charging.comparator==="workbook"?" proxy":"")}</p>
+          {depot?.amount!=null && " · $"+depot.amount.toFixed(2)+" "+depot.label}</p>
         {powerDeal.charging.merit.downsideGap!=null && <small>Downside gap ${powerDeal.charging.merit.downsideGap.toFixed(2)} per charge</small>}
         <small>{cost.basis}</small>
         <small>{powerDeal.charging.name} · {powerDeal.charging.result.peakSessions??"Unknown"} peak charges · {powerDeal.charging.result.opening||"Opening unconfirmed"}</small>

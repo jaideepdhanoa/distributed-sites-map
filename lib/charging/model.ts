@@ -33,34 +33,41 @@ export type Inputs = {
   ranking?: import("./merit").RankingInputs;
   values:Record<Key,number|null>; evidence:Partial<Record<Key,Evidence>>;
   sourceValues?:Partial<Record<Key,{value:number|null;evidence:Evidence}>>;
-  layout:string; rights:"unknown"|"controlled"|"unavailable"; rightsSource:string; rightsDate:string;
+  mixId?:string; layout:string; rights:"unknown"|"controlled"|"unavailable"; rightsSource:string; rightsDate:string;
   comparable:boolean; sensitivityPct:number; terms:"purchase"|"lease"; comparator:"workbook"|"local"; energyScope:"excluded"|"included";
   openEarly:string; openLate:string; depotDate:string; allOptionsReviewed:boolean; peakDay:"weekday"|"weekend"; temporaryEnd:string; temporarySource:string;
 };
 export const keys = Object.keys(fields) as Key[];
 export type Assumptions = Partial<Record<"charges"|"unitBuild"|"attendant"|"perPost"|"kw"|"fixed"|"insurance"|"perCharger"|"ports"|"upgrade"|"tax"|"hostHours"|"escalation",number|null>>;
 export const amounts = (n:number|null, digits = 0) => n == null ? "Unknown" : n.toLocaleString("en-US",{style:"currency",currency:"USD",minimumFractionDigits:digits,maximumFractionDigits:digits});
-export function initialCase(d: Pick<DealProps,"purchase"|"selectionResearch"|"asking_price"|"bays_that_fit">):Inputs {
+export function initialCase(d: Pick<DealProps,"purchase"|"selectionResearch"|"asking_price"|"bays_that_fit"|"chargingSpace"|"charging">, preferred?:import("./preliminary").LayoutCost):Inputs {
   const w=d.purchase?.inputs, a=d.purchase?.assumptions, ref=a?.charging;
   const values = Object.fromEntries(keys.map(k=>[k,null])) as Inputs["values"];
-  const stalls=w?.fit ?? d.bays_that_fit ?? w?.stalls ?? null;
+  const assessed=d.chargingSpace;
+  const priced=d.charging?.preliminary;
+  const source=preferred ?? (priced && "layouts" in priced ? priced.layouts[0] : undefined);
+  const mix=source ?? assessed?.layouts?.[0];
+  const stalls=assessed ? (mix?.stalls ?? assessed.count) : w?.fit ?? d.bays_that_fit ?? w?.stalls ?? null;
   Object.assign(values,{stalls, days:365, hostWeek:0,hostEnd:0,ownWeek:24,ownEnd:24,weekdayHours:24,weekendHours:24,
     hostFee:0, posts:stalls!=null && ref?.perPost ? Math.ceil(stalls/ref.perPost) : null,
     wage:ref?.attendant!=null ? ref.attendant/(365*24) : null, charger:ref?.kw ?? null,
-    conversion:0,interruption:0,loss:0, ask:d.selectionResearch ? d.selectionResearch.quote : d.asking_price ?? w?.ask ?? null,
+    conversion:mix?.conversionCost??0,interruption:0,loss:mix?.lostAnnualCash??0, ask:d.selectionResearch ? d.selectionResearch.quote : d.asking_price ?? w?.ask ?? null,
     cash:w?.cash ?? null,assetCap:w?.landCap ?? null,build:ref?.unitBuild!=null && stalls!=null ? stalls*ref.unitBuild : null,
     tax:ref?.tax!=null ? ref.tax*100:null,rate:a?.capital!=null ? a.capital*100:null,closing:a?.closing!=null ? a.closing*100:null,
     years:a?.horizon ?? null, depot:a?.hub!=null && ref?.charges ? a.hub/ref.charges : null});
+  if(source) Object.assign(values,{cash:source.ledger.inputs.cash,conversion:source.ledger.inputs.conversion,loss:source.ledger.inputs.displaced,upgrade:source.ledger.inputs.upgrade,
+    ...(source.ledger.terms==="purchase"?{ask:source.ledger.inputs.price}:{rent:source.ledger.inputs.price,ask:null})});
   const evidence:Inputs["evidence"]={};
   for(const key of keys) if(values[key]!=null) {
     const planning=(["days","hostWeek","hostEnd","ownWeek","ownEnd","weekdayHours","weekendHours","hostFee","conversion","interruption","loss"] as Key[]).includes(key);
     evidence[key]={status:"assumed",source:planning?"Planning assumption":key==="ask" && d.selectionResearch ? d.selectionResearch.basis : "Workbook screening input",date:planning?"":(key==="ask"?d.selectionResearch?.reviewedOn:"") || w?.checked || ""};
   }
+  if (assessed && stalls!=null) evidence.stalls={status:"assumed",source:mix?.condition.split(". ")[0] ?? assessed.basis.slice(0,400),date:""};
   const research=d.selectionResearch;
   if(research?.quote!=null && research.source && research.reviewedOn && /^public (whole-property ask|quote\b)/i.test(research.basis)){
     evidence.ask={status:"quoted",source:research.basis,url:research.source,date:research.reviewedOn};
   }
-  return {values,evidence,sourceValues:{},layout:"Workbook footprint",rights:"unknown",rightsSource:"",rightsDate:"",comparable:false,sensitivityPct:10,terms:"purchase",comparator:"workbook",energyScope:"excluded",openEarly:"",openLate:"",depotDate:"",allOptionsReviewed:false,peakDay:"weekday",temporaryEnd:"",temporarySource:""};
+  return {values,evidence,sourceValues:{},mixId:mix?.mixId,layout:mix?.condition.split(". ")[0] ?? (assessed ? assessed.basis.slice(0,240) : "Workbook footprint"),rights:"unknown",rightsSource:"",rightsDate:"",comparable:false,sensitivityPct:10,terms:source?.ledger.terms??"purchase",comparator:"workbook",energyScope:"excluded",openEarly:"",openLate:"",depotDate:"",allOptionsReviewed:false,peakDay:"weekday",temporaryEnd:"",temporarySource:""};
 }
 export const decisions=["Evidence needed","Verify a condition","Reprice","Advance diligence","Suggest drop"] as const;
 export type Decision=typeof decisions[number];

@@ -8,6 +8,7 @@ import { triage } from "@/lib/spaces/triage";
 import { chargingHold,screenSummary, type Inputs } from "@/lib/selection/screen";
 import { readGeneratedOptional } from "@/lib/snapshot/read";
 import { mapCatalog } from "@/lib/spaces/mapCatalogLoad";
+import { pipelineTrack } from "@/lib/selection/pipelineTrack";
 import { reviewAtStage } from "@/lib/selection/opportunity";
 import { opportunityRegister } from "@/lib/selection/opportunityLoad";
 import { selectionResearch } from "@/lib/selection/researchLoad";
@@ -56,7 +57,7 @@ export async function loadMapDeals(role: ActionRole, includePurchase = true) {
       return new Set(rows.map(r => r.target_kind + ":" + r.target_id));
     }).catch(() => undefined) : undefined,
   ]);
-  const reviews = allowed ? opportunityRegister()?.sites : undefined;
+  const reviews = opportunityRegister()?.sites;
   const research = allowed ? selectionResearch() : null;
   const captured = allowed && actionsEnabled() ? await withSql(async sql => {
     const result = await sql.query<{site_id:string}>("SELECT DISTINCT site_id FROM pnl_lines WHERE deleted_at IS NULL AND amount IS NOT NULL AND updated_by <> 'fixture'");
@@ -71,7 +72,7 @@ export async function loadMapDeals(role: ActionRole, includePurchase = true) {
   const layouts = new Map(outlines?.reviewsAvailable ? outlines.sites.map(site => {
     const zones = site.zones.filter(zone => zone.kind !== "clear");
     const revision = createHash("sha256").update(JSON.stringify([site.revision, site.frame.id,
-      zones.map(zone => [zone.kind, zone.label, zone.points])])).digest("hex").slice(0,12);
+      site.frame, site.zones])).digest("hex").slice(0,12);
     return [site.id, { revision, zones: zones.map(zone => zone.label), stalls:zones.map(zone=>{const fit=checkSpaceFit(zone,site.frame);return ["interior","footprint","measure"].includes(fit.check)?null:fit.inside?.[0]??null;}) }] as const;
   }) : []);
   const enriched = features.map(feature => {
@@ -84,17 +85,19 @@ export async function loadMapDeals(role: ActionRole, includePurchase = true) {
     if (current && !outlines.reviewsAvailable) view.fit = "Current outline needs verification";
     const active = d.stage_group !== "dropped" && !/off[ -]?market/i.test(d.stage || "");
     const screening = active && (row || selection?.[d.deal_id]) ? screenSummary(d.city,selection?.[d.deal_id],view,d) : undefined;
-    if (!allowed) return {...feature, properties:{...d,screening}};
+    const track=pipelineTrack(reviews?.[d.deal_id]?.primary.disposition);
+    if (!allowed) return {...feature, properties:{...d,screening,pipelineTrack:track}};
     const statementCoverage = !captured ? "unavailable" : captured.has(d.deal_id) || captured.has(d.universe_id || "") ? "present" : "empty";
     const chargingSpace = pipelineFit(current, row, outlines.reviewsAvailable, inputs?.fit ?? d.bays_that_fit);
+    chargingSpace.revision = layouts.get(d.deal_id)?.revision ?? row?.revision;
     const pendingDrop = active && pendingDrops
       ? pendingDrops.has("deal:" + d.deal_id) || Boolean(d.universe_id && pendingDrops.has("site:" + d.universe_id)) : undefined;
-    const record:DealProps={...d,pendingDrop,chargingSpace,chargingHold:chargingHold(selection?.[d.deal_id]),screening,statementCoverage,opportunityReview:reviewAtStage(reviews?.[d.deal_id], d.stage, d.decision_reason || d.chips?.find(c => c.family === "drop_reason")?.label),selectionResearch:research?.get(d.deal_id),...(inputs && purchase ? {purchase:{inputs,assumptions:purchase.assumptions,
+    const record:DealProps={...d,pipelineTrack:track,pendingDrop,chargingSpace,chargingHold:chargingHold(selection?.[d.deal_id]),screening,statementCoverage,opportunityReview:reviewAtStage(reviews?.[d.deal_id], d.stage, d.decision_reason || d.chips?.find(c => c.family === "drop_reason")?.label),selectionResearch:research?.get(d.deal_id),...(inputs && purchase ? {purchase:{inputs,assumptions:purchase.assumptions,
       layout:layouts.get(d.deal_id)}} : {})};
     if (active && !/^dropped/i.test(d.stage || "") && record.opportunityReview?.primary.disposition === "Suggest drop") {
       record.suggested_drop = record.opportunityReview.primary.rationale;
     }
-    if(active && ["MIA","PHX","LAS"].includes(d.city) && !selection?.[d.deal_id]?.land) record.charging=summarize(record,sourceRevision(record),saved?.get(d.deal_id),purchase?.assumptions);
+    if(active && ["MIA","PHX","LAS"].includes(d.city) && !selection?.[d.deal_id]?.land) record.charging=summarize(record,sourceRevision(record,purchase?.assumptions),saved?.get(d.deal_id),purchase?.assumptions);
     return {...feature,properties:record};
   });
   // Live decisions can change while the published workbook snapshot stays the same.

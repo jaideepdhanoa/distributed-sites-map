@@ -2,7 +2,7 @@ import { z } from "zod";
 import { isDropReason } from "./dropReasons";
 import { isExcludedSite } from "../alerts/excluded";
 
-export const dispositions = ["Shortlist", "Service diligence", "Reserve", "Suggest drop", "Hold", "Watch availability",
+export const dispositions = ["Shortlist", "Investigate", "Service diligence", "Reserve", "Suggest drop", "Hold", "Watch availability",
   "Archive listing", "Outside mandate", "Conditional", "Off-market prospect", "Dropped"] as const;
 export const routes = ["Operating acquisition", "Offered acquisition", "Operating lease", "Service premises",
   "Fleet service", "Host agreement", "Property only", "Site lead"] as const;
@@ -61,7 +61,7 @@ export function parseOpportunities(value: unknown) {
 export function reviewAtStage(review: OpportunitySite | undefined, stage: string, reason?: string) {
   if (!review || !/^dropped\b/i.test(stage)) return review;
   const previous = review.primary.disposition;
-  if (!["Suggest drop", "Shortlist", "Service diligence", "Reserve"].includes(previous)) return review;
+  if (!["Suggest drop", "Shortlist", "Investigate", "Service diligence", "Reserve"].includes(previous)) return review;
   const primary: Opportunity = {...review.primary, disposition: "Dropped", rank: null};
   if (previous !== "Suggest drop") primary.next = "A reviewer approves reopening after new evidence changes the drop reason.";
   if (reason && isDropReason(reason)) primary.dropReason = reason;
@@ -72,7 +72,7 @@ export function matchingOption(review: OpportunitySite | undefined, decision: st
   if (!review) return undefined;
   const options = [review.primary, ...review.alternatives];
   if (!decision && !route && review.primary.disposition === "Dropped") {
-    return options.find(option => ["Shortlist", "Service diligence", "Reserve"].includes(option.disposition));
+    return options.find(option => ["Shortlist", "Investigate", "Service diligence", "Reserve"].includes(option.disposition));
   }
   return options.find(option => (!decision || decision === option.disposition) && (!route || route === option.route)
     && (!reason || reason === option.dropReason));

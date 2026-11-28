@@ -149,7 +149,7 @@ test("explain a preliminary range with a conditional aisle on desktop and phone"
   const a={horizon:10,demand:10,hub:1000000,capital:0,closing:.1,charging:{charges:100000,perPost:3,ports:2,
     unitBuild:10000,upgrade:20000,attendant:12000,fixed:2000,insurance:1000,perCharger:500,tax:.01}} as PurchaseAssumptions;
   const site={deal_id:"PIPE-PHX-9997",name:"Example car wash",business_type:"Car wash",kind:"pipeline",asking_price:100000,
-    purchase:{inputs:{cash:5000,ownership:"Yes"},assumptions:a},chargingSpace:{count:0,value:"0 spaces",layouts:[{stalls:4,condition:"Parking with shared aisle access",parts:[{area:"Rear parking",stalls:3},{area:"Side parking",stalls:1}]},{stalls:6,condition:"Convert two wash bays",operatingConversion:true,conversionCost:25000,lostAnnualCash:2000,parts:[{area:"Existing parking",stalls:4},{area:"Wash bays",stalls:2}]},{stalls:7,condition:"Unpriced wash conversion",operatingConversion:true}]}} as DealProps;
+    purchase:{inputs:{cash:5000,ownership:"Yes"},assumptions:a},chargingSpace:{count:0,value:"0 spaces",layouts:[{stalls:4,condition:"Parking with shared aisle access",parts:[{area:"Rear parking",stalls:3},{area:"Side parking",stalls:1}]},{stalls:6,condition:"Convert two wash bays",operatingConversion:true,conversionCost:25000,lostAnnualCash:2000,parts:[{area:"Existing parking",stalls:4},{area:"Wash bays",stalls:2}]},{stalls:7,condition:"Unpriced wash conversion",operatingConversion:true},{stalls:4,condition:"Alternate parking entrance"}]}} as DealProps;
   site.charging={preliminary:preliminaryCost(site,a),result:{siteCost:null},stale:false} as NonNullable<DealProps["charging"]>;
   let saved:unknown;
   await page.route("**/api/actions/charging?site=*",route=>{
@@ -161,15 +161,30 @@ test("explain a preliminary range with a conditional aisle on desktop and phone"
   });
   await page.goto("/charging?site="+site.deal_id+"&view=explain");
   const panel=page.getByRole("region",{name:"Preliminary site cost"});
-  await expect(panel).toContainText("$10.15–$10.43");
+  const layout=panel.getByRole("region",{name:"Stall configuration"});
+  const choices=layout.locator(".layout-choices").getByRole("button");
+  await expect(choices).toHaveCount(4);
+  await expect(choices.first()).toContainText("$10.15 → $10.43");
+  await expect(layout).toContainText("upfront utility upgrade of $20,000 → $30,000 (+50%)");
+  const rows=await choices.evaluateAll(nodes=>new Set(nodes.map(el=>el.getBoundingClientRect().top)).size);
+  expect(rows).toBe(info.project.name==="mobile"?2:1);
+  await choices.last().click();
+  await expect(choices.last()).toHaveAttribute("aria-pressed","true");
+  await choices.first().click();
   await expect(panel).toContainText("shared aisle access");
   await expect(page.getByText("Parity comparison pending")).toHaveCount(0);
   await expect(panel).toContainText("4,000 annual charges");
   const utility=panel.getByRole("group",{name:"Utility upgrade ($) scenarios"});
   await utility.getByRole("button",{name:/^\+50%/}).click();
   await expect(panel.locator(".screen-result")).toContainText("$10.43");
+  await expect(layout).toContainText("$30,000 → $45,000 (+50%)");
+  await expect(panel.locator(".screen-result")).toContainText("4,000 annual charges");
+  await panel.getByRole("button",{name:/^Type exact Utility upgrade/}).click();
+  const exactUpgrade=panel.getByRole("spinbutton",{name:/^Exact Utility upgrade/});
+  await exactUpgrade.fill("0");await exactUpgrade.press("Enter");
+  await expect(layout.locator(".layout-legend")).toHaveText("Cost per charge with an upfront utility upgrade of $0");
+  await expect(choices.first()).not.toContainText("→");
   await utility.getByRole("button",{name:/^Base/}).click();
-  const layout=panel.getByRole("region",{name:"Stall configuration"});
   await layout.getByRole("button",{name:/Unpriced wash conversion/}).click();
   const lostCash=panel.getByRole("region",{name:"Car wash cash lost to conversion"});
   await expect(lostCash).toContainText("Credit 75% of source cash after conversion");
@@ -211,6 +226,9 @@ test("explain a preliminary range with a conditional aisle on desktop and phone"
   await panel.getByRole("button",{name:"Save screening alternative"}).click();
   await panel.getByRole("link",{name:"Reopen saved ledger"}).click();
   await expect(panel.locator(".screen-result")).toContainText("$9.17");
+  await expect(layout.locator(".layout-only")).toContainText("3 stalls");
+  await expect(layout).toContainText("Rear parking (3)");
+  await expect(layout.locator(".layout-legend")).not.toContainText("+50%");
   await page.goto("/charging?site="+site.deal_id+"&view=explain");
   await expect(panel.locator(".screen-result")).toContainText("$10.15");
   expect(await panel.evaluate(el=>el.scrollWidth <= el.clientWidth + 1)).toBe(true);
@@ -229,6 +247,17 @@ test("explain a preliminary range with a conditional aisle on desktop and phone"
     expect((await purchase.boundingBox())!.height).toBeLessThan(300);
     expect(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
   }
+
+  const layouts=site.chargingSpace!.layouts!;
+  for (let i=0;i<5;i++) layouts.push({stalls:i+2,condition:"Secondary parking arrangement "+(i+1)});
+  site.charging!.preliminary=preliminaryCost(site,a);
+  await page.reload();
+  await expect(choices).toHaveCount(9);
+  const wrappedRows=await choices.evaluateAll(nodes=>new Set(nodes.map(el=>el.getBoundingClientRect().top)).size);
+  expect(wrappedRows).toBe(info.project.name==="mobile"?5:3);
+  await choices.last().click();
+  await expect(panel.locator(".screen-result")).toContainText("6 operating stalls");
+  expect(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
 });
 
 test("open released charging ranges from the Phoenix list",async({page},info)=>{

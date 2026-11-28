@@ -39,7 +39,8 @@ if (!existsSync(path)) throw Error("The generated opportunity register is missin
       const live=rows.filter(r=>r.pipelineTrack==="charging");
       const examples=new Map();
       for(const row of live.filter(r=>r.charging)){
-        const kind=row.charging.selected ? "selected" : row.charging.preliminary?.layouts ? "assessed" : "unpriced";
+        const lead=row.charging.preliminary?.layouts?.[0];
+        const kind=row.charging.selected ? "selected" : lead?.ledger?.validation ? (lead.ledger.hypothetical ? "assumed fit" : "conditional terms") : lead ? "assessed" : "unpriced";
         if(!examples.has(kind)) examples.set(kind,row);
       }
       const editorsMatch=(await Promise.all([...examples.values()].map(async row=>{
@@ -51,7 +52,9 @@ if (!existsSync(path)) throw Error("The generated opportunity register is missin
       }))).every(Boolean);
       coverage = {
         drawnChargingSites:live.filter(r=>r.chargingSpace?.layouts?.some(l=>l.system)).length,
-        pricedChargingSites:live.filter(r=>r.charging?.preliminary?.layouts?.some(l=>l.system)).length,
+        pricedChargingSites:live.filter(r=>r.charging?.preliminary?.layouts?.length).length,
+        conditionalChargingSites:live.filter(r=>r.charging?.preliminary?.layouts?.[0]?.ledger?.validation).length,
+        assumedFitChargingSites:live.filter(r=>r.charging?.preliminary?.layouts?.[0]?.ledger?.hypothetical).length,
         systemChargingCombinations:live.reduce((n,r)=>n+(r.chargingSpace?.layouts?.filter(l=>l.system).length??0),0),
         editorCasesChecked:examples.size,
         activeWithEvidence: rows.filter(r => r.review?.coverage).length,

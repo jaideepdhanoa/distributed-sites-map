@@ -279,7 +279,7 @@ function Editor({data,reload,revision,explain,updateHistory}:{updateHistory:(row
       <label>Rights evidence<input className="field" value={draft.rightsSource} maxLength={400} onChange={e=>edit({...draft,rightsSource:e.target.value})}/></label>
       <label>Rights evidence date<input className="field" type="date" value={draft.rightsDate} onChange={e=>edit({...draft,rightsDate:e.target.value})}/></label>
     </div>
-    {draft.rights!=="unknown" && <label><input type="checkbox" className="check" checked={draft.allOptionsReviewed} onChange={e=>edit({...draft,allOptionsReviewed:e.target.checked})}/> All credible layouts and attainable terms reviewed</label>}
+    {(draft.rights!=="unknown" || draft.values.stalls===0) && <label><input type="checkbox" className="check" checked={draft.allOptionsReviewed} onChange={e=>edit({...draft,allOptionsReviewed:e.target.checked})}/> All credible layouts and attainable terms reviewed</label>}
     <div className="charging-controls">{quick.filter(k=>!(k==="ask" && draft.terms==="lease") && !(k==="rent" && draft.terms==="purchase")).map(field)}</div>
     {groups.map(group=><details className="disclosure" key={group}><summary className="disclosure">{group}</summary><div className="charging-controls">
       {keys.filter(k=>fields[k].group===group && !quick.includes(k)).map(field)}

@@ -1,3 +1,4 @@
+import { planningPriceCases, type PlanningPrice } from "./planningInputs";
 import type { DealProps } from "../types";
 import type { PurchaseAssumptions } from "../purchaseReview";
 import type { ChargingFootprint } from "../spaces/pipelineFit";
@@ -19,16 +20,18 @@ export type ListAssumptions = {
 export const defaultListAssumptions: ListAssumptions = { assumeFit:false, stalls: 6, volume: 100, creditCash: true };
 
 export type ScreenTenure = Pick<Inputs, "rights" | "terms"> & {values: Pick<Inputs["values"], "rent">};
-export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?: ScreenTenure,
-  trial?: { assumptions: ListAssumptions; hypothetical: boolean }): PreliminaryCost {
+type Trial = {assumptions: ListAssumptions; hypothetical: boolean};
+
+function costCase(d: DealProps, a?: PurchaseAssumptions, selected?: ScreenTenure,
+  trial?: Trial, planning?: PlanningPrice): PreliminaryCost {
   const option = d.opportunityReview?.primary;
   if (d.kind === "land" || option?.disposition === "Outside mandate") return { reason: "Outside the current charging acquisition scope" };
-  if (d.listing_removed || ["Watch availability", "Archive listing", "Dropped", "Off-market prospect"].includes(option?.disposition ?? "")) {
+  if (!planning && (d.listing_removed || ["Watch availability", "Archive listing", "Dropped", "Off-market prospect"].includes(option?.disposition ?? ""))) {
     return { reason: "Confirm the property is available and obtain current terms" };
   }
   if (trial?.hypothetical && option?.disposition === "Suggest drop") return {reason:"Review the disposition before testing a new charging layout"};
   if (selected?.rights === "unavailable") return { reason: "Charging rights are unavailable for the selected case" };
-  if (d.chargingHold && /seller availability/i.test(d.chargingHold)) return { reason: d.chargingHold };
+  if (!planning && d.chargingHold && /seller availability/i.test(d.chargingHold)) return { reason: d.chargingHold };
   const lease = option?.route === "Operating lease" || selected?.terms === "lease";
   if (["Host agreement", "Fleet service", "Service premises"].includes(option?.route ?? "")) {
     return { reason: "Charging access and commercial terms are needed for this service offer" };
@@ -46,17 +49,17 @@ export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?
   const filed = trial?.hypothetical && !lease && option?.route?.includes("acquisition")
     ? d.opportunityReview?.coverage?.cases.find(c => c.stalls === trial.assumptions.stalls && c.price != null && c.base != null)
     : parcelTerms;
-  const price = filed?.price ?? (lease ? selected?.terms === "lease" && selected.rights === "controlled" ? selected.values.rent : null
+  const price = planning?.value ?? filed?.price ?? (lease ? selected?.terms === "lease" && selected.rights === "controlled" ? selected.values.rent : null
     : wholeProperty ? (research ? research.quote : d.asking_price ?? w?.ask) : null);
-  if (parcelTerms && wholeProperty && research?.quote != null && Math.abs(research.quote - parcelTerms.price!) > 1) return {reason:"Reconcile the filed test price and current property terms"};
-  if (!lease && research?.quote != null && d.asking_price != null && d.asking_price > 0 && Math.abs(research.quote - d.asking_price) > 1) {
+  if (!planning && parcelTerms && wholeProperty && research?.quote != null && Math.abs(research.quote - parcelTerms.price!) > 1) return {reason:"Reconcile the filed test price and current property terms"};
+  if (!planning && !lease && research?.quote != null && d.asking_price != null && d.asking_price > 0 && Math.abs(research.quote - d.asking_price) > 1) {
     return {reason:"Reconcile the two asking prices and confirm which assets are included"};
   }
   if (price == null || !Number.isFinite(price) || price <= 0) return { reason: lease
     ? "Confirm monthly rent and rights to use the spaces for charging" : "Confirm a current purchase price that includes the property" };
 
   const fit = d.chargingSpace;
-  const layouts:ChargingFootprint[] = trial?.hypothetical ? [{stalls:trial.assumptions.stalls, condition:"Assumed footprint · verify space, access and displacement"}] : fit?.layouts ?? (fit?.count && fit.count > 0 ? [{stalls:fit.count, condition:fit.basis}] : []);
+  const layouts:ChargingFootprint[] = planning?.layouts ?? (trial?.hypothetical ? [{stalls:trial.assumptions.stalls, condition:"Assumed footprint · verify space, access and displacement"}] : fit?.layouts ?? (fit?.count && fit.count > 0 ? [{stalls:fit.count, condition:fit.basis}] : []));
   if (!layouts.length) return { reason: fit?.count === 0 ? "No charging spaces fit the assessed layout" : fit?.basis || "Measure a charging layout and its aisle" };
   const c = a?.charging;
   if (!a || !c || !(a.horizon && a.horizon > 0 && a.demand && a.demand > 0 && c.charges && c.charges > 0 &&
@@ -66,23 +69,24 @@ export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?
 
   // Use retained business cash only for an operating purchase. A missing figure earns no credit.
   const retained = !lease && option?.route !== "Property only" && !/^no$/i.test(w?.open ?? "") ? w?.cash : null;
-  const credited = filed && option?.route !== "Property only" && !/^no$/i.test(w?.open ?? "") ? filed.cash : retained;
+  const credited = planning ? Math.min(0, retained ?? 0) : filed && option?.route !== "Property only" && !/^no$/i.test(w?.open ?? "") ? filed.cash : retained;
   // Removing credit for positive earnings must preserve any operating loss.
   const cash = trial?.assumptions.creditCash === false ? Math.min(0, credited ?? 0) : credited ?? 0;
   const upgrade = trial?.assumptions.upgrade ?? c.upgrade;
   const terms=lease ? "lease" : "purchase";
-  const priceBasis=filed ? "Filed test price · confirm the offering" : lease ? "Selected charging lease" : research?.basis || "Workbook property ask";
-  const cashBasis=trial?.assumptions.creditCash===false && (credited??0)>0 ? "Credit removed in list trial" : credited==null ? "No business income credited" : filed ? "Retained cash in filed test" : "Workbook retained annual cash";
+  const priceBasis=planning?.label ?? (filed ? "Filed test price · confirm the offering" : lease ? "Selected charging lease" : research?.basis || "Workbook property ask");
+  const cashBasis=planning ? (credited && credited<0 ? "Recorded operating loss included" : "No positive business income credited pending validation") : trial?.assumptions.creditCash===false && (credited??0)>0 ? "Credit removed in list trial" : credited==null ? "No business income credited" : filed ? "Retained cash in filed test" : "Workbook retained annual cash";
   const space=fit?.value ?? "unmeasured";
   const costed: LayoutCost[] = [];
   for (const layout of layouts) {
     const incomeUnverified=layout.operatingConversion && layout.lostAnnualCash==null && (credited??0)>0;
     const layoutIncome=incomeUnverified ? 0 : credited??0;
     const ledger:LedgerBasis = {
-      mixId:layout.mixId, componentIds:layout.componentIds, areaKinds:layout.areaKinds, terms, siteDrivers:true, withheldOperatingCash:incomeUnverified?credited??undefined:undefined, parts:layout.parts, rightsByArea:layout.rightsByArea, businessType:d.business_type, creditCash:trial?.assumptions.creditCash, condition:layout.condition, space:layout.system ? layout.stalls+" assessed stalls" : space, priceBasis, cashBasis:incomeUnverified ? "Positive business income excluded until conversion losses are quantified" : cashBasis, hypothetical:trial?.hypothetical??false,
+      mixId:layout.mixId, componentIds:layout.componentIds, areaKinds:layout.areaKinds, terms, siteDrivers:true, withheldOperatingCash:incomeUnverified?credited??undefined:undefined, parts:layout.parts, rightsByArea:layout.rightsByArea, businessType:d.business_type, creditCash:trial?.assumptions.creditCash, condition:layout.condition, space:layout.system ? layout.stalls+" assessed stalls" : space, priceBasis, cashBasis:incomeUnverified ? "Positive business income excluded until conversion losses are quantified" : cashBasis, hypothetical:planning?.assumedFit ?? trial?.hypothetical ?? false,
+      ...(planning ? {validation:planning.validation} : {}),
       parcel:layout.parcel, conversionRecorded:layout.conversionCost!=null, displacedRecorded:layout.lostAnnualCash!=null,
       workbookDefaults:trial ? {volume:100,unitBuild:c.unitBuild,postCost:c.attendant,upgrade:c.upgrade,cash:credited??0} : undefined,
-      source:lease || filed ? null : research?.source, date:lease || filed ? null : research?.reviewedOn,
+      source:planning?.source ?? (lease || filed ? null : research?.source), date:planning ? null : lease || filed ? null : research?.reviewedOn,
       proxy:a.hub!=null ? a.hub/c.charges : null,
       inputs:{stalls:layout.stalls, volume:100, benchmark:c.charges, referenceYears:a.horizon, referenceStalls:a.demand,
         price, years:a.horizon, rate:a.capital*100, closing:a.closing*100, unitBuild:trial?.assumptions.unitBuild??c.unitBuild, upgrade,
@@ -109,4 +113,18 @@ export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?
   }
   return {layouts:costed, space, price, terms, priceBasis, cash, cashBasis,
     years:a.horizon, capital:a.capital, closing:a.closing, tax:c.tax};
+}
+
+
+export function preliminaryCost(d:DealProps, a?:PurchaseAssumptions, selected?:ScreenTenure, trial?:Trial):PreliminaryCost {
+  const original=costCase(d,a,selected,trial);
+  if ("layouts" in original) return original;
+  let result: Extract<PreliminaryCost,{layouts:LayoutCost[]}> | undefined;
+  for (const planning of planningPriceCases(d,selected,trial)) {
+    const estimate=costCase(d,a,selected,trial,planning);
+    if (!("layouts" in estimate)) continue;
+    if (result) result.layouts.push(...estimate.layouts);
+    else result=estimate;
+  }
+  return result ?? original;
 }

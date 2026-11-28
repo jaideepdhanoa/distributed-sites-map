@@ -107,6 +107,13 @@ def build(book, register=None):
         raise ValueError("Each site needs one primary opportunity.")
     attach_visit_plans(book, sites)
     attach_coverage(book, sites)
+    if "Planning inputs" in book:
+        columns = {"Input": "kind", "Label": "label", "Value": "value",
+                   "Validate": "validation", "Source": "source"}
+        for site_id, item in coverage_rows(book, "Planning inputs", columns):
+            if site_id not in sites:
+                raise ValueError("Unknown site in Planning inputs.")
+            sites[site_id].setdefault("planningInputs", []).append(item)
     return {"version": 1, "register": register, "sites": sites}
 
 

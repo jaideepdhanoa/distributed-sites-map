@@ -4,12 +4,14 @@ import { displayedDepot, pipelineCost } from "./pipelineCost";
 import { siteMerit,type Merit } from "./merit";
 import { paidScreen } from "./reference";
 import type { DealProps } from "../types";
-import { amounts,calculate,initialCase,modelVersion,type Result,type SavedCase } from "./model";
+import { amounts,calculate,initialCase,verifiedZeroFit,modelVersion,type Result,type SavedCase } from "./model";
 
 export type ChargingSummary = {selectedMix?:string;selectedStalls?:number|null;screenTenure?:ScreenTenure;screenAssumptions?: PurchaseAssumptions;preliminary?: PreliminaryCost;energyScope?:ReturnType<typeof initialCase>["energyScope"];merit:Merit;screen:ReturnType<typeof paidScreen>;screenDepot:number|null;name:string;sourceRevision:string;stale:boolean;result:Result;selected:string|null;term:"purchase"|"lease";comparator:"workbook"|"local"};
 export function summarize(deal:DealProps,sourceRevision:string,active?:SavedCase, assumptions: PurchaseAssumptions | undefined = deal.purchase?.assumptions):ChargingSummary {
   const stale=!!active && (active.sourceRevision!==sourceRevision || active.model!==modelVersion);
-  const preliminary=preliminaryCost(deal,assumptions,stale ? undefined : active?.inputs);
+  const preliminary=active && !stale && verifiedZeroFit(active.inputs)
+    ? {reason:"Verified site-wide zero capacity. Submit the documented finding for drop approval."}
+    : preliminaryCost(deal,assumptions,stale ? undefined : active?.inputs);
   const inputs=active?.inputs ?? initialCase(deal,"layouts" in preliminary ? preliminary.layouts[0] : undefined);
   const a=deal.purchase?.assumptions;
   const screen=paidScreen(deal);

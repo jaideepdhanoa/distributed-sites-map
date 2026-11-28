@@ -63,7 +63,7 @@ import { useNarrowList } from "./useNarrowList";
 import { StagePending } from "./StagePending";
 
 const coverageLabels = {positive:"with potential spaces", zero:"zero in assessed layout", unmeasured:"need measurement",
-  priced:"site estimates", scenario:"what-if only", pending:"without a cost"} as const;
+  priced:"site estimates", conditional:"conditional estimates", scenario:"what-if only", pending:"without a cost"} as const;
 type Coverage = keyof typeof coverageLabels;
 export type PipelineRow = {
   screen?:ReturnType<typeof listScreen>;
@@ -567,7 +567,7 @@ export default function PipelineList({
       <div><span className="only-desktop">Median asking</span><span className="only-mobile">Median asking</span><strong title={summary.medianAsking == null ? "Not on file" : undefined}>{summary.medianAsking == null ? "—" : fullMoney(summary.medianAsking)}</strong><small>{summary.withAsking} of {summary.count} reported</small></div>
       {signedIn && <div><span>Acquisition shortlist</span><strong>{ordered.filter(({deal}) => matchingOption(deal.opportunityReview, "Shortlist", "")).length}</strong>
         <a className="text-link" onClick={() => rememberReviewPosition(listScroller(), "", picked)} href={reviewLink("/selection-review", {scope, disposition:"Shortlist"}, origin)}>Review shortlisted sites</a></div>}
-      {signedIn && <><div><span>Cost per charge</span>{coverageLinks(["priced","scenario","pending"])}</div>
+      {signedIn && <><div><span>Cost per charge</span>{coverageLinks(["priced","conditional","scenario","pending"])}</div>
         <div><span>Charging layouts</span>{coverageLinks(["positive","zero","unmeasured"])}</div></>}
     </ShortlistSummary>
   );

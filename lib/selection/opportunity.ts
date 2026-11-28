@@ -33,7 +33,12 @@ const coverageSchema = z.object({
   cases: z.array(caseSchema).max(24),
 }).refine(row => new Set(row.cases.map(c => c.stalls)).size === row.cases.length);
 export type SiteCoverage = z.infer<typeof coverageSchema>;
-const siteSchema = z.object({ name: text, primary: optionSchema, alternatives: z.array(optionSchema).max(20), visitPlan: visitPlanSchema.optional(), coverage: coverageSchema.optional() })
+const planningInput = z.object({
+  kind: z.enum(["Stalls", "Price"]), label: text.max(120), value: z.number().positive().finite(),
+  validation: text, source: link,
+}).refine(row => row.kind !== "Stalls" || (Number.isInteger(row.value) && row.value <= 200));
+export type PlanningInput = z.infer<typeof planningInput>;
+const siteSchema = z.object({ name: text, primary: optionSchema, planningInputs: z.array(planningInput).max(24).optional(), alternatives: z.array(optionSchema).max(20), visitPlan: visitPlanSchema.optional(), coverage: coverageSchema.optional() })
   .refine(row => new Set([row.primary, ...row.alternatives].map(o => o.route)).size === row.alternatives.length + 1);
 const fileSchema = z.object({
   version: z.literal(1), register: z.url().regex(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[\w-]+\/edit$/).nullable(),

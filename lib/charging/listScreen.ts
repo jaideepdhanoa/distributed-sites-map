@@ -28,9 +28,9 @@ export function listScreen(d: DealProps, assumptions = defaultListAssumptions) {
   if (!("layouts" in estimate)) return result(original, originalGroup);
   const layout = estimate.layouts[0];
   const proxy = a.hub != null && a.charging?.charges ? a.hub / a.charging.charges : null;
-  const detail = assessed ? (custom ? "Trial" : c.stale ? "System estimate · selected case needs recalculation" : "Preliminary") + " · " + layout.stalls + " spaces · " + layout.condition
+  const detail = layout.ledger?.validation ? "Conditional estimate · "+layout.stalls+" stalls · "+layout.condition+" · "+layout.ledger.priceBasis+" · "+layout.ledger.validation : assessed ? (custom ? "Trial" : c.stale ? "System estimate · selected case needs recalculation" : "Preliminary") + " · " + layout.stalls + " spaces · " + layout.condition
     : "If " + layout.stalls + " spaces fit · " + estimate.priceBasis + (c.selected ? " · selected case incomplete" : "");
-  return result({amount:layout.base.perCharge, value:costRange(layout), basis:detail + " · excludes electricity"}, assessed ? "priced" : "scenario", estimate, proxy);
+  return result({amount:layout.base.perCharge, value:costRange(layout), basis:detail + " · excludes electricity"}, layout.ledger?.validation ? "conditional" : assessed ? "priced" : "scenario", estimate, proxy);
 }
 
 export function hasListChanges(a:ListAssumptions, includeStalls = true) {

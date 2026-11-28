@@ -31,7 +31,7 @@ export function displayedFit(fit?:PipelineFit, c?:ChargingSummary):PipelineFit|u
   const conditional=fit?.layouts?.[0];
   if(fit?.count===0 && conditional && conditional.stalls>0)
     return {...fit,count:conditional.stalls,value:"Up to "+conditional.stalls+" spaces",basis:conditional.condition+" · "+fit.value+" inside outline"};
-  if(lead && fit && lead.mixId && lead.mixId!==fit.layouts?.[0]?.mixId)
+  if(lead && !lead.ledger?.hypothetical && fit && lead.mixId && lead.mixId!==fit.layouts?.[0]?.mixId)
     return {...fit,count:lead.stalls,value:lead.stalls+" spaces",basis:lead.condition};
   return fit;
 }
@@ -59,7 +59,7 @@ export function pipelineCost(charging?: ChargingSummary) {
     if ("layouts" in charging.preliminary) {
       const layout = charging.preliminary.layouts[0];
       return {value:costRange(layout), amount:layout.base.perCharge,
-        basis:(charging.stale ? "System estimate · selected case needs recalculation · " : "Preliminary · ") + layout.stalls + (layout.stalls === 1 ? " space · " : " spaces · ") + layout.condition + " · excludes electricity"};
+        basis:(layout.ledger?.validation ? "Conditional estimate · " : charging.stale ? "System estimate · selected case needs recalculation · " : "Preliminary · ") + layout.stalls + (layout.stalls === 1 ? " space · " : " spaces · ") + layout.condition + (layout.ledger?.validation ? " · "+layout.ledger.priceBasis+" · "+layout.ledger.validation : "") + " · excludes electricity"};
     }
     return {value:"Not estimated", basis:charging.preliminary.reason, amount:null};
   }

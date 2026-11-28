@@ -316,11 +316,36 @@ test("open released charging combinations at equal utilization",async({page})=>{
     if (estimate && "layouts" in estimate) {
       const prices=estimate.layouts.filter(l=>l.system);
       const rate=prices[0]?.base.sessions/prices[0]?.stalls;
-      expect(prices.length===mixes.length && prices.every((l,i)=>l.stalls===mixes[i].stalls &&
-        l.condition===mixes[i].condition && Math.abs(l.base.sessions/l.stalls-rate)<1e-6)).toBe(true);
+      expect(mixes.every(m=>prices.some(l=>l.mixId===m.mixId)) && prices.every(l=>
+        mixes.some(m=>l.mixId===m.mixId && l.stalls===m.stalls && l.condition===m.condition) &&
+        Math.abs(l.base.sessions/l.stalls-rate)<1e-6)).toBe(true);
       priced+=prices.length;
     }
   }
   expect(catalog.reviewsAvailable && count>0 && priced>0).toBe(true);
   console.log("Reconciled",count,"system combinations on linked pipeline records, including",priced,"priced combinations.");
+});
+
+
+test("switch conditional price and fit assumptions without drawing stalls",async({page},info)=>{
+  const assumptions={horizon:10,demand:10,hub:1000000,capital:0,closing:.1,charging:{charges:100000,perPost:3,ports:2,
+    unitBuild:10000,upgrade:20000,attendant:12000,fixed:2000,insurance:1000,perCharger:500,tax:.01}} as PurchaseAssumptions;
+  const site={deal_id:"PIPE-PHX-9997",name:"Example repair premises",kind:"pipeline",asking_price:160000,
+    selectionResearch:{quote:140000,basis:"Public whole-property ask",scope:"Property",check:"Measure the bay openings."},
+    chargingSpace:{count:null,value:"Needs measurement",basis:"Verify vehicle access"},
+    opportunityReview:{primary:{route:"Property only",disposition:"Investigate"},coverage:{countyStatus:"Address matched",cases:[]}}} as unknown as DealProps;
+  site.charging={preliminary:preliminaryCost(site,assumptions),result:{siteCost:null},stale:false} as NonNullable<DealProps["charging"]>;
+  await page.route("**/api/actions/charging?site=*",route=>route.fulfill({json:{site,history:[],screens:[],source:"aaaaaaaaaaaaaaaaaaaaaaaa",canWrite:false}}));
+  await page.goto("/charging?site="+site.deal_id+"&view=explain&basis=screen");
+  const panel=page.getByRole("region",{name:"Preliminary site cost"});
+  const choices=panel.locator(".layout-choices button");
+  await expect(choices).toHaveCount(4);
+  await expect(choices.first()).toContainText("$160,000");
+  await choices.last().click();
+  await expect(choices.last()).toHaveAttribute("aria-pressed","true");
+  await expect(choices.last()).toContainText("$140,000");
+  await expect(panel).toContainText("recorded prices disagree");
+  await expect(panel).toContainText("Assumed layout");
+  await mkdir("review-shots",{recursive:true});
+  await panel.getByRole("region",{name:"Stall configuration"}).screenshot({path:"review-shots/"+info.project.name+"-conditional-pricing.png",animations:"disabled"});
 });

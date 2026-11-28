@@ -224,3 +224,49 @@ test("a selected local case and a priced system layout each retain their own com
   assert.deepEqual(displayedDepot(selected),{amount:7,label:"Local depot"});
   assert.equal(displayedFit(deal.chargingSpace,selected)?.count,9);
 });
+
+test("identified opportunities automatically price conflicting inputs and preserve the physical count",()=>{
+  const site={...deal,stage:"Desk screen",chargingSpace:{count:null,value:"Needs measurement",basis:"Aisle unresolved"},
+    asking_price:140000,selectionResearch:{quote:110000,scope:"Property",basis:"Public whole-property ask"},
+    opportunityReview:{primary:{disposition:"Investigate",route:"Property only",next:"Check the aisle"},coverage:{countyStatus:"Address matched",cases:[]}}} as unknown as DealProps;
+  const priced=preliminaryCost(site,assumptions);
+  assert.ok("layouts" in priced);
+  assert.deepEqual(priced.layouts.map(l=>[l.stalls,l.ledger.inputs.price]),[[2,140000],[4,140000],[2,110000],[4,110000]]);
+  const [lead]=priced.layouts;
+  assert.ok(lead.ledger.hypothetical);
+  assert.match(lead.ledger.validation!,/prices disagree/);
+  assert.equal(lead.ledger.inputs.cash,0);
+  const summary={result:{siteCost:null},preliminary:priced,screenAssumptions:assumptions} as unknown as ChargingSummary;
+  assert.equal(displayedFit(site.chargingSpace,summary)?.count,null);
+  assert.equal(listScreen({...site,charging:summary}).group,"conditional");
+  assert.equal(listScreen({...site,charging:summary}).cost.value,costRange(lead));
+  assert.ok("reason" in preliminaryCost({...site,opportunityReview:{...site.opportunityReview!,coverage:undefined}},assumptions));
+  assert.ok("reason" in preliminaryCost(site,assumptions,{rights:"unavailable",terms:"purchase",values:{rent:null}}));
+});
+
+test("reviewed price and fit tests retain losses and identify availability triggers",()=>{
+  const site={...deal,asking_price:null,purchase:{inputs:{cash:-500,ownership:"No"}},
+    chargingSpace:{count:null,value:"Needs measurement",basis:"Unclear"},
+    opportunityReview:{primary:{disposition:"Watch availability",route:"Offered acquisition"},coverage:{countyStatus:"Address matched",cases:[]},
+      planningInputs:[{kind:"Stalls",value:1,label:"Released bay",validation:"Measure the opening.",source:"https://example.org/plan"},
+      {kind:"Price",value:145000,label:"Historical price",validation:"Verify sale terms.",source:"https://example.org/terms"}]}} as unknown as DealProps;
+  const priced=preliminaryCost(site,assumptions);
+  assert.ok("layouts" in priced);
+  const {ledger}=priced.layouts[0];
+  assert.equal(ledger.inputs.stalls,1);assert.equal(ledger.inputs.cash,-500);
+  assert.equal(ledger.source,"https://example.org/terms");
+  assert.match(ledger.validation!,/becomes available.*opening.*sale terms/);
+  assert.ok("reason" in preliminaryCost({...site,opportunityReview:{...site.opportunityReview!,primary:{...site.opportunityReview!.primary,disposition:"Service diligence"}}},assumptions));
+});
+
+test("a confirmed whole-site zero recommends drop after all alternatives are reviewed",async()=>{
+  const {calculate}=await import("../../lib/charging/model");
+  const c=initialCase(deal);
+  c.values.stalls=0;c.allOptionsReviewed=true;
+  c.evidence.stalls={status:"assumed",source:"One area",date:"2026-01-01"};
+  assert.notEqual(calculate(c).decision,"Suggest drop");
+  c.evidence.stalls={status:"verified",source:"Whole-parcel parking, open land and conversion review",date:"2026-01-01"};
+  assert.equal(calculate(c).decision,"Suggest drop");
+  c.allOptionsReviewed=false;
+  assert.notEqual(calculate(c).decision,"Suggest drop");
+});

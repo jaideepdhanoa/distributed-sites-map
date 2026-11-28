@@ -6,7 +6,7 @@ import { paidScreen } from "./reference";
 import type { DealProps } from "../types";
 import { amounts,calculate,initialCase,modelVersion,type Result,type SavedCase } from "./model";
 
-export type ChargingSummary = {selectedStalls?:number|null;screenTenure?:ScreenTenure;screenAssumptions?: PurchaseAssumptions;preliminary?: PreliminaryCost;energyScope?:ReturnType<typeof initialCase>["energyScope"];merit:Merit;screen:ReturnType<typeof paidScreen>;screenDepot:number|null;name:string;sourceRevision:string;stale:boolean;result:Result;selected:string|null;term:"purchase"|"lease";comparator:"workbook"|"local"};
+export type ChargingSummary = {selectedMix?:string;selectedStalls?:number|null;screenTenure?:ScreenTenure;screenAssumptions?: PurchaseAssumptions;preliminary?: PreliminaryCost;energyScope?:ReturnType<typeof initialCase>["energyScope"];merit:Merit;screen:ReturnType<typeof paidScreen>;screenDepot:number|null;name:string;sourceRevision:string;stale:boolean;result:Result;selected:string|null;term:"purchase"|"lease";comparator:"workbook"|"local"};
 export function summarize(deal:DealProps,sourceRevision:string,active?:SavedCase, assumptions: PurchaseAssumptions | undefined = deal.purchase?.assumptions):ChargingSummary {
   const stale=!!active && (active.sourceRevision!==sourceRevision || active.model!==modelVersion);
   const preliminary=preliminaryCost(deal,assumptions,stale ? undefined : active?.inputs);
@@ -16,7 +16,7 @@ export function summarize(deal:DealProps,sourceRevision:string,active?:SavedCase
   const fit=inputs.values.stalls;
   const supported=screen.filter(s=>fit!=null && s.stalls<=fit).sort((a,b)=>b.stalls-a.stalls)[0];
   const merit=siteMerit(deal,inputs,!!active,stale,!!supported && supported.downside>=0);
-  return {selectedStalls:active?.inputs.values.stalls,screenTenure:active && !stale ? {rights:inputs.rights, terms:inputs.terms, values:{rent:inputs.values.rent}} : undefined,screenAssumptions:deal.purchase ? undefined : assumptions,preliminary,energyScope:inputs.energyScope,merit,screen,screenDepot:a?.hub && a.charging?.charges?a.hub/a.charging.charges:null,name:active?.name??"Moove staffed · planning",sourceRevision,selected:active?active.id+":"+active.revision:null,
+  return {selectedMix:active?.inputs.mixId,selectedStalls:active?.inputs.values.stalls,screenTenure:active && !stale ? {rights:inputs.rights, terms:inputs.terms, values:{rent:inputs.values.rent}} : undefined,screenAssumptions:deal.purchase ? undefined : assumptions,preliminary,energyScope:inputs.energyScope,merit,screen,screenDepot:a?.hub && a.charging?.charges?a.hub/a.charging.charges:null,name:active?.name??"Moove staffed · planning",sourceRevision,selected:active?active.id+":"+active.revision:null,
     stale,result:active?.result??calculate(inputs),term:inputs.terms,comparator:inputs.comparator};
 }
 export function filedScreenLabel(screen:ReturnType<typeof paidScreen>) {

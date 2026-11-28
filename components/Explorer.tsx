@@ -2961,7 +2961,7 @@ export default function Explorer() {
         <MapView key={mapAttempt} signedIn={Boolean(me)} spacesMarket={allCities?"all":city} spacesOpen={params.get("spaces")==="1"} spaceSiteIds={new Set(locationRows.map(row => {
             const mapped = siteById.get(row.id);
             return (mapped && dealForSite(mapped)?.deal_id) || row.id;
-          }))} spaceSelectedId={spaceSelectedId} spaceEstimate={dealRows.find(d=>d.deal_id===params.get("spaceSite"))?.charging?.preliminary}
+          }))} spaceSelectedId={spaceSelectedId} spaceCharging={data?.deals.features.find(f=>f.properties.deal_id===params.get("spaceSite"))?.properties.charging}
           onDrawAt={me ? (siteId, center) => {
             setShowSpaces(true); setPickedSpace(""); setMarking({siteId,lng:center[0],lat:center[1],nonce:Date.now()});
             if (dealRows.some(deal=>deal.deal_id===siteId)) { setSelected(siteId); setPreviewId(siteId); setSheetSnap("peek"); }

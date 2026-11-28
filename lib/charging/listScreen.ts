@@ -6,11 +6,7 @@ import { defaultListAssumptions, preliminaryCost, type ListAssumptions, type Pre
 
 export function listSpace(physical?: PipelineFit, charging?:DealProps["charging"]) {
   const fit=displayedFit(physical,charging);
-  const layout = fit?.layouts?.[0];
   if (fit?.count == null) return {value:fit?.value ?? "Needs measurement", basis:fit?.basis || "No measured layout on file", count:null, group:"unmeasured"};
-  if (fit.count === 0 && layout && layout.stalls > 0) {
-    return {value:`Up to ${layout.stalls} spaces`, basis:layout.condition + " · " + fit.value + " inside outline", count:layout.stalls, group:"positive"};
-  }
   if (fit.count === 0) return {value:"0 in assessed layout", basis:fit.basis, count:0, group:"zero"};
   return {...fit, group:"positive"};
 }

@@ -21,7 +21,6 @@ import {
 import { remainingBasis, screenLedger, higherUpgradeCase } from "@/lib/charging/screenLedger";
 import { amounts } from "@/lib/charging/model";
 import { costRange } from "@/lib/charging/pipelineCost";
-import type { PreliminaryCost } from "@/lib/charging/preliminary";
 import { navigateSpaces } from "@/lib/spaces/navigation";
 import { reviewLabel, reviewReturn } from "@/lib/reviewNavigation";
 import { outlineId } from "@/lib/spaces/outlineAnchor";
@@ -61,7 +60,7 @@ export default function MainMapSpaces({
   market,
   selectedSite,
   previewSite,
-  estimate,
+  charging,
   mapSiteIds,
   onDraw,
   onDrawAt,
@@ -73,11 +72,12 @@ export default function MainMapSpaces({
   market: string;
   selectedSite?: string;
   previewSite?: string;
-  estimate?:PreliminaryCost;
+  charging?:import("@/lib/charging/summary").ChargingSummary;
   mapSiteIds: ReadonlySet<string>;
   onDraw?: () => void;
   onDrawAt?: (site: string, center: Point) => void;
 }) {
+  const estimate=charging?.preliminary;
   const params = useSearchParams();
   const back = reviewReturn(params.get("returnTo"), ["/space-review", "/selection-review"], "");
   const open = params.get("spaces") === "1";
@@ -136,7 +136,8 @@ export default function MainMapSpaces({
     for(const label of omitted) url.searchParams.append("omit",label);
     window.history.replaceState(null,"",url);
   };
-  const preferred=estimate && "layouts" in estimate ? estimate.layouts[0]?.mixId : undefined;
+  const recommended=estimate && "layouts" in estimate ? estimate.layouts[0]?.mixId : undefined;
+  const preferred=charging?.selected && !charging.stale && cases.some(c=>c.mixId===charging.selectedMix) ? charging.selectedMix : recommended;
   const namedIndex=cases.findIndex(c=>c.mixId===namedCase || c.name===namedCase);
   const caseIndex = study === "default" ? namedCase ? namedIndex : Math.max(0,cases.findIndex(c=>c.mixId===preferred)) : Number(study);
   const selectedCase = filter === "all" && !area && cases && Number.isInteger(caseIndex) ? cases[caseIndex] : undefined;
@@ -581,6 +582,7 @@ export default function MainMapSpaces({
             {site && filter==="all" && !area && !draft && assessment && !cases.length && <p className="layer-meta">{catalog?.reviewsAvailable ? "No system combination fits the currently usable, scaled outlines." : "Latest outline edits are unavailable."}</p>}
             {site && filter==="all" && !draft && <ParcelInventory inventory={assessment?.inventory} zones={site.zones}/>}
             {site && !draft && (filter==="all" && !area && cases?.length || rowTrial || canTestRow) ? <div className="parcel-sketch">
+              {charging?.selected && <p><b>Selected site case</b> · {charging.name} · {charging.selectedStalls??"Unknown"} stalls · {charging.stale?"Needs recalculation":amounts(charging.result.siteCost,2)+"/charge"} <a className="text-link" href={"/charging?"+new URLSearchParams({site:site.id,case:charging.selected,view:"explain",basis:"detail"})}>Open saved case</a></p>}
               <label>Charging layout<select aria-label="Charging layout" className="secondary" value={selectedCase ? String(caseIndex) : rowTrial ? "row" : "none"} onChange={event=>{
                 const value=event.target.value;
                 if(value==="row" && active) {

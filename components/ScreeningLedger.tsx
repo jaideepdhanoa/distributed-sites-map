@@ -160,10 +160,10 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
           setAreas(old=>({...old,[index]:next}));
           setLocals(old=>({...old,[index]:next.length?{stalls:remaining.inputs.stalls}:{}}));clearStatus();
         }}/>{part.area} · {part.stalls}</label>)}</fieldset>}
-      <div className="ledger-control"><LedgerNumber label="Operating stalls" caption="Stalls" unit="count" scale={{base:Math.max(layoutCount,...bases.map(b=>b.inputs.stalls)),factor:1,fallback:12,limit:200}} value={v.stalls} valid={n=>validChange("stalls",n)} onValue={n=>change("stalls",n)}/>
+      {!omitted.length && <div className="ledger-control"><LedgerNumber label="Operating stalls" caption="Stalls" unit="count" scale={{base:Math.max(layoutCount,...bases.map(b=>b.inputs.stalls)),factor:1,fallback:12,limit:200}} value={v.stalls} valid={n=>validChange("stalls",n)} onValue={n=>change("stalls",n)}/>
         <div className="ledger-presets" role="group" aria-label="Stall count scenarios">
           {stallTrials.map(t=><button type="button" key={t.step} className="paper-btn" disabled={!t.valid} onClick={()=>change("stalls",t.stalls)}>{t.step<0?"−1 stall":"+1 stall"}{t.impact!=null && <small>{delta(t.impact)}/charge</small>}</button>)}
-          <button type="button" className="paper-btn" onClick={()=>change("stalls",layoutCount)}>Restore {layoutCount} stalls</button></div></div>
+          <button type="button" className="paper-btn" onClick={()=>change("stalls",layoutCount)}>Restore {layoutCount} stalls</button></div></div>}
       <p><b>{v.stalls===layoutCount?(basis.hypothetical?"Assumed layout":omitted.length?"Selected areas":"Assessed layout"):"Manual stall trial"}</b> · {v.stalls} × {num(r.perStall*v.volume/100)} charges per stall per year = {count(r.sessions)} annual charges.</p>
       <small>Same utilization per stall across layouts. Confirm circulation, aisle access and operating rights. {omitted.length>0 && "Costs reflect the retained areas."}</small>
     </section>

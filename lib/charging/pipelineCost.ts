@@ -28,6 +28,9 @@ export function displayedFit(fit?:PipelineFit, c?:ChargingSummary):PipelineFit|u
     return {count:c.selectedStalls,value:c.selectedStalls+" spaces",basis:"Selected case · "+c.name+
       (fit ? " · System assessment: "+fit.value : "")};
   const lead=c && !c.stale && c.preliminary && "layouts" in c.preliminary ? c.preliminary.layouts[0] : null;
+  const conditional=fit?.layouts?.[0];
+  if(fit?.count===0 && conditional && conditional.stalls>0)
+    return {...fit,count:conditional.stalls,value:"Up to "+conditional.stalls+" spaces",basis:conditional.condition+" · "+fit.value+" inside outline"};
   if(lead && fit && lead.mixId && lead.mixId!==fit.layouts?.[0]?.mixId)
     return {...fit,count:lead.stalls,value:lead.stalls+" spaces",basis:lead.condition};
   return fit;

@@ -109,7 +109,7 @@ test("filter layouts and reprice the pipeline from the list", async ({page}, inf
   await dialog.getByRole("button",{name:"Restore defaults"}).click();
   await expect(rows.getByText("If 6 spaces fit",{exact:false})).toHaveCount(0);
   if (phone) {
-    const card = rows.filter({hasText:"Sample selected case"}), actions = card.getByRole("button",{name:"View calculation"});
+    const card = rows.filter({hasText:"Sample selected case"}), actions = card.getByRole("link",{name:"View charging case"});
     const body = await card.locator("button.list-row").boundingBox(), action = await actions.boundingBox();
     expect(action!.y).toBeGreaterThanOrEqual(body!.y + body!.height - 1);
     expect(action!.x + action!.width).toBeLessThanOrEqual(page.viewportSize()!.width);

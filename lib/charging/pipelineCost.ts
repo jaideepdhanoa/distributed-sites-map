@@ -41,12 +41,18 @@ export function screenBasis(c?:ChargingSummary) {
   return c && !c.stale && (!c.selected || c.result.siteCost==null) && c.preliminary && "layouts" in c.preliminary ? "screen" : undefined;
 }
 
+export function displayedDepot(c:ChargingSummary) {
+  const screen=screenBasis(c) && c.preliminary && "layouts" in c.preliminary ? c.preliminary.layouts[0] : undefined;
+  return screen ? {amount:screen.ledger?.proxy??c.screenDepot??null,label:"Workbook depot proxy"} :
+    {amount:c.stale?null:c.result.depot,label:c.comparator==="local"?"Local depot":"Workbook depot proxy"};
+}
+
 export function pipelineCost(charging?: ChargingSummary) {
   if (!charging) return { value: "No charging case", basis: "", amount: null };
   if (charging.stale) return { value: "Needs recalculation", basis: "Site inputs have changed", amount: null };
   const amount = charging.result.siteCost;
   if (amount != null && (charging.selected || !charging.preliminary)) {
-    const scope = charging.energyScope === "excluded" ? " · excludes electricity" : "";
+    const scope = charging.energyScope === "excluded" ? " · excludes electricity" : charging.energyScope==="included" ? " · includes electricity" : "";
     return { value: amounts(amount, 2), basis: (charging.selected ? "Selected case" + (charging.selectedStalls != null ? " · " + charging.selectedStalls + " stalls" : "") : "Planning estimate") + scope, amount };
   }
   if (charging.preliminary) {

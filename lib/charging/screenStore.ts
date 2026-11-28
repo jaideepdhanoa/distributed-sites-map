@@ -12,7 +12,7 @@ export const screenSaveSchema=z.strictObject({kind:z.literal("screen"),id:z.uuid
   basis:z.unknown(),listTrial:z.custom<ListAssumptions>(validListTrial).optional(),omitted:z.array(z.string()).optional(),scenario:z.literal(0),sourceRevision:z.string().regex(/^[a-f0-9]{24}$/),
   changes:z.partialRecord(key,z.number().finite()).refine(changes=>
     Object.entries(changes).every(([k,v])=>validChange(k as LedgerKey,v)),"Review the trial values.")});
-const projection="case_id AS id,name,author,saved_at AS at,inputs";
+const projection='case_id AS id,name,author,saved_at AS at,inputs,source_revision AS "sourceRevision"';
 
 export async function screenHistory(sql:Sql,site:string) {
   return (await sql.query<SavedScreen>("SELECT "+projection+" FROM charging_case_revisions WHERE site_id=$1 AND model_version=$2 ORDER BY saved_at DESC",[site,screenVersion])).rows;

@@ -17,7 +17,7 @@ export type LedgerBasis = {
   rightsByArea?:Record<string,boolean>; parts?:{area:string;stalls:number}[]; businessType?:string; siteDrivers?:boolean; withheldOperatingCash?:number;
   parcel?:boolean; conversionRecorded?:boolean; displacedRecorded?:boolean;
 };
-export type SavedScreen = {id:string; name:string; author:string; at:string;
+export type SavedScreen = {sourceRevision?:string; id:string; name:string; author:string; at:string;
   inputs:{basis:LedgerBasis; changes:Changes; scenario:number; omitted?:string[]}};
 
 /** Preserve the historical volume/upgrade stress when reopening an immutable v1 case. */

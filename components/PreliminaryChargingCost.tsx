@@ -17,6 +17,7 @@ export function PreliminaryChargingCost({estimate,hypothetical=false,saveContext
   return <section className="preliminary-cost" aria-label="Preliminary site cost">
     <h3>{initial?initial.name:hypothetical?"What if this footprint fits?":"Preliminary site cost per completed charge"}</h3>
     {initial && <p>Saved by {initial.author} · {new Date(initial.at).toLocaleDateString()}</p>}
+    {initial?.sourceRevision && saveContext && initial.sourceRevision!==saveContext.source && <p role="status">Site evidence has changed since this alternative was saved. These figures use its original inputs.</p>}
     {bases.length?<ScreeningLedger key={JSON.stringify([initial?.id,bases.map(b=>b.condition),index,excluded,saveContext?.source])} bases={bases} initialIndex={index} excluded={excluded} saveContext={saveContext} initial={initial}/>:
       <p>{"reason" in estimate?estimate.reason:"Refresh the site to load its calculation inputs."}</p>}
   </section>;

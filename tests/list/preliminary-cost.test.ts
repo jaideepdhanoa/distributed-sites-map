@@ -3,7 +3,7 @@ import test from "node:test";
 import type { DealProps } from "../../lib/types";
 import type { PurchaseAssumptions } from "../../lib/purchaseReview";
 import { preliminaryCost } from "../../lib/charging/preliminary";
-import { costRange, pipelineCost } from "../../lib/charging/pipelineCost";
+import { costRange, displayedDepot, displayedFit, pipelineCost } from "../../lib/charging/pipelineCost";
 import { initialCase } from "../../lib/charging/model";
 import type { ChargingSummary } from "../../lib/charging/summary";
 
@@ -210,4 +210,14 @@ test("uncombining uses the exact remaining geometry and requires allocation of b
   assert.equal(screenLedger(bays).perCharge,null);
   assert.ok(screenLedger(bays,{conversion:1000}).perCharge!=null);
   assert.equal(remainingBasis(original,["Bay"],[parking]),parking);
+});
+
+test("a selected local case and a priced system layout each retain their own comparator and stall count",()=>{
+  const preliminary=preliminaryCost(deal,{...assumptions,hub:2000000});
+  assert.ok("layouts" in preliminary);
+  const c={result:{siteCost:null,depot:7},preliminary,comparator:"local",selected:"case:1",selectedStalls:9,name:"Local case"} as unknown as ChargingSummary;
+  assert.deepEqual(displayedDepot(c),{amount:20,label:"Workbook depot proxy"});
+  const selected={...c,result:{...c.result,siteCost:6}};
+  assert.deepEqual(displayedDepot(selected),{amount:7,label:"Local depot"});
+  assert.equal(displayedFit(deal.chargingSpace,selected)?.count,9);
 });

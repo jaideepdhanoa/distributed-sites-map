@@ -1,6 +1,6 @@
 "use client";
 import { PreliminaryChargingCost } from "./PreliminaryChargingCost";
-import { pipelineCost, screenBasis } from "@/lib/charging/pipelineCost";
+import { displayedDepot, pipelineCost, screenBasis } from "@/lib/charging/pipelineCost";
 import { siteMerit } from "@/lib/charging/merit";
 import { MeritEditor } from "./SiteMerit";
 import { useEffect,useRef,useState } from "react";
@@ -24,10 +24,10 @@ const keyOf=(r:SavedCase)=>r.id+":"+r.revision;
 export function ChargingSiteSection({deal}:{deal:DealProps}) {
   const c=deal.charging;
   if(!c)return null;
-  const cost=pipelineCost(c);
+  const cost=pipelineCost(c),depot=displayedDepot(c);
   return <section className="charging-preview" aria-label="Charging economics"><strong>Charging economics</strong>
     <p>{c.merit.action} · {c.name}</p>
-    <p>{cost.value}{cost.amount!=null && " per charge"} · {amounts(c.result.depot,2)} {c.comparator==="workbook"?"depot proxy":"depot"}</p>
+    <p>{cost.value}{cost.amount!=null && " per charge"} · {amounts(depot.amount,2)} {depot.label}</p>
     <small>{cost.basis}</small><p>{c.merit.next}</p>{!c.selected && <p className="layer-meta">{filedScreenLabel(c.screen)}</p>}<ChargingLink site={deal.deal_id} basis={screenBasis(c)} revision={c.selected}/></section>;
 }
 export function ChargingEditor({site,revision,explain=false,screenId,basis,layoutName,omitted}:{site:string;revision?:string|null;explain?:boolean;screenId?:string|null;basis?:string|null;layoutName?:string|null;omitted?:string[]}) {

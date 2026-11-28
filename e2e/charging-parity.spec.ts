@@ -1,7 +1,7 @@
 import {preliminaryCost} from "../lib/charging/preliminary";
 import type {DealProps} from "../lib/types";
 import type {PurchaseAssumptions} from "../lib/purchaseReview";
-import {pipelineCost} from "../lib/charging/pipelineCost";
+import {amounts} from "../lib/charging/model";
 import {test,expect} from "@playwright/test";
 import {mkdir} from "node:fs/promises";
 import {calculate,initialCase,modelVersion,type SavedCase} from "../lib/charging/model";
@@ -292,12 +292,16 @@ test("open released charging ranges from the Phoenix list",async({page},info)=>{
   const sampled=deals.find(d=>d?.charging?.preliminary && "layouts" in d.charging.preliminary && !d.charging.stale && d.charging.result.siteCost==null);
   if (process.env.MAP_PRODUCTION_CHECK==="1") expect(Boolean(sampled)).toBe(true);
   if (!sampled) return;
-  const label=pipelineCost(sampled.charging).value;
+  const estimate=sampled.charging!.preliminary!;
+  if (!("layouts" in estimate)) throw Error("Expected a priced layout");
+  const layout=estimate.layouts[0];
+  const base=amounts(layout.base.perCharge,2), higher=amounts(layout.downside.perCharge,2);
   const index=ids.indexOf(sampled.deal_id);
-  expect((await rows.nth(index).textContent())?.includes(label)).toBe(true);
+  await expect(rows.nth(index)).toContainText(base+" base · "+higher+" higher utility");
   await page.goto("/charging?site="+encodeURIComponent(sampled.deal_id)+"&view=explain");
   const panel=page.getByRole("region",{name:"Preliminary site cost"});
-  expect((await panel.textContent())?.includes(label)).toBe(true);
+  await expect(panel.locator(".screen-result")).toContainText(base);
+  await expect(panel.locator(".layout-choices")).toContainText(higher);
 });
 
 test("open released charging combinations at equal utilization",async({page})=>{

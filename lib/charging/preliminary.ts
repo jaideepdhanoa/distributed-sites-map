@@ -14,9 +14,9 @@ export type PreliminaryCost = { reason: string } | {
 };
 
 export type ListAssumptions = {
-  stalls: number; volume: number; upgrade?: number; unitBuild?: number; attendant?: number; creditCash: boolean;
+  assumeFit?:boolean; stalls: number; volume: number; upgrade?: number; unitBuild?: number; attendant?: number; creditCash: boolean;
 };
-export const defaultListAssumptions: ListAssumptions = { stalls: 6, volume: 100, creditCash: true };
+export const defaultListAssumptions: ListAssumptions = { assumeFit:false, stalls: 6, volume: 100, creditCash: true };
 
 export type ScreenTenure = Pick<Inputs, "rights" | "terms"> & {values: Pick<Inputs["values"], "rent">};
 export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?: ScreenTenure,

@@ -1,5 +1,6 @@
 "use client";
 import { dropReasons } from "@/lib/selection/dropReasons";
+import { displayedFit,pipelineCost,screenBasis } from "@/lib/charging/pipelineCost";
 import { amounts } from "@/lib/charging/model";
 import { marketSequence,diligenceOrder,incompatibleMarkets } from "@/lib/charging/merit";
 import {ChargingLink} from "@/components/ChargingLink";
@@ -70,7 +71,7 @@ function SelectionList() {
   const shortlist = decision === "Shortlist";
   const droppedView = decision === "Dropped";
   const scoped = rows.filter(r => evidenceMatches(r.review) && (!investment || sequence.has(r.id)) && matchesPlace(r,r.name + " " + (r.review?.name || "")) && matchesDecision(r.review) && (!check || r.priority === check) &&
-    (!params.get("stalls") || r.charging?.screen.some(c=>c.stalls===Number(params.get("stalls")) && c.downside>=0)) &&
+    (!params.get("stalls") || r.chargingSpace?.layouts?.some(c=>c.stalls===Number(params.get("stalls")))) &&
     (!params.get("charging") || r.charging?.merit.action===params.get("charging"))).sort((a,b)=>{
       if(investment)return a.city.localeCompare(b.city) || sequence.get(a.id)!.rank-sequence.get(b.id)!.rank;
       const priority = order === "attention" ? compareAttention(match(a.review),match(b.review)) :
@@ -122,7 +123,7 @@ function SelectionList() {
       <label>Screening check<select aria-label="Next check" className="secondary" value={check} onChange={e=>setReviewFilter("check",e.target.value)}><option value="">All checks</option>{[...new Set(rows.map(r=>r.priority))].sort().map(c=><option key={c}>{c}</option>)}</select></label>
       <label>Charging decision<select className="secondary" value={params.get("charging")||""} onChange={e=>setReviewFilter("charging",e.target.value)}>
         <option value="">All decisions</option>{[...new Set(rows.flatMap(r=>r.charging?[r.charging.merit.action]:[]))].sort().map(s=><option key={s}>{s}</option>)}</select></label>
-      <label>Moove-staffed downside at parity<select className="secondary" value={params.get("stalls")||""} onChange={e=>setReviewFilter("stalls",e.target.value)}><option value="">Any stall count</option>{[4,6,8,10].map(n=><option value={n} key={n}>{n} hypothetical stalls</option>)}</select></label>
+      <label>Moove-staffed downside at parity<select className="secondary" value={params.get("stalls")||""} onChange={e=>setReviewFilter("stalls",e.target.value)}><option value="">Any stall count</option>{[...new Set(rows.flatMap(r=>r.chargingSpace?.layouts?.map(l=>l.stalls)??[]))].sort((a,b)=>a-b).map(n=><option value={n} key={n}>{n} assessed stalls</option>)}</select></label>
       <label>Order<select aria-label="Order" className="secondary" value={params.get("sort")||""} onChange={e=>setReviewFilter("sort",e.target.value)}><option value="">Diligence priority</option>{rows.some(r=>r.financeVisible) && <option value="investment">Investment sequence by market</option>}<option value="market">Market and site</option><option value="earlier">Earlier usable charges</option></select></label>
       </div>
     </details>
@@ -142,23 +143,24 @@ function SelectionList() {
           <ShortlistCard row={r} review={r.review} option={selected} origin={origin+"#"+r.id}/>
           {investment && <p>{r.city} #{sequence.get(r.id)!.rank} · {amounts(sequence.get(r.id)!.value)} incremental value · {sequence.get(r.id)!.peak} residual peak charges</p>}
         </li>;
+        const cost=pipelineCost(r.charging), fit=displayedFit(r.chargingSpace,r.charging);
         return <li id={r.id} tabIndex={-1} key={r.id} onClick={()=>rememberReviewPosition(pane.current,r.id)}><div>
         <small>{droppedView ? r.city : `${r.city} · ${r.stage} · ${r.section}`}</small><h2>{r.name}</h2>{r.review?.name && r.review.name !== r.name && <small>{r.review.name}</small>}
         {r.review?.primary.disposition === "Dropped" && r.review.primary.route === "Site lead" && <p><strong>Reconcile stage history before reopening.</strong></p>}{r.review ? <OpportunityReview review={r.review} matched={match(r.review)} active charging={r.charging}/> : <><strong>{r.charging?.merit.action ?? r.priority}</strong><p>{r.charging?.merit.next ?? r.instruction}</p></>}{investment && <p>{r.city} #{sequence.get(r.id)!.rank} · {amounts(sequence.get(r.id)!.value)} incremental value · {sequence.get(r.id)!.peak} residual peak charges</p>}<small>{r.id}</small></div><div>{!droppedView && <strong>{r.readiness}</strong>}
         {r.mirrorStage && r.stage !== r.mirrorStage && <p>Workbook stage: {r.mirrorStage}</p>}
         {!droppedView && r.financeVisible && <p>Workbook base savings: {r.amount === null ? "Unmodeled" : (r.amount*100).toFixed(1)+"%"}</p>}
         {r.charging && match(r.review)?.disposition !== "Dropped" && <div className="charging-preview"><strong>Charging · {r.charging.merit.action}</strong>{r.review && r.charging.merit.next !== match(r.review)?.next && <p>{r.charging.merit.next}</p>}
-          <p>{r.charging.name} · {r.charging.result.siteCost==null?"Cost pending":"$"+r.charging.result.siteCost.toFixed(2)+"/charge"}</p><small>{r.charging.merit.netValue!=null?"Standalone downside network value "+amounts(r.charging.merit.netValue):"Investment rank pending"}</small>{!r.charging.selected && <p>{filedScreenLabel(r.charging.screen)}</p>}
-          <ChargingLink site={r.id} revision={r.charging.selected} returnTo={origin+"#"+r.id}/></div>}
+          <p>{fit?.value} · {cost.value}{cost.amount!=null && "/charge"}<small>{cost.basis}</small></p><small>{r.charging.merit.netValue!=null?"Standalone downside network value "+amounts(r.charging.merit.netValue):"Investment rank pending"}</small>{!r.charging.selected && <p>{filedScreenLabel(r.charging.screen)}</p>}
+          <ChargingLink site={r.id} basis={screenBasis(r.charging)} revision={r.charging.selected} returnTo={origin+"#"+r.id}/></div>}
         {!droppedView && r.research && <SelectionResearch row={r.research}/>}
-        {(r.hasRecord || r.mapped) && <a href={reviewLink("/",{site:r.id,city:r.city,funnel:"pipeline",sheet:"full"},origin+"#"+r.id)}>Open site record</a>}
+        {(r.hasRecord || r.mapped) && <a href={reviewLink("/",{site:r.id,city:r.city,funnel:"pipeline",sheet:"full",...(serviceView?{track:"service"}:{})},origin+"#"+r.id)}>Open site record</a>}
       {match(r.review)?.disposition !== "Dropped" && <p>{r.geometry} · {r.option}</p>}
         {match(r.review)?.disposition !== "Dropped" && r.quickLube && r.priority !== "Screen fleet service" && <p>Retained lifts and fleet-service rights also need a separate check.</p>}
         {!droppedView && r.assessed && <a href={reviewLink("/space-review",{site:r.id,panel:"space-options"},origin+"#"+r.id)}>Review layout evidence{r.evidenceDate && " · "+r.evidenceDate}</a>}
       </div></li>;})}</ul>
       {filed.length > 0 && showFiled && <details className="disclosure" key={decision} open={droppedView || undefined}>
         <summary className="disclosure">{droppedView ? "Outside the active pipeline" : "Filed reviews outside the active list"} ({filed.length})</summary>
-        <ul className="space-review-results">{filed.map(r=><li key={r.id}><div><small>{r.city} · {r.stage} · {r.id}</small><h2>{r.review.name}</h2><OpportunityReview review={r.review} matched={match(r.review)}/>{r.hasRecord && <a href={reviewLink("/",{site:r.id,city:r.city,funnel:"pipeline",sheet:"full"},origin+"#"+r.id)}>Open site record</a>}</div></li>)}</ul>
+        <ul className="space-review-results">{filed.map(r=><li key={r.id}><div><small>{r.city} · {r.stage} · {r.id}</small><h2>{r.review.name}</h2><OpportunityReview review={r.review} matched={match(r.review)}/>{r.hasRecord && <a href={reviewLink("/",{site:r.id,city:r.city,funnel:"pipeline",sheet:"full",...(serviceView?{track:"service"}:{})},origin+"#"+r.id)}>Open site record</a>}</div></li>)}</ul>
       </details>}
       {shortlist && <footer className="shortlist-guide">{guidance}{dataDetails}</footer>}</>}
   </main>;

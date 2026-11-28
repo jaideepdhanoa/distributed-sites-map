@@ -76,9 +76,7 @@ test("filter layouts and reprice the pipeline from the list", async ({page}, inf
   const list=page.getByTestId("pipeline-list");
   await list.getByTestId("sort-by").selectOption("chargeCost");
   const rows=list.locator("[data-site-row]");
-  await expect(rows.first()).toContainText("Sample footprint trial");
-  await expect(rows.first()).toContainText("$7.22");
-  await expect(rows.first()).toContainText("If 6 spaces fit");
+  await expect(rows.getByText("If 6 spaces fit",{exact:false})).toHaveCount(0);
   const phone=info.project.name==="mobile";
   if (phone) await list.getByRole("button",{name:"Figures",exact:true}).click();
   await list.getByRole("button",{name:"1 with potential spaces"}).click();
@@ -88,6 +86,7 @@ test("filter layouts and reprice the pipeline from the list", async ({page}, inf
   if (phone) await list.getByRole("button",{name:"Figures",exact:true}).click();
   await list.getByRole("button",{name:"Cost assumptions",exact:true}).click();
   const dialog=page.getByRole("dialog");
+  await dialog.getByLabel("Test an assumed footprint").check();
   await dialog.getByLabel("Utility upgrade ($)").fill("120000");
   await mkdir("review-shots",{recursive:true});
   await dialog.screenshot({path:`review-shots/${info.project.name}-pipeline-assumptions.png`});
@@ -108,9 +107,9 @@ test("filter layouts and reprice the pipeline from the list", async ({page}, inf
   await page.getByRole("link",{name:/Back to site review/}).click();
   await list.getByRole("button",{name:"Cost assumptions · edited"}).click();
   await dialog.getByRole("button",{name:"Restore defaults"}).click();
-  await expect(rows.first()).toContainText("$7.22");
+  await expect(rows.getByText("If 6 spaces fit",{exact:false})).toHaveCount(0);
   if (phone) {
-    const card = rows.first(), actions = card.getByRole("button",{name:"View calculation"});
+    const card = rows.filter({hasText:"Sample selected case"}), actions = card.getByRole("button",{name:"View calculation"});
     const body = await card.locator("button.list-row").boundingBox(), action = await actions.boundingBox();
     expect(action!.y).toBeGreaterThanOrEqual(body!.y + body!.height - 1);
     expect(action!.x + action!.width).toBeLessThanOrEqual(page.viewportSize()!.width);

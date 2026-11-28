@@ -1,6 +1,7 @@
 import { nextDecision, offeredTransaction, recommendation } from "./selection/opportunityDisplay";
 import { currentScreen } from "./selection/screen";
 import { comparisonPower } from "./mapPower";
+import { displayedFit } from "./charging/pipelineCost";
 import { chargingLabels,chargingRows } from "./charging/summary";
 import { purchaseLabels, purchaseRows } from "./purchaseReview";
 import { marketLabels, marketEvidence, marketComparisonRows } from "./marketContext";
@@ -172,7 +173,7 @@ function decisionRows(deal: DealProps | undefined, signedIn: boolean): CompareRo
   if (!deal || !signedIn) return [];
   const screen = deal.screening && currentScreen(deal.screening, deal);
   const review = deal.opportunityReview;
-  const fit = deal.chargingSpace;
+  const fit = displayedFit(deal.chargingSpace,deal.charging);
   const applicable = deal.kind !== "land" && deal.financials_open !== false && deal.figures_status !== "vacant";
   return [
     ...(deal.pendingDrop ? [{label:"Drop proposal", value:"Awaiting approval"}] : []),

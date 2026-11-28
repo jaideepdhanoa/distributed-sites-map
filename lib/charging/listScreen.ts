@@ -25,6 +25,7 @@ export function listScreen(d: DealProps, assumptions = defaultListAssumptions) {
   const a = d.purchase?.assumptions ?? c.screenAssumptions;
   const assessed = c.preliminary && "layouts" in c.preliminary;
   if (!a) return result(original, originalGroup, assessed ? c.preliminary : undefined);
+  if(!assessed && !assumptions.assumeFit) return result(original,originalGroup);
   const custom = hasListChanges(assumptions, false);
   const estimate = assessed && !custom ? c.preliminary! :
     preliminaryCost(d, a, c.screenTenure, {assumptions, hypothetical:!assessed});
@@ -37,7 +38,7 @@ export function listScreen(d: DealProps, assumptions = defaultListAssumptions) {
 }
 
 export function hasListChanges(a:ListAssumptions, includeStalls = true) {
-  return (includeStalls && a.stalls !== defaultListAssumptions.stalls) || !a.creditCash ||
+  return (includeStalls && (a.assumeFit || a.stalls !== defaultListAssumptions.stalls)) || !a.creditCash ||
     a.upgrade != null || a.unitBuild != null || a.attendant != null;
 }
 

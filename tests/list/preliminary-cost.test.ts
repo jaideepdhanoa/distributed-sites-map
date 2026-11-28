@@ -65,12 +65,13 @@ test("what-if costs can be compared without creating a footprint or replacing a 
   const emptyFit = {...deal, chargingSpace:undefined};
   const c = {result:{siteCost:null},screen:[],screenAssumptions:assumptions,preliminary:preliminaryCost(emptyFit,assumptions)} as unknown as ChargingSummary;
   const d = {...emptyFit, charging:c};
-  const screen = listScreen(d);
+  assert.equal(listScreen(d).group,"pending");
+  const screen = listScreen(d,{...defaultListAssumptions,assumeFit:true});
   assert.equal(screen.group,"scenario");
   assert.match(screen.cost.basis,/If 6 spaces fit/);
   assert.equal(screen.cost.amount,43300/6000);
-  assert.equal(listScreen(d,{...defaultListAssumptions,volume:50}).cost.amount,43300/6000);
-  const trial = listScreen(d,{...defaultListAssumptions,upgrade:0,attendant:0,unitBuild:0,creditCash:false});
+  assert.equal(listScreen(d,{...defaultListAssumptions,assumeFit:true,volume:50}).cost.amount,43300/6000);
+  const trial = listScreen(d,{...defaultListAssumptions,assumeFit:true,upgrade:0,attendant:0,unitBuild:0,creditCash:false});
   assert.equal(trial.cost.amount,15500/6000);
   assert.equal(listScreen({...d,charging:{...c,selected:"case:1",result:{...c.result,siteCost:8}}}).cost.amount,8);
   assert.equal(listScreen({...d,charging:{...c,stale:true}}).group,"pending");

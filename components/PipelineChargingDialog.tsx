@@ -23,7 +23,7 @@ export function PipelineChargingDialog({onClose, assumptions, workbook, apply, s
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const read = (key:string) => data.get(key) ? Number(data.get(key)) : undefined;
-    apply({stalls:Number(data.get("stalls")), volume:100, creditCash:data.has("creditCash"),
+    apply({assumeFit:data.has("assumeFit"),stalls:Number(data.get("stalls")), volume:100, creditCash:data.has("creditCash"),
       upgrade:read("upgrade"), unitBuild:read("unitBuild"), attendant:read("attendant")});
   }
   return <dialog ref={ref} className="pipeline-cost-dialog" aria-labelledby="pipeline-cost-title" onCancel={onClose}>
@@ -43,6 +43,7 @@ export function PipelineChargingDialog({onClose, assumptions, workbook, apply, s
     </> : <form onSubmit={submit}>
       <p>Compare annual net cost divided by completed charges. Changes apply to list estimates and hypothetical layouts for this session. Selected case figures use their saved inputs.</p>
       <div className="pipeline-assumption-fields">
+        <label><input className="check" type="checkbox" name="assumeFit" defaultChecked={assumptions.assumeFit}/> Test an assumed footprint on unpriced sites</label>
         <label>Spaces for unverified layouts<input className="field" name="stalls" type="number" min="1" max="200" step="1" required defaultValue={assumptions.stalls}/></label>
         <label>Utility upgrade ($)<input className="field" name="upgrade" type="number" min="0" max="1000000000" step="any" placeholder={optional(c?.upgrade)} defaultValue={assumptions.upgrade}/></label>
         <label>Construction per stall ($)<input className="field" name="unitBuild" type="number" min="0" max="1000000000" step="any" placeholder={optional(c?.unitBuild)} defaultValue={assumptions.unitBuild}/></label>

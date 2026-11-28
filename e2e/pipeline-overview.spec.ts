@@ -31,6 +31,7 @@ test("pipeline shows ranked opportunities, charging figures and a compact header
   await expect(rows.first()).toContainText("4–6 spaces");
   await expect(rows.first()).toContainText("$7.25");
   await expect(rows.last()).toContainText("Wait for availability");
+  await expect(rows.first()).not.toContainText("Confirm the asking price and when");
   if (!phone) {
     const header = list.locator("thead");
     expect((await header.boundingBox())!.height).toBeLessThanOrEqual(44);
@@ -115,4 +116,43 @@ test("filter layouts and reprice the pipeline from the list", async ({page}, inf
     expect(action!.x + action!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   }
   await page.screenshot({path:`review-shots/${info.project.name}-pipeline-charging.png`,animations:"disabled"});
+});
+
+test("a large conditional layout stays compact and opens its own calculation", async ({page}, info) => {
+  const name = "Example service yard";
+  const condition = "Yard conversion. Validate the shared drive aisle and confirm the equipment can move.";
+  const validation = "Obtain a construction quote sized for the drawn layout.";
+  const layout = {stalls:26, mixId:"mix-example-yard", system:true, condition,
+    base:{perCharge:11,upgrade:1000000,annualCost:110000,sessions:10000},
+    downside:{perCharge:12,upgrade:1500000,annualCost:120000,sessions:10000},
+    ledger:{terms:"purchase",validation,condition,priceBasis:"Example terms",inputs:{price:1200000},proxy:15}};
+  const primary = {disposition:"Investigate",route:"Site lead",next:"Confirm parcel access before booking.",rank:null};
+  const properties = {deal_id:"PIPE-PHX-9876", kind:"pipeline",city:"PHX",name,address:"Illustrative yard",
+    stage:"1 Desk screen",stage_group:"desk",business_type:"Auto repair",opportunityReview:{name,primary,alternatives:[]},
+    chargingSpace:{count:4,value:"4 spaces",basis:"Parking",layouts:[{stalls:4,mixId:"mix-parking"},layout]},
+    charging:{name:"Example",merit:{action:"Evidence needed",order:5},result:{siteCost:null},screen:[],selected:null,stale:false,preliminary:{layouts:[layout]}}};
+  const features = Array.from({length:8},(_,i)=>({type:"Feature",geometry:{type:"Point",coordinates:[-112,33.45]},
+    properties:{...properties,deal_id:"PIPE-PHX-"+(9876+i),name:name+" "+(i+1)}}));
+  await page.route("**/api/data/deals", route=>route.fulfill({json:{type:"FeatureCollection",features}}));
+  await page.route("**/api/list/layout**",route=>route.fulfill({json:{stored:false,layout:null}}));
+  await page.goto("/?view=list&funnel=pipeline&city=PHX&pstage=all");
+  const list=page.getByTestId("pipeline-list");
+  const phone=info.project.name==="mobile";
+  if (phone) await list.getByRole("button",{name:"Figures",exact:true}).click();
+  await list.getByRole("button",{name:"8 at or below depot at base"}).click();
+  if (phone) await list.getByRole("button",{name:"Figures",exact:true}).click();
+  const row=list.locator("[data-site-row]").first();
+  await expect(row).toContainText("26 spaces");
+  await expect(row).toContainText("$11.00 base · $12.00 higher utility");
+  await expect(row).toContainText("Validate build cost");
+  await expect(row).not.toContainText(validation);
+  await expect(row).not.toContainText(primary.next);
+  if (!phone) expect((await row.boundingBox())!.height).toBeLessThan(115);
+  await mkdir("review-shots",{recursive:true});
+  await page.screenshot({path:`review-shots/${info.project.name}-pipeline-scan.png`,animations:"disabled"});
+  await row.getByRole("button",{name:phone?"View calculation":"$11.00 base · $12.00 higher utility"}).click();
+  const dialog=page.getByRole("dialog");
+  await expect(dialog).toContainText(validation);
+  await expect(dialog).toContainText(primary.next);
+  await expect(dialog.getByRole("link",{name:"Open unit economics ledger"})).toHaveAttribute("href",/layout=mix-example-yard/);
 });

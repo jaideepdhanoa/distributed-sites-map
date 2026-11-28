@@ -154,6 +154,9 @@ test("shortlisted visit shows the charging decision and its parallel diligence w
   await page.goto("/selection-review?disposition=Shortlist");
   await expect(page.getByRole("heading",{name:"Acquisition shortlist"})).toBeVisible();
   await expect(page.getByRole("link",{name:/needing my approval/})).toHaveAttribute("href",/qapprove=1/);
+  const detailsToggle = page.getByText("Site details",{exact:true});
+  await expect(page.getByText("Site evidence and economics")).toBeHidden();
+  await detailsToggle.click();
   await expect(page.getByText("Site evidence and economics")).toBeVisible();
   const overview = page.locator(".shortlist-figures");
   await expect(overview).toContainText("$120,000");
@@ -165,12 +168,13 @@ test("shortlisted visit shows the charging decision and its parallel diligence w
   await costLink.click();
   await page.getByRole("link",{name:"← Selection review"}).click();
   await expect(page).toHaveURL(/disposition=Shortlist#PIPE-LAS-9001$/);
-  await expect(page.locator(".shortlist-figures")).toBeVisible();
+  await expect(detailsToggle).toBeVisible();
   await mkdir("review-shots",{recursive:true});
   await page.screenshot({path:"review-shots/"+info.project.name+"-acquisition-shortlist.png",animations:"disabled"});
   await page.getByRole("button",{name:"Filter shortlist"}).click();
   await expect(page.getByLabel("Commercial decision")).toBeVisible();
   await page.getByRole("button",{name:"Hide filters"}).click();
+  if (!await page.locator(".shortlist-figures").isVisible()) await detailsToggle.click();
   await page.getByText("Parcel, space and charging evidence").click();
   await expect(page.getByText(coverage.county)).toBeVisible();
   await expect(page.getByText("No positive price")).toBeVisible();
@@ -201,4 +205,32 @@ test("shortlisted visit shows the charging decision and its parallel diligence w
   await expect(card.getByRole("row",{name:/month 9/})).toContainText("$280");
   await card.getByLabel(/Monthly operating cash/).fill("20");
   await expect(card.getByRole("row",{name:/month 15/})).toContainText("$100");
+});
+
+test("scan acquisition costs in base order and open the qualifying layout", async ({page},info) => {
+  const names=["Example West Garage","Example North Yard","Example Corner Wash","Example Auto Plaza","Example Lake Repair","Example Orchard Bays"];
+  const rows=names.map((name,index)=>{
+    const id="PIPE-LAS-"+(9200+index);
+    const primary={route:"Site lead",disposition:"Shortlist",rank:null,next:"Validate access to the yard.",rationale:"The lowest drawn layout reaches depot parity."};
+    const layout={stalls:25-index,mixId:"example-yard-"+index,condition:"Parking and converted yard",system:true,
+      base:{perCharge:11+index,upgrade:1000000,sessions:10000},downside:{perCharge:12+index,upgrade:1500000},
+      ledger:{terms:"purchase",proxy:18,validation:index===1?"Confirm the offered legal parcel.":undefined}};
+    return {id,city:"LAS",stage:"Financial screen",name,hasRecord:true,financeVisible:true,pipelineTrack:"charging",
+      review:{name,primary,alternatives:[]},chargingSpace:{count:layout.stalls,value:layout.stalls+" spaces",basis:layout.condition},
+      charging:{preliminary:{layouts:[layout]},merit:{},result:{},screen:[]}};
+  });
+  await page.route("**/api/data/selection-review",r=>r.fulfill({json:{hasInputs:true,mismatches:0,rows:[...rows].reverse()}}));
+  await page.goto("/selection-review?disposition=Shortlist");
+  const cards=page.locator(".shortlist-card");
+  await expect(cards).toHaveCount(names.length);
+  await expect(cards.getByRole("heading",{level:2})).toHaveText(names);
+  const first=cards.first();
+  await expect(first).toContainText("Base · $1M utility");
+  await expect(first).toContainText("Higher utility · $1.5M");
+  await expect(first.getByRole("link",{name:"$11.00"})).toHaveAttribute("href",/layout=example-yard-0/);
+  await expect(first.getByText("Validate access to the yard.",{exact:false})).toBeHidden();
+  expect((await first.boundingBox())!.height).toBeLessThan(info.project.name==="mobile"?150:100);
+  expect(await page.locator("main").evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  await mkdir("review-shots",{recursive:true});
+  await page.screenshot({path:"review-shots/"+info.project.name+"-acquisition-scan.png",animations:"disabled"});
 });

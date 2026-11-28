@@ -39,3 +39,30 @@ test("an accepted drop updates a pending review without changing the source or a
   assert.equal(matchingOption(ranked,"Dropped","","No longer for sale")?.route, offer.route);
   assert.equal(matchingOption(ranked,"Dropped","","Tenant lease"),undefined);
 });
+
+test("acquisition shortlist follows available purchase layouts at base depot parity", async () => {
+  const {acquisitionReview} = await import("../../lib/selection/acquisitionShortlist");
+  type Summary = import("../../lib/charging/summary").ChargingSummary;
+  const layout = {stalls:30,mixId:"drawn-yard",base:{perCharge:15},downside:{perCharge:22},
+    ledger:{terms:"purchase",proxy:15,validation:"Confirm yard rights"}};
+  function site(overrides = {}) {
+    return {charging:{preliminary:{layouts:[{...layout,...overrides}]}} as unknown as Summary};
+  }
+  const pending = {...entry,primary:{...offer,disposition:"Investigate" as const,rank:null}};
+  const qualify = acquisitionReview(pending,site());
+  assert.equal(qualify?.primary.disposition,"Shortlist");
+  assert.equal(qualify?.primary.rank,null);
+  assert.equal(qualify?.primary.next,pending.primary.next);
+  for (const input of [site({base:{perCharge:15.01}}),site({stalls:3}),site({mixId:undefined}),
+    site({ledger:{...layout.ledger,hypothetical:true}}),site({ledger:{...layout.ledger,terms:"lease"}}),
+    {...site(),listing_removed:true},{...site(),pendingDrop:true},{...site(),chargingHold:"Verify current seller availability"},
+    {...site(),stage:"Off-market"},{}]) {
+    assert.equal(acquisitionReview(qualify,input)?.primary.disposition,"Investigate");
+  }
+  for (const disposition of ["Service diligence","Watch availability","Dropped","Suggest drop"] as const) {
+    const blocked = {...entry,primary:{...offer,disposition,rank:null}};
+    assert.equal(acquisitionReview(blocked,site()),blocked);
+  }
+  assert.equal(acquisitionReview(pending,site({mixId:undefined,parcel:true,stalls:4}))?.primary.disposition,"Shortlist");
+  assert.equal(matchingOption({...pending,alternatives:[offer]},"Shortlist",""),undefined);
+});

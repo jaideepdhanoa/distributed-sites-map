@@ -102,17 +102,7 @@ function costCase(d: DealProps, a?: PurchaseAssumptions, selected?: ScreenTenure
       base:range(base), downside:range(downside)});
   }
   if (!costed.length) return {reason:"No completed charges in this layout"};
-  // Keep the least disruptive operating scope first. A smaller priced variant can
-  // save a staffed post, but a different rights or cash assumption is a new case.
-  const first=costed[0];
-  if(first.operatingScope!=null) {
-    const comparable=costed.filter(l=>l.operatingScope===first.operatingScope &&
-      (l.rights?.pending===0)===(first.rights?.pending===0) &&
-      l.ledger.conversionRecorded===first.ledger.conversionRecorded &&
-      l.ledger.displacedRecorded===first.ledger.displacedRecorded && l.ledger.cashBasis===first.ledger.cashBasis);
-    const preferred=comparable.reduce((best,l)=>l.base.perCharge<best.base.perCharge ? l : best,first);
-    if(preferred!==first) costed.unshift(...costed.splice(costed.indexOf(preferred),1));
-  }
+  costed.sort((a,b) => a.base.perCharge - b.base.perCharge);
   return {layouts:costed, space, price, terms, priceBasis, cash, cashBasis,
     years:a.horizon, capital:a.capital, closing:a.closing, tax:c.tax};
 }
@@ -121,12 +111,12 @@ function costCase(d: DealProps, a?: PurchaseAssumptions, selected?: ScreenTenure
 export function preliminaryCost(d:DealProps, a?:PurchaseAssumptions, selected?:ScreenTenure, trial?:Trial):PreliminaryCost {
   const original=costCase(d,a,selected,trial);
   if ("layouts" in original) return original;
-  let result: Extract<PreliminaryCost,{layouts:LayoutCost[]}> | undefined;
-  for (const planning of planningPriceCases(d,selected,trial)) {
-    const estimate=costCase(d,a,selected,trial,planning);
-    if (!("layouts" in estimate)) continue;
-    if (result) result.layouts.push(...estimate.layouts);
-    else result=estimate;
-  }
-  return result ?? original;
+  const offers = planningPriceCases(d,selected,trial).flatMap(planning => {
+    const estimate = costCase(d,a,selected,trial,planning);
+    return "layouts" in estimate ? [estimate] : [];
+  });
+  if (!offers.length) return original;
+  // Keep the purchase terms and evidence of the winning price scenario with its layout.
+  offers.sort((a,b) => a.layouts[0].base.perCharge - b.layouts[0].base.perCharge);
+  return {...offers[0], layouts:offers.flatMap(offer => offer.layouts).sort((a,b) => a.base.perCharge - b.base.perCharge)};
 }

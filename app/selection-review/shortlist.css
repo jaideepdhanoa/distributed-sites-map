@@ -33,3 +33,24 @@
 .shortlist-figures dt,.shortlist-figures small { color:var(--ink-3); font-size:.78rem; }
 .shortlist-figures dd { margin:0; font-weight:600; }
 .shortlist-figures small { display:block; font-weight:400; }
+
+
+.shortlist-page .shortlist-intro { margin:12px 0 10px; padding-bottom:9px; }
+.shortlist-intro p { margin:.4rem 0; max-width:85ch; }
+.shortlist-results { gap:0; border:1px solid #d9d4c7; border-radius:10px; overflow:hidden; }
+.shortlist-card { padding:10px 16px 5px; border:0; border-radius:0; }
+.shortlist-results > li + li { border-top:1px solid #d9d4c7; }
+.shortlist-card .shortlist-summary { display:grid; grid-template-columns:minmax(0,1fr) minmax(330px,.92fr); align-items:center; gap:18px; }
+.shortlist-summary h2 { margin:0; font-size:1.12rem; }
+.shortlist-identity a { color:inherit; text-decoration:none; }
+.shortlist-identity a:hover { text-decoration:underline; }
+.shortlist-identity small,.shortlist-metrics dt { font-size:.78rem; color:var(--ink-3); }
+.shortlist-metrics { display:grid; grid-template-columns:.45fr 1fr 1fr; gap:6px; margin:0; }
+.shortlist-metrics dd { margin:2px 0 0; font-variant-numeric:tabular-nums; font-weight:650; }
+.shortlist-card .shortlist-detail > summary { width:fit-content; min-height:26px; color:#345d45; font-size:.81rem; }
+.shortlist-card .shortlist-detail[open] { padding-bottom:8px; }
+@media(max-width:680px) {
+  .shortlist-card { padding:10px 12px 5px; }
+  .shortlist-card .shortlist-summary { grid-template-columns:1fr; gap:7px; }
+  .shortlist-metrics { grid-template-columns:.5fr 1fr 1fr; }
+}

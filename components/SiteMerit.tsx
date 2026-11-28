@@ -50,7 +50,7 @@ export function MeritEditor({merit:m,draft,onChange}:{merit:Merit;draft:Inputs;o
         <button type="button" className="text-link" onClick={()=>update({schedule:undefined})}>Remove cash schedule</button>
       </> : <button type="button" className="secondary" onClick={()=>update({schedule:{key:"",source:"",flows:[blankFlow]}})}>Add cash schedule</button>}
     </details>
-    <p>Change the inputs that move together under downside conditions. Blank fields use the working case. Use the same footprint, terms and charging rights.</p>
+    <p>The investment downside combines the changes entered below. Blank fields keep the working-case values. The shortlist uses a separate utility sensitivity that raises only the upgrade allowance by 50%.</p>
     <div className="charging-controls">{downsideKeys.map(k=><label key={k}>Downside · {fields[k].label}<input className="field" type="number" min={fields[k].min} max={fields[k].max} step={k==="stalls"?"1":"any"} value={n.downside[k]??""} placeholder={String(draft.values[k]??"Unknown")} onChange={e=>{
       const downside={...n.downside};if(e.target.value==="")delete downside[k];else downside[k]=e.target.valueAsNumber;update({downside});
     }}/></label>)}</div>

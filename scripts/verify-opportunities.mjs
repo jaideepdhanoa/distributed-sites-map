@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { isDeepStrictEqual } from "node:util";
 import { setTimeout as sleep } from "node:timers/promises";
+import shortlist from "../lib/selection/acquisitionShortlist.ts";
 import opportunity from "../lib/selection/opportunity.ts";
 import { signedInReleaseReader } from "./verify-space-layouts.mjs";
 
@@ -29,6 +30,7 @@ if (!existsSync(path)) throw Error("The generated opportunity register is missin
         if (!deal) return !row.hasRecord;
         return (row.pipelineTrack==="service") === (expected.sites[row.id]?.primary.disposition === "Service diligence")
           && row.pipelineTrack === deal.pipelineTrack
+          && isDeepStrictEqual(row.review,deal.opportunityReview)
           && isDeepStrictEqual(row.charging?.preliminary,deal.charging?.preliminary)
           && isDeepStrictEqual(row.chargingSpace, deal.chargingSpace)
           && row.charging?.sourceRevision === deal.charging?.sourceRevision
@@ -69,10 +71,15 @@ if (!existsSync(path)) throw Error("The generated opportunity register is missin
         filedOutsideActive: filed?.length,
       };
       const actual = new Map([...rows, ...(filed || [])].filter(r => r.review).map(r => [r.id, r]));
+      const activeRows = new Map(rows.map(r => [r.id,r]));
+      function projected(id, review, stage, reason) {
+        const raw = opportunity.reviewAtStage(review, stage || "", reason);
+        return activeRows.has(id) ? shortlist.acquisitionReview(raw,mapDeals.get(id) ?? activeRows.get(id)) : raw;
+      }
       verified = projectionsMatch && editorsMatch && new Set(rows.map(r => r.id)).size === rows.length &&
         actual.size === count && registerUrl === expected.register &&
-        Object.entries(expected.sites).every(([id, site]) => isDeepStrictEqual(opportunity.reviewAtStage(site, actual.get(id)?.stage || "", actual.get(id)?.decisionReason),actual.get(id)?.review)) &&
-        features.every(({properties:p}) => p.kind !== "pipeline" || isDeepStrictEqual(opportunity.reviewAtStage(expected.sites[p.deal_id], p.stage, p.decision_reason || p.chips?.find(c => c.family === "drop_reason")?.label),p.opportunityReview));
+        Object.entries(expected.sites).every(([id, site]) => isDeepStrictEqual(projected(id, site, actual.get(id)?.stage, actual.get(id)?.decisionReason),actual.get(id)?.review)) &&
+        features.every(({properties:p}) => p.kind !== "pipeline" || isDeepStrictEqual(projected(p.deal_id,expected.sites[p.deal_id], p.stage, p.decision_reason || p.chips?.find(c => c.family === "drop_reason")?.label),p.opportunityReview));
     }
     if (!verified) throw Error("Signed-in opportunity review readback did not match the private register.");
     console.log(JSON.stringify(coverage));

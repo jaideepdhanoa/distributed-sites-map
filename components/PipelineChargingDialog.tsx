@@ -33,8 +33,11 @@ export function PipelineChargingDialog({onClose, assumptions, workbook, apply, s
     {site ? <>
       {layout && <section className="preliminary-cost" aria-label="Preliminary site cost">
         <h3>{site.screen.group==="scenario"?"What if this footprint fits?":"Lowest base cost per completed charge"}</h3>
-        <p><b>{site.screen.cost.value}</b> per completed charge</p><p>{site.screen.cost.basis}</p>
-        <p>Base utility {amounts(layout.base.upgrade)} · Higher utility {amounts(layout.downside.upgrade)}.</p>
+        <dl className="short-case-costs">
+          <div><dt>Base · {amounts(layout.base.upgrade)} utility upgrade</dt><dd>{amounts(layout.base.perCharge,2)} / charge</dd></div>
+          <div><dt>Higher utility · {amounts(layout.downside.upgrade)} upgrade (+50%)</dt><dd>{amounts(layout.downside.perCharge,2)} / charge</dd></div>
+        </dl>
+        <p>Only the utility upgrade changes. Both estimates use {layout.stalls} stalls at the same utilization, with the same price, construction and operating cash.</p><p>{site.screen.cost.basis}</p>
         <p>{layout.ledger.terms === "lease" ? "Monthly rent modeled" : "Purchase price modeled"} · {amounts(layout.ledger.inputs.price)} · {layout.ledger.priceBasis}</p>
         <p>{amounts(layout.base.annualCost)} annual net cost ÷ {Math.round(layout.base.sessions).toLocaleString("en-US")} annual charges</p>
         <a className="text-link" href={explanationUrl(site.id,undefined,window.location.pathname+window.location.search)+"&basis=list"+(layout.mixId ? "&layout="+encodeURIComponent(layout.mixId) : "")+listTrialHash(assumptions)}>Open unit economics ledger</a>

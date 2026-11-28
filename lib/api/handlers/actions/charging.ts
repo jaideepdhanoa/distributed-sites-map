@@ -1,3 +1,4 @@
+import { acquisitionReview } from "@/lib/selection/acquisitionShortlist";
 import { openActions,isResponse,jsonOk,jsonError,runWrite } from "@/lib/actions/http";
 import { isSession,requireUser } from "@/lib/guard";
 import { canReadFinancials } from "@/lib/agent/access";
@@ -33,6 +34,7 @@ async function siteFor(request:Request,role:ActionRole) {
   site.stage=stage;
   const a=purchaseFile()?.assumptions;
   site.charging=summarize(site,sourceRevision(site,a),(await selectedCases()).get(id),a);
+  site.opportunityReview = acquisitionReview(site.opportunityReview, site);
   return site;
 }
 export async function GET(request:Request) {

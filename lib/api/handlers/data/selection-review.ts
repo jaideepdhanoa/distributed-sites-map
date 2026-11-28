@@ -1,3 +1,4 @@
+import { acquisitionReview } from "@/lib/selection/acquisitionShortlist";
 import { sheetMoney } from "@/lib/keyNumbers";
 import { shownPriceSource } from "@/lib/format";
 import { NextResponse } from "next/server";
@@ -76,7 +77,7 @@ export async function loadSelectionReview(role:ActionRole) {
     const asking = financeVisible && priced && (priced.asking_price != null || priced.asking_price_display)
       ? [sheetMoney(priced.asking_price, priced.asking_price_display), shownPriceSource(priced)].filter(Boolean).join(" · ") : undefined;
     rows.push({id,pipelineTrack:pipelineTrack(opportunities?.sites[id]?.primary.disposition),charging,asking,chargingSpace:financeVisible ? priced?.chargingSpace : undefined,
-      pendingDrop:financeVisible ? deal.pendingDrop : undefined,review:register?.sites[id],city,name:String(p.name || p.address || register?.sites[id]?.name || id),mapped:Boolean(mapped.get(id)?.geometry),hasRecord:mapped.has(id),stage,mirrorStage:input?.stage || "",
+      pendingDrop:financeVisible ? deal.pendingDrop : undefined,review:deal.opportunityReview ?? acquisitionReview(register?.sites[id], {...extra, stage, charging}),city,name:String(p.name || p.address || register?.sites[id]?.name || id),mapped:Boolean(mapped.get(id)?.geometry),hasRecord:mapped.has(id),stage,mirrorStage:input?.stage || "",
       research:evidence?.get(id),priority,instruction,geometry:!a && typeof input?.recorded === "number" ? input.recorded+" stalls in the workbook" : view.baseline,option:summary.fit || view.finding || view.focus,assessed:Boolean(a),evidenceDate:a?.reviewedOn || "",
       section:input?.section || (input ? "Missing section" : "Workbook input unavailable"),amount:financeVisible ? input?.screen ?? null : null,
       readiness:investmentScreen(input,financeVisible),financeVisible,quickLube:(input?.segment || a?.row.segment || "").toLowerCase().includes("lube") });

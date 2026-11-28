@@ -2,7 +2,7 @@
 
 import { compareAttention, matchingOption } from "@/lib/selection/opportunity";
 import { recommendation } from "@/lib/selection/opportunityDisplay";
-import { listScreen, listSpace, hasListChanges, listCostLabel } from "@/lib/charging/listScreen";
+import { listScreen, listSpace, hasListChanges, listCostLabel, listCostFigures } from "@/lib/charging/listScreen";
 import { defaultListAssumptions, type ListAssumptions } from "@/lib/charging/preliminary";
 import { PipelineChargingDialog } from "./PipelineChargingDialog";
 import { ChargingLink } from "./ChargingLink";
@@ -677,7 +677,7 @@ export default function PipelineList({
               action: signedIn && row.deal.opportunityReview ? cell(row, "priority", true) : undefined,
               measures: signedIn && row.deal.kind === "pipeline" ? [
                 ["Charging spaces", listSpace(row.deal.chargingSpace, row.deal.charging, row.screen?.estimate).value],
-                ["Cost per charge", row.screen ? [row.screen.cost.value, listCostLabel(row.screen, row.deal.charging)].filter(Boolean).join(" · ") : "Not estimated"],
+                ["Cost per charge", row.screen ? [listCostFigures(row.screen), listCostLabel(row.screen, row.deal.charging)].filter(Boolean).join(" · ") : "Not estimated"],
               ] : undefined,
               chips: (() => {
                 if (row.deal.kind === "land") return <LandPausedChip />;
@@ -728,7 +728,7 @@ export default function PipelineList({
             if (!screen) return "—";
             const label = listCostLabel(screen, row.deal.charging);
             return <span className="pipeline-measure">
-              {screen.estimate ? <button type="button" className="text-link" onClick={ev=>{ev.stopPropagation();setCostPanel(id);}}>{screen.cost.value}</button>
+              {screen.estimate ? <button type="button" className="text-link" onClick={ev=>{ev.stopPropagation();setCostPanel(id);}}>{listCostFigures(screen)}</button>
                 : row.deal.charging ? <ChargingLink site={id} revision={row.deal.charging.selected}>{screen.cost.value}</ChargingLink> : screen.cost.value}
               {label && <small>{label}</small>}
             </span>;

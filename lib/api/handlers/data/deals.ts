@@ -1,3 +1,4 @@
+import { acquisitionReview } from "@/lib/selection/acquisitionShortlist";
 import type { ActionRole } from "@/lib/actions/roles";
 import { NextResponse } from "next/server";
 import type { DealProps } from "@/lib/types";
@@ -98,6 +99,7 @@ export async function loadMapDeals(role: ActionRole, includePurchase = true) {
       record.suggested_drop = record.opportunityReview.primary.rationale;
     }
     if(active && ["MIA","PHX","LAS"].includes(d.city) && !selection?.[d.deal_id]?.land) record.charging=summarize(record,sourceRevision(record,purchase?.assumptions),saved?.get(d.deal_id),purchase?.assumptions);
+    if (active) record.opportunityReview = acquisitionReview(record.opportunityReview, record);
     return {...feature,properties:record};
   });
   // Live decisions can change while the published workbook snapshot stays the same.

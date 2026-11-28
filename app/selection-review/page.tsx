@@ -1,4 +1,5 @@
 "use client";
+import { diligenceLayout } from "@/lib/charging/diligenceLayout";
 import { dropReasons } from "@/lib/selection/dropReasons";
 import { displayedFit,pipelineCost,screenBasis } from "@/lib/charging/pipelineCost";
 import { amounts } from "@/lib/charging/model";
@@ -56,7 +57,7 @@ function SelectionList() {
   const incompatible=[...incompatibleMarkets(candidates)].filter(c=>!market || market===c);
   const investment=params.get("sort")==="investment";
   const decision = currentDisposition(params.get("disposition") || "");
-  const order = params.get("sort") || "attention";
+  const order = params.get("sort") || (decision === "Shortlist" ? "baseCost" : "attention");
   const hasReviews = Boolean(data?.registerUrl || data?.filed?.length || rows.some(r=>r.review));
   const route = params.get("route") || "";
   const reason = decision === "Dropped" ? params.get("reason") || "" : "";
@@ -70,12 +71,13 @@ function SelectionList() {
   const showFiled = !check && !params.get("stalls") && !params.get("charging") && !investment;
   const shortlist = decision === "Shortlist";
   const droppedView = decision === "Dropped";
+  const baseCost = (row:SelectionRow) => (shortlist ? diligenceLayout(row.charging?.preliminary,true)?.base.perCharge : undefined) ?? pipelineCost(row.charging).amount ?? Infinity;
   const scoped = rows.filter(r => evidenceMatches(r.review) && (!investment || sequence.has(r.id)) && matchesPlace(r,r.name + " " + (r.review?.name || "")) && matchesDecision(r.review) && (!check || r.priority === check) &&
     (!params.get("stalls") || r.chargingSpace?.layouts?.some(c=>c.stalls===Number(params.get("stalls")))) &&
     (!params.get("charging") || r.charging?.merit.action===params.get("charging"))).sort((a,b)=>{
       if(investment)return a.city.localeCompare(b.city) || sequence.get(a.id)!.rank-sequence.get(b.id)!.rank;
       const priority = order === "attention" ? compareAttention(match(a.review),match(b.review)) :
-        order === "baseCost" ? (pipelineCost(a.charging).amount ?? Infinity) - (pipelineCost(b.charging).amount ?? Infinity) :
+        order === "baseCost" ? baseCost(a) - baseCost(b) :
         order === "earlier" ? (b.charging?.result.earlyMin??-1)-(a.charging?.result.earlyMin??-1) : 0;
       return priority || (scope && order !== "market" ? scope.get(a.id)! - scope.get(b.id)! : 0) || (order === "attention" ? diligenceOrder(a.charging?.merit,b.charging?.merit) : 0) || a.city.localeCompare(b.city) || a.name.localeCompare(b.name);
     });
@@ -97,9 +99,11 @@ function SelectionList() {
   return <main ref={pane} className={shortlist ? "space-review-page shortlist-page" : "space-review-page"}>
     <a className="text-link" href={back}>← Pipeline list</a>
     {shortlist ? <header className="shortlist-intro"><h1>Acquisition shortlist</h1>
-      <p>Priority diligence uses a drawn layout of at least four stalls, comparable costs or documented break-even terms, and a check that can change the decision. There is no fixed shortlist size.</p>
-      <a className="text-link" href="/?review=1&qmarket=all&qstage=any&qapprove=1">Open items needing my approval →</a>
-      <small>The Review inbox also includes changes and requests across the wider pipeline.</small>
+      <p>Every available purchase opportunity with at least 4 drawn stalls and a base cost per charge at or below its depot benchmark qualifies. There is no stall maximum or fixed number of sites.</p>
+      <details className="disclosure"><summary className="disclosure">How the two costs are calculated</summary>
+        <p><b>Base</b> uses the lowest-cost qualifying layout and purchase terms at the modeled utility upgrade. <b>Higher utility</b> raises that upgrade by 50%. Both use the same stalls, utilization per stall, purchase price and operating assumptions. Electricity and utility demand charges are excluded from both the site and depot comparison.</p>
+        <p>The shortlist updates when layouts, prices, availability or cost assumptions change. A drawn layout can qualify while use rights or sale terms await validation. Withdrawn offers and parked service opportunities are excluded.</p>
+      </details>
     </header> : <><h1>Selection review</h1><p>Choose the next diligence check. Investment approval requires verified site rights, usable space, power, retained cash flow and network benefit.</p></>}
     {!shortlist && guidance}
     {shortlist && <button type="button" className="paper-btn shortlist-filter-toggle" aria-controls="selection-filters" aria-expanded={showFilters} onClick={()=>setShowFilters(!showFilters)}>
@@ -125,7 +129,7 @@ function SelectionList() {
       <label>Charging decision<select className="secondary" value={params.get("charging")||""} onChange={e=>setReviewFilter("charging",e.target.value)}>
         <option value="">All decisions</option>{[...new Set(rows.flatMap(r=>r.charging?[r.charging.merit.action]:[]))].sort().map(s=><option key={s}>{s}</option>)}</select></label>
       <label>Drawn stall count<select className="secondary" value={params.get("stalls")||""} onChange={e=>setReviewFilter("stalls",e.target.value)}><option value="">Any stall count</option>{[...new Set(rows.flatMap(r=>r.chargingSpace?.layouts?.map(l=>l.stalls)??[]))].sort((a,b)=>a-b).map(n=><option value={n} key={n}>{n} assessed stalls</option>)}</select></label>
-      <label>Order<select aria-label="Order" className="secondary" value={params.get("sort")||""} onChange={e=>setReviewFilter("sort",e.target.value)}><option value="">Diligence priority</option>{rows.some(r=>r.financeVisible) && <option value="baseCost">Lowest base cost per charge</option>}{rows.some(r=>r.financeVisible) && <option value="investment">Investment sequence by market</option>}<option value="market">Market and site</option><option value="earlier">Earlier usable charges</option></select></label>
+      <label>Order<select aria-label="Order" className="secondary" value={params.get("sort")||""} onChange={e=>setReviewFilter("sort",e.target.value)}><option value="">{shortlist ? "Lowest base cost per charge" : "Diligence priority"}</option>{(!shortlist || params.get("sort")==="baseCost") && rows.some(r=>r.financeVisible) && <option value="baseCost">Lowest base cost per charge</option>}{rows.some(r=>r.financeVisible) && <option value="investment">Investment sequence by market</option>}<option value="market">Market and site</option><option value="earlier">Earlier usable charges</option></select></label>
       </div>
     </details>
     </div>
@@ -159,10 +163,10 @@ function SelectionList() {
         {match(r.review)?.disposition !== "Dropped" && r.quickLube && r.priority !== "Screen fleet service" && <p>Retained lifts and fleet-service rights also need a separate check.</p>}
         {!droppedView && r.assessed && <a href={reviewLink("/space-review",{site:r.id,panel:"space-options"},origin+"#"+r.id)}>Review layout evidence{r.evidenceDate && " · "+r.evidenceDate}</a>}
       </div></li>;})}</ul>
-      {filed.length > 0 && showFiled && <details className="disclosure" key={decision} open={droppedView || undefined}>
+      {!shortlist && filed.length > 0 && showFiled && <details className="disclosure" key={decision} open={droppedView || undefined}>
         <summary className="disclosure">{droppedView ? "Outside the active pipeline" : "Filed reviews outside the active list"} ({filed.length})</summary>
         <ul className="space-review-results">{filed.map(r=><li key={r.id}><div><small>{r.city} · {r.stage} · {r.id}</small><h2>{r.review.name}</h2><OpportunityReview review={r.review} matched={match(r.review)}/>{r.hasRecord && <a href={reviewLink("/",{site:r.id,city:r.city,funnel:"pipeline",sheet:"full",...(serviceView?{track:"service"}:{})},origin+"#"+r.id)}>Open site record</a>}</div></li>)}</ul>
       </details>}
-      {shortlist && <footer className="shortlist-guide">{guidance}{dataDetails}</footer>}</>}
+      {shortlist && <footer className="shortlist-guide"><a className="text-link" href="/?review=1&qmarket=all&qstage=any&qapprove=1">Open items needing my approval →</a>{guidance}{dataDetails}</footer>}</>}
   </main>;
 }

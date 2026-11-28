@@ -23,3 +23,6 @@
   .pipeline-list .list-cards .pipeline-dialog-actions { grid-column: 2; gap: 0 14px; }
   .pipeline-list .list-cards .pipeline-dialog-actions .text-link { display: inline-flex; align-items: center; min-height: 44px; }
 }
+.short-case-costs { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr)); gap:.5rem 1rem; }
+.short-case-costs dt { color:var(--ink-3); font-size:.82rem; }
+.short-case-costs dd { margin:2px 0; font-weight:650; font-variant-numeric:tabular-nums; }

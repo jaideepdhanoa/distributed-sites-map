@@ -143,14 +143,14 @@ test("a large conditional layout stays compact and opens its own calculation", a
   if (phone) await list.getByRole("button",{name:"Figures",exact:true}).click();
   const row=list.locator("[data-site-row]").first();
   await expect(row).toContainText("26 spaces");
-  await expect(row).toContainText("$11.00–$12.00");
+  await expect(row).toContainText("$11.00 base · $12.00 higher utility");
   await expect(row).toContainText("Validate build cost");
   await expect(row).not.toContainText(validation);
   await expect(row).not.toContainText(primary.next);
   if (!phone) expect((await row.boundingBox())!.height).toBeLessThan(115);
   await mkdir("review-shots",{recursive:true});
   await page.screenshot({path:`review-shots/${info.project.name}-pipeline-scan.png`,animations:"disabled"});
-  await row.getByRole("button",{name:phone?"View calculation":"$11.00–$12.00"}).click();
+  await row.getByRole("button",{name:phone?"View calculation":"$11.00 base · $12.00 higher utility"}).click();
   const dialog=page.getByRole("dialog");
   await expect(dialog).toContainText(validation);
   await expect(dialog).toContainText(primary.next);

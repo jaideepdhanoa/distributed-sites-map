@@ -154,6 +154,9 @@ test("shortlisted visit shows the charging decision and its parallel diligence w
   await page.goto("/selection-review?disposition=Shortlist");
   await expect(page.getByRole("heading",{name:"Acquisition shortlist"})).toBeVisible();
   await expect(page.getByRole("link",{name:/needing my approval/})).toHaveAttribute("href",/qapprove=1/);
+  const detailsToggle = page.getByText("Site details",{exact:true});
+  await expect(page.getByText("Site evidence and economics")).toBeHidden();
+  await detailsToggle.click();
   await expect(page.getByText("Site evidence and economics")).toBeVisible();
   const overview = page.locator(".shortlist-figures");
   await expect(overview).toContainText("$120,000");
@@ -165,12 +168,13 @@ test("shortlisted visit shows the charging decision and its parallel diligence w
   await costLink.click();
   await page.getByRole("link",{name:"← Selection review"}).click();
   await expect(page).toHaveURL(/disposition=Shortlist#PIPE-LAS-9001$/);
-  await expect(page.locator(".shortlist-figures")).toBeVisible();
+  await expect(detailsToggle).toBeVisible();
   await mkdir("review-shots",{recursive:true});
   await page.screenshot({path:"review-shots/"+info.project.name+"-acquisition-shortlist.png",animations:"disabled"});
   await page.getByRole("button",{name:"Filter shortlist"}).click();
   await expect(page.getByLabel("Commercial decision")).toBeVisible();
   await page.getByRole("button",{name:"Hide filters"}).click();
+  if (!await page.locator(".shortlist-figures").isVisible()) await detailsToggle.click();
   await page.getByText("Parcel, space and charging evidence").click();
   await expect(page.getByText(coverage.county)).toBeVisible();
   await expect(page.getByText("No positive price")).toBeVisible();

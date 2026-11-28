@@ -37,6 +37,12 @@ export function listScreen(d: DealProps, assumptions = defaultListAssumptions) {
   return result({amount:layout.base.perCharge, value:costRange(layout), basis:detail + " · excludes electricity"}, layout.ledger?.validation ? "conditional" : assessed ? "priced" : "scenario", estimate, proxy);
 }
 
+/** Label each price in compact list rows and mobile cards. */
+export function listCostFigures(screen:ReturnType<typeof listScreen>) {
+  const layout = screen.estimate && "layouts" in screen.estimate ? screen.estimate.layouts[0] : undefined;
+  return layout ? amounts(layout.base.perCharge,2)+" base · "+amounts(layout.downside.perCharge,2)+" higher utility" : screen.cost.value;
+}
+
 /** Brief qualifiers for scanning. The calculation keeps the complete evidence and conditions. */
 export function listCostLabel(screen: ReturnType<typeof listScreen>, charging?: DealProps["charging"]) {
   const layout = screen.estimate && "layouts" in screen.estimate ? screen.estimate.layouts[0] : undefined;
@@ -57,12 +63,7 @@ export function hasListChanges(a:ListAssumptions, includeStalls = true) {
 
 export function proxyReading(screen: ReturnType<typeof listScreen>) {
   if (screen.proxy == null || !screen.estimate || !("layouts" in screen.estimate)) return "";
-  const {base, downside} = screen.estimate.layouts[0];
-  const gap = displayedPriceDelta(downside.perCharge,screen.proxy);
-  if (gap===0) return "Matches depot proxy in downside to the cent";
-  if (gap <= 0) return amounts(-gap,2) + " below depot proxy in downside";
-  const baseGap=displayedPriceDelta(base.perCharge,screen.proxy);
-  if (baseGap===0) return "Matches depot proxy in base to the cent";
-  if (baseGap<0) return "Below depot proxy in base only";
-  return amounts(baseGap,2) + " above depot proxy in base";
+  const gap = displayedPriceDelta(screen.estimate.layouts[0].base.perCharge,screen.proxy);
+  if (gap === 0) return "Base cost matches the depot benchmark to the cent";
+  return amounts(Math.abs(gap),2) + (gap < 0 ? " below" : " above") + " the depot benchmark at base utility";
 }

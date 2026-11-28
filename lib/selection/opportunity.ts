@@ -75,7 +75,7 @@ export function reviewAtStage(review: OpportunitySite | undefined, stage: string
 
 export function matchingOption(review: OpportunitySite | undefined, decision: string, route: string, reason = "") {
   if (!review) return undefined;
-  const options = [review.primary, ...review.alternatives];
+  const options = decision === "Shortlist" ? [review.primary] : [review.primary, ...review.alternatives];
   if (!decision && !route && review.primary.disposition === "Dropped") {
     return options.find(option => ["Shortlist", "Investigate", "Service diligence", "Reserve"].includes(option.disposition));
   }

@@ -3,8 +3,8 @@ import { checkSpaceFit } from "./fitCheck";
 import type { MapSpaceSite } from "./mapCatalog";
 import { kinds, type Assessment } from "./options";
 
-export type ChargingFootprint = { stalls: number; condition: string; rights?:ReturnType<typeof layoutRights>; rightsByArea?:Record<string,boolean>; parcel?:boolean; conversionCost?:number; lostAnnualCash?:number; system?:boolean; operatingConversion?:boolean; parts?:{area:string;stalls:number}[] };
-export type PipelineFit = { value: string; basis: string; count: number | null; layouts?: ChargingFootprint[] };
+export type ChargingFootprint = { mixId?:string; componentIds?:Record<string,string>; operatingScope?:string; areaKinds?:Record<string,string>; stalls: number; condition: string; rights?:ReturnType<typeof layoutRights>; rightsByArea?:Record<string,boolean>; parcel?:boolean; conversionCost?:number; lostAnnualCash?:number; system?:boolean; operatingConversion?:boolean; parts?:{area:string;stalls:number}[] };
+export type PipelineFit = { revision?:string; value: string; basis: string; count: number | null; layouts?: ChargingFootprint[] };
 
 function rangeText([low, high]: readonly number[]) {
   return (low === high ? String(low) : low + "–" + high) + (high === 1 && low === 1 ? " space" : " spaces");
@@ -24,8 +24,8 @@ export function pipelineFit(site: MapSpaceSite | undefined, assessment: Assessme
       const cases = assessedCases(site.zones,site.frame,assessment);
       const assessed = cases.map(c => {
         const parts=areaCounts(c.rows);
-        return {stalls:parts.reduce((total,p)=>total+p.stalls,0),condition:c.name+". "+c.condition,
-          rights:layoutRights(c.rows,site.zones),rightsByArea:Object.fromEntries(parts.map(p=>[p.area,site.zones.find(z=>z.label===p.area)?.useRight?.status==="documented"])),system:!!c.system,parcel:true,parts,operatingConversion:!!c.system && parts.some(p=>site.zones.some(z=>z.label===p.area && ["bay","vacuum","apron","storage"].includes(z.kind))),conversionCost:c.conversionCost,lostAnnualCash:c.lostAnnualCash};
+        return {areaKinds:Object.fromEntries(parts.map(p=>[p.area,site.zones.find(z=>z.label===p.area)!.kind])),mixId:c.mixId,componentIds:c.componentIds,operatingScope:c.operatingScope,stalls:parts.reduce((total,p)=>total+p.stalls,0),condition:c.name+". "+c.condition,
+          rights:layoutRights(c.rows,site.zones),rightsByArea:Object.fromEntries(parts.map(p=>[p.area,site.zones.find(z=>z.label===p.area)?.useRight?.status==="documented"])),system:!!c.system,parcel:true,parts,operatingConversion:parts.some(p=>site.zones.some(z=>z.label===p.area && ["bay","vacuum","apron","storage"].includes(z.kind))),conversionCost:c.conversionCost,lostAnnualCash:c.lostAnnualCash};
       });
       if (assessed.length) {
         const first=assessed[0];

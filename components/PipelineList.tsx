@@ -126,7 +126,7 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   if (id === "priority") return signedIn ? (deal.opportunityReview ? recommendation(deal.opportunityReview.primary) : "Awaiting review") : "";
   if (id === "spaces" || id === "chargeCost") {
     if (!signedIn || deal.kind === "land") return "";
-    const fact = id === "spaces" ? listSpace(deal.chargingSpace) : (row.screen ?? listScreen(deal)).cost;
+    const fact = id === "spaces" ? listSpace(deal.chargingSpace,deal.charging) : (row.screen ?? listScreen(deal)).cost;
     return fact ? [fact.value, fact.basis].filter(Boolean).join(" · ") : "No layout estimate";
   }
   if (id === "merit") return signedIn ? deal.charging?.merit.action ?? deal.screening?.priority ?? "—" : "";
@@ -216,7 +216,7 @@ function stageFilterCode(deal: DealProps): string {
 
 function sortValue(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   const deal = row.deal;
-  if (id === "spaces") return signedIn ? listSpace(deal.chargingSpace).count : null;
+  if (id === "spaces") return signedIn ? listSpace(deal.chargingSpace,deal.charging).count : null;
   if (id === "chargeCost") return signedIn ? (row.screen ?? listScreen(deal)).cost.amount : null;
   if (id === "merit") return deal.charging?.merit.order ?? null;
   if (id === "asking") return signedIn ? deal.asking_price : null;
@@ -407,7 +407,7 @@ export default function PipelineList({
   }, [activeLayout, mapArea, rows, sheetColumns, visible,signedIn,financeOpen,finEvidence,finCarry]);
   const coverage = params.get("chargeCoverage") || "";
   const matches = (row:PipelineRow, key:string) => row.deal.kind === "pipeline" &&
-    (row.screen?.group === key || listSpace(row.deal.chargingSpace).group === key);
+    (row.screen?.group === key || listSpace(row.deal.chargingSpace,row.deal.charging).group === key);
   const ordered = signedIn && Object.hasOwn(coverageLabels,coverage) ? scopedRows.filter(row=>matches(row, coverage)) : scopedRows;
   const detailRow = costPanel && costPanel !== "assumptions" ? ordered.find(row=>row.deal.deal_id === costPanel) : undefined;
   const scope = ordered.map(row=>row.deal.deal_id).join("|");
@@ -715,7 +715,7 @@ export default function PipelineList({
           if (column === "spaces" || column === "chargeCost") {
             if (!signedIn || row.deal.kind === "land") return "—";
             const cost = column === "chargeCost";
-            const fact = cost ? row.screen?.cost : listSpace(row.deal.chargingSpace);
+            const fact = cost ? row.screen?.cost : listSpace(row.deal.chargingSpace,row.deal.charging);
             return <span className="pipeline-measure">{cost && row.screen?.group === "scenario" && <strong className="pipeline-what-if">What-if estimate</strong>}{cost && row.deal.charging
               ? row.screen?.estimate ? <button type="button" className="text-link" onClick={ev=>{ev.stopPropagation();setCostPanel(id);}}>{fact?.value}</button>
                 : <ChargingLink site={id} revision={row.deal.charging.selected}>{fact?.value}</ChargingLink>

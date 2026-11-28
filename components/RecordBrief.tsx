@@ -1,9 +1,10 @@
+import { DiligenceLayout } from "./DiligenceLayout";
 import type { ReactNode } from "react";
 import type { PowerRecords } from "@/lib/powerLinkIndex";
 import { PowerFollowUp } from "./PowerEvidence";
 import { useRouter } from "next/navigation";
 import { currentSearch, rememberSearch } from "@/lib/navSearch";
-import { pipelineCost, screenBasis } from "@/lib/charging/pipelineCost";
+import { displayedFit, pipelineCost, screenBasis } from "@/lib/charging/pipelineCost";
 import { chooseRecordTab } from "./PanelSections";
 import { ChargingLink } from "./ChargingLink";
 import { RecordRecommendation, RecommendationSources } from "./OpportunityReview";
@@ -49,7 +50,7 @@ export default function RecordBrief({ target, pnl, power, snapshot, ...input }: 
   const cash = input.signedIn && input.deal ? cashTile(input.deal) : null;
   const cashGap = !economics && cash && !cash.hidden ? (cash.value === "—" ? "Cash flow not on file" : cash.value) : "";
   const source = evidence?.kind === "county" ? evidence.href : financial && coverage ? `Financial statement · ${coverage}` : land && first?.label === "Open land" ? first.source : "";
-  const space = input.deal?.chargingSpace;
+  const space = displayedFit(input.deal?.chargingSpace,input.deal?.charging);
   const metrics = input.signedIn && input.deal?.kind === "pipeline" && <section className="record-charging" aria-label="Charging feasibility">
     <h3>Charging feasibility</h3>
     <dl>
@@ -58,6 +59,7 @@ export default function RecordBrief({ target, pnl, power, snapshot, ...input }: 
         ? <ChargingLink site={input.deal.deal_id} basis={screenBasis(input.deal.charging)} revision={input.deal.charging.selected}>{cost.value}</ChargingLink> : cost.value}
         {cost.basis && cost.basis !== space?.basis && <small>{cost.basis}</small>}</dd></div>
     </dl>
+    <DiligenceLayout site={input.deal.deal_id} charging={input.deal.charging}/>
     {space?.basis && space.basis === cost.basis && <small className="shared-basis">{space.basis}</small>}
   </section>;
   const siteCheck = (<div><dt>{opportunity ? "Recorded site check" : origin}</dt><dd>{evidence?.kind === "county"

@@ -27,18 +27,38 @@ if (!existsSync(path)) throw Error("The generated opportunity register is missin
       const projectionsMatch = rows.every(row => {
         const deal = mapDeals.get(row.id);
         if (!deal) return !row.hasRecord;
-        return isDeepStrictEqual(row.chargingSpace, deal.chargingSpace)
+        return (row.pipelineTrack==="service") === (expected.sites[row.id]?.primary.disposition === "Service diligence")
+          && row.pipelineTrack === deal.pipelineTrack
+          && isDeepStrictEqual(row.charging?.preliminary,deal.charging?.preliminary)
+          && isDeepStrictEqual(row.chargingSpace, deal.chargingSpace)
           && row.charging?.sourceRevision === deal.charging?.sourceRevision
           && row.charging?.selected === deal.charging?.selected
           && row.charging?.result?.siteCost === deal.charging?.result?.siteCost
           && row.pendingDrop === deal.pendingDrop;
       });
+      const live=rows.filter(r=>r.pipelineTrack==="charging");
+      const examples=new Map();
+      for(const row of live.filter(r=>r.charging)){
+        const kind=row.charging.selected ? "selected" : row.charging.preliminary?.layouts ? "assessed" : "unpriced";
+        if(!examples.has(kind)) examples.set(kind,row);
+      }
+      const editorsMatch=(await Promise.all([...examples.values()].map(async row=>{
+        const reply=await read("/api/actions/charging?site="+encodeURIComponent(row.id));
+        if(!reply.ok) return false;
+        const {site,source}=await reply.json();
+        return source===row.charging.sourceRevision && site.charging?.selected===row.charging.selected &&
+          isDeepStrictEqual(site.chargingSpace,row.chargingSpace) && isDeepStrictEqual(site.charging?.preliminary,row.charging.preliminary);
+      }))).every(Boolean);
       coverage = {
+        drawnChargingSites:live.filter(r=>r.chargingSpace?.layouts?.some(l=>l.system)).length,
+        pricedChargingSites:live.filter(r=>r.charging?.preliminary?.layouts?.some(l=>l.system)).length,
+        systemChargingCombinations:live.reduce((n,r)=>n+(r.chargingSpace?.layouts?.filter(l=>l.system).length??0),0),
+        editorCasesChecked:examples.size,
         activeWithEvidence: rows.filter(r => r.review?.coverage).length,
         footprintScenarios: rows.reduce((n, r) => n + (r.review?.coverage?.cases?.length || 0), 0),
         activeWithoutReview: rows.filter(r => !r.review).length,
         activeWithNextDecision: rows.filter(r => r.review?.primary.next?.trim()).length,
-        activeSites: rows.length,
+        activeSites: rows.filter(r=>r.pipelineTrack==="charging").length,
         activeShortlist: rows.filter(r => r.review?.primary.disposition === "Shortlist").length,
         shortlistVisitPlans: rows.filter(r => r.review?.primary.disposition === "Shortlist" && r.review.visitPlan).length,
         serviceDiligence: rows.filter(r => r.review?.primary.disposition === "Service diligence").length,
@@ -46,7 +66,7 @@ if (!existsSync(path)) throw Error("The generated opportunity register is missin
         filedOutsideActive: filed?.length,
       };
       const actual = new Map([...rows, ...(filed || [])].filter(r => r.review).map(r => [r.id, r]));
-      verified = projectionsMatch && new Set(rows.map(r => r.id)).size === rows.length &&
+      verified = projectionsMatch && editorsMatch && new Set(rows.map(r => r.id)).size === rows.length &&
         actual.size === count && registerUrl === expected.register &&
         Object.entries(expected.sites).every(([id, site]) => isDeepStrictEqual(opportunity.reviewAtStage(site, actual.get(id)?.stage || "", actual.get(id)?.decisionReason),actual.get(id)?.review)) &&
         features.every(({properties:p}) => p.kind !== "pipeline" || isDeepStrictEqual(opportunity.reviewAtStage(expected.sites[p.deal_id], p.stage, p.decision_reason || p.chips?.find(c => c.family === "drop_reason")?.label),p.opportunityReview));

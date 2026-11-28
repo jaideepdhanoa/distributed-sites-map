@@ -19,7 +19,7 @@ const inputs=z.strictObject({
   ranking:ranking.optional(),
   values:z.strictObject(bounds),evidence:z.partialRecord(key,evidence),
   sourceValues:z.partialRecord(key,z.strictObject({value:z.number().finite().nullable(),evidence})).optional(),
-  layout:z.string().min(1).max(240),rights:z.enum(["unknown","controlled","unavailable"]),rightsSource:z.string().max(400),rightsDate:date,
+  mixId:z.string().max(100).optional(),layout:z.string().min(1).max(240),rights:z.enum(["unknown","controlled","unavailable"]),rightsSource:z.string().max(400),rightsDate:date,
   comparable:z.boolean(),sensitivityPct:z.number().finite().min(1).max(100),terms:z.enum(["purchase","lease"]),comparator:z.enum(["workbook","local"]),energyScope:z.enum(["included","excluded"]),
   openEarly:date,openLate:date,depotDate:date,allOptionsReviewed:z.boolean(),peakDay:z.enum(["weekday","weekend"]),temporaryEnd:date,temporarySource:z.string().max(400),
 }).refine(c=>Object.entries(c.sourceValues??{}).every(([name,source])=>{

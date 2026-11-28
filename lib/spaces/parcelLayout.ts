@@ -7,6 +7,7 @@ type Frame = Pick<Aerial, "width" | "height" | "bounds" | "metersPerPixel">;
 export type Angle = 45 | 60 | 90;
 export type RowSpec = { area: string; edge: number; angle: Angle; count: number; sharedAisle?: boolean; offset?:number };
 export type ParcelCase = {
+  mixId?: string; componentIds?: Record<string,string>; operatingScope?: string;
   name: string; condition: string; rows: RowSpec[]; approach?: Point[];
   conversionCost?: number; lostAnnualCash?: number; system?: boolean;
 };

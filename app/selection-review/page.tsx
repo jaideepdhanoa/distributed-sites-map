@@ -1,5 +1,6 @@
 "use client";
 import { dropReasons } from "@/lib/selection/dropReasons";
+import { displayedFit,pipelineCost,screenBasis } from "@/lib/charging/pipelineCost";
 import { amounts } from "@/lib/charging/model";
 import { marketSequence,diligenceOrder,incompatibleMarkets } from "@/lib/charging/merit";
 import {ChargingLink} from "@/components/ChargingLink";
@@ -10,6 +11,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import ShortlistCard from "@/components/ShortlistCard";
 import "./shortlist.css";
 import OpportunityReview from "@/components/OpportunityReview";
+import { pipelineTrack } from "@/lib/selection/pipelineTrack";
 import { compareAttention, currentDisposition, dispositions, matchingOption, routes, type OpportunitySite, type FiledReview } from "@/lib/selection/opportunity";
 import SelectionResearch from "@/components/SelectionResearch";
 import type { SelectionRow } from "@/lib/selection/screen";
@@ -41,7 +43,14 @@ function SelectionList() {
       .catch(() => { if (!controller.signal.aborted) setError(true); });
     return () => controller.abort();
   },[attempt]);
-  const rows = data?.rows || [];
+  const serviceView = params.get("disposition") === "Service diligence";
+  const explicitDecision=params.get("disposition");
+  const explicitRoute=params.get("route");
+  const rows=(data?.rows || []).filter(row=>{
+    const category=row.pipelineTrack ?? pipelineTrack(row.review?.primary.disposition);
+    if(category==="service" || serviceView) return serviceView && category==="service";
+    return category==="charging" || Boolean(explicitDecision || explicitRoute);
+  });
   const candidates=rows.map(r=>({id:r.id,city:r.city,merit:r.charging?.merit}));
   const sequence=marketSequence(candidates);
   const incompatible=[...incompatibleMarkets(candidates)].filter(c=>!market || market===c);
@@ -57,12 +66,12 @@ function SelectionList() {
   const match = (review?:OpportunitySite) => matchingOption(review,decision,route,reason);
   const matchesDecision = (review?:OpportunitySite) => review ? Boolean(match(review)) : !route && (!decision || decision === "Unreviewed");
   const matchesPlace = (r:{id:string;city:string}, name:string) => (!scope || scope.has(r.id)) && (!market || r.city === market) && [name,r.city,r.id].join(" ").toLowerCase().includes(query.trim().toLowerCase());
-  const filed = (data?.filed || []).filter(r => evidenceMatches(r.review) && matchesPlace(r,r.review.name) && matchesDecision(r.review));
+  const filed = (data?.filed || []).filter(r => (r.review.primary.disposition === "Service diligence") === serviceView && evidenceMatches(r.review) && matchesPlace(r,r.review.name) && matchesDecision(r.review));
   const showFiled = !check && !params.get("stalls") && !params.get("charging") && !investment;
   const shortlist = decision === "Shortlist";
   const droppedView = decision === "Dropped";
   const scoped = rows.filter(r => evidenceMatches(r.review) && (!investment || sequence.has(r.id)) && matchesPlace(r,r.name + " " + (r.review?.name || "")) && matchesDecision(r.review) && (!check || r.priority === check) &&
-    (!params.get("stalls") || r.charging?.screen.some(c=>c.stalls===Number(params.get("stalls")) && c.downside>=0)) &&
+    (!params.get("stalls") || r.chargingSpace?.layouts?.some(c=>c.stalls===Number(params.get("stalls")))) &&
     (!params.get("charging") || r.charging?.merit.action===params.get("charging"))).sort((a,b)=>{
       if(investment)return a.city.localeCompare(b.city) || sequence.get(a.id)!.rank-sequence.get(b.id)!.rank;
       const priority = order === "attention" ? compareAttention(match(a.review),match(b.review)) :
@@ -87,7 +96,7 @@ function SelectionList() {
   return <main ref={pane} className={shortlist ? "space-review-page shortlist-page" : "space-review-page"}>
     <a className="text-link" href={back}>← Pipeline list</a>
     {shortlist ? <header className="shortlist-intro"><h1>Acquisition shortlist</h1>
-      <p>Choose the next visit by the question it can settle.</p>
+      <p>Priority diligence uses a drawn layout of at least four stalls, comparable costs or documented break-even terms, and a check that can change the decision. There is no fixed shortlist size.</p>
       <a className="text-link" href="/?review=1&qmarket=all&qstage=any&qapprove=1">Open items needing my approval →</a>
       <small>The Review inbox also includes changes and requests across the wider pipeline.</small>
     </header> : <><h1>Selection review</h1><p>Choose the next diligence check. Investment approval requires verified site rights, usable space, power, retained cash flow and network benefit.</p></>}
@@ -114,7 +123,7 @@ function SelectionList() {
       <label>Screening check<select aria-label="Next check" className="secondary" value={check} onChange={e=>setReviewFilter("check",e.target.value)}><option value="">All checks</option>{[...new Set(rows.map(r=>r.priority))].sort().map(c=><option key={c}>{c}</option>)}</select></label>
       <label>Charging decision<select className="secondary" value={params.get("charging")||""} onChange={e=>setReviewFilter("charging",e.target.value)}>
         <option value="">All decisions</option>{[...new Set(rows.flatMap(r=>r.charging?[r.charging.merit.action]:[]))].sort().map(s=><option key={s}>{s}</option>)}</select></label>
-      <label>Moove-staffed downside at parity<select className="secondary" value={params.get("stalls")||""} onChange={e=>setReviewFilter("stalls",e.target.value)}><option value="">Any stall count</option>{[4,6,8,10].map(n=><option value={n} key={n}>{n} hypothetical stalls</option>)}</select></label>
+      <label>Moove-staffed downside at parity<select className="secondary" value={params.get("stalls")||""} onChange={e=>setReviewFilter("stalls",e.target.value)}><option value="">Any stall count</option>{[...new Set(rows.flatMap(r=>r.chargingSpace?.layouts?.map(l=>l.stalls)??[]))].sort((a,b)=>a-b).map(n=><option value={n} key={n}>{n} assessed stalls</option>)}</select></label>
       <label>Order<select aria-label="Order" className="secondary" value={params.get("sort")||""} onChange={e=>setReviewFilter("sort",e.target.value)}><option value="">Diligence priority</option>{rows.some(r=>r.financeVisible) && <option value="investment">Investment sequence by market</option>}<option value="market">Market and site</option><option value="earlier">Earlier usable charges</option></select></label>
       </div>
     </details>
@@ -124,7 +133,7 @@ function SelectionList() {
     {scope && <p className="inherited-scope">Limited to the sites from your pipeline list. <button type="button" className="text-link" onClick={()=>setReviewFilter("scope","")}>Show all active sites</button></p>}
     {!data && !error && <p role="status">Loading pipeline…</p>}
     {error && <p role="alert">Pipeline could not be loaded. <button className="text-link" onClick={()=>setAttempt(a=>a+1)}>Retry</button></p>}
-    {data && <><p aria-live="polite">{droppedView ? `${droppedCount} ${droppedCount === 1 ? "site" : "sites"} with a dropped opportunity` : shortlist ? scoped.length+" shortlisted · "+rows.length+" active pipeline sites" : `${scoped.length} of ${rows.length} active sites`}</p>
+    {data && <><p aria-live="polite">{droppedView ? `${droppedCount} ${droppedCount === 1 ? "site" : "sites"} with a dropped opportunity` : shortlist ? scoped.length+" shortlisted · "+rows.length+" active pipeline sites" : serviceView ? `${scoped.length} parked service opportunities` : `${scoped.length} of ${rows.length} active sites`}</p>
       {!data.hasInputs && <p>Workbook screen pending. Some unlocated sites use their dated assessment cohort.</p>}
       {!shortlist && dataDetails}
       {!scoped.length && !(droppedView && showFiled && filed.length) && <p>{investment?"No current site case qualifies for investment ranking in this view.":"No sites match these filters."}</p>}
@@ -134,23 +143,24 @@ function SelectionList() {
           <ShortlistCard row={r} review={r.review} option={selected} origin={origin+"#"+r.id}/>
           {investment && <p>{r.city} #{sequence.get(r.id)!.rank} · {amounts(sequence.get(r.id)!.value)} incremental value · {sequence.get(r.id)!.peak} residual peak charges</p>}
         </li>;
+        const cost=pipelineCost(r.charging), fit=displayedFit(r.chargingSpace,r.charging);
         return <li id={r.id} tabIndex={-1} key={r.id} onClick={()=>rememberReviewPosition(pane.current,r.id)}><div>
         <small>{droppedView ? r.city : `${r.city} · ${r.stage} · ${r.section}`}</small><h2>{r.name}</h2>{r.review?.name && r.review.name !== r.name && <small>{r.review.name}</small>}
         {r.review?.primary.disposition === "Dropped" && r.review.primary.route === "Site lead" && <p><strong>Reconcile stage history before reopening.</strong></p>}{r.review ? <OpportunityReview review={r.review} matched={match(r.review)} active charging={r.charging}/> : <><strong>{r.charging?.merit.action ?? r.priority}</strong><p>{r.charging?.merit.next ?? r.instruction}</p></>}{investment && <p>{r.city} #{sequence.get(r.id)!.rank} · {amounts(sequence.get(r.id)!.value)} incremental value · {sequence.get(r.id)!.peak} residual peak charges</p>}<small>{r.id}</small></div><div>{!droppedView && <strong>{r.readiness}</strong>}
         {r.mirrorStage && r.stage !== r.mirrorStage && <p>Workbook stage: {r.mirrorStage}</p>}
         {!droppedView && r.financeVisible && <p>Workbook base savings: {r.amount === null ? "Unmodeled" : (r.amount*100).toFixed(1)+"%"}</p>}
         {r.charging && match(r.review)?.disposition !== "Dropped" && <div className="charging-preview"><strong>Charging · {r.charging.merit.action}</strong>{r.review && r.charging.merit.next !== match(r.review)?.next && <p>{r.charging.merit.next}</p>}
-          <p>{r.charging.name} · {r.charging.result.siteCost==null?"Cost pending":"$"+r.charging.result.siteCost.toFixed(2)+"/charge"}</p><small>{r.charging.merit.netValue!=null?"Standalone downside network value "+amounts(r.charging.merit.netValue):"Investment rank pending"}</small>{!r.charging.selected && <p>{filedScreenLabel(r.charging.screen)}</p>}
-          <ChargingLink site={r.id} revision={r.charging.selected} returnTo={origin+"#"+r.id}/></div>}
+          <p>{fit?.value} · {cost.value}{cost.amount!=null && "/charge"}<small>{cost.basis}</small></p><small>{r.charging.merit.netValue!=null?"Standalone downside network value "+amounts(r.charging.merit.netValue):"Investment rank pending"}</small>{!r.charging.selected && <p>{filedScreenLabel(r.charging.screen)}</p>}
+          <ChargingLink site={r.id} basis={screenBasis(r.charging)} revision={r.charging.selected} returnTo={origin+"#"+r.id}/></div>}
         {!droppedView && r.research && <SelectionResearch row={r.research}/>}
-        {(r.hasRecord || r.mapped) && <a href={reviewLink("/",{site:r.id,city:r.city,funnel:"pipeline",sheet:"full"},origin+"#"+r.id)}>Open site record</a>}
+        {(r.hasRecord || r.mapped) && <a href={reviewLink("/",{site:r.id,city:r.city,funnel:"pipeline",sheet:"full",...(serviceView?{track:"service"}:{})},origin+"#"+r.id)}>Open site record</a>}
       {match(r.review)?.disposition !== "Dropped" && <p>{r.geometry} · {r.option}</p>}
         {match(r.review)?.disposition !== "Dropped" && r.quickLube && r.priority !== "Screen fleet service" && <p>Retained lifts and fleet-service rights also need a separate check.</p>}
         {!droppedView && r.assessed && <a href={reviewLink("/space-review",{site:r.id,panel:"space-options"},origin+"#"+r.id)}>Review layout evidence{r.evidenceDate && " · "+r.evidenceDate}</a>}
       </div></li>;})}</ul>
       {filed.length > 0 && showFiled && <details className="disclosure" key={decision} open={droppedView || undefined}>
         <summary className="disclosure">{droppedView ? "Outside the active pipeline" : "Filed reviews outside the active list"} ({filed.length})</summary>
-        <ul className="space-review-results">{filed.map(r=><li key={r.id}><div><small>{r.city} · {r.stage} · {r.id}</small><h2>{r.review.name}</h2><OpportunityReview review={r.review} matched={match(r.review)}/>{r.hasRecord && <a href={reviewLink("/",{site:r.id,city:r.city,funnel:"pipeline",sheet:"full"},origin+"#"+r.id)}>Open site record</a>}</div></li>)}</ul>
+        <ul className="space-review-results">{filed.map(r=><li key={r.id}><div><small>{r.city} · {r.stage} · {r.id}</small><h2>{r.review.name}</h2><OpportunityReview review={r.review} matched={match(r.review)}/>{r.hasRecord && <a href={reviewLink("/",{site:r.id,city:r.city,funnel:"pipeline",sheet:"full",...(serviceView?{track:"service"}:{})},origin+"#"+r.id)}>Open site record</a>}</div></li>)}</ul>
       </details>}
       {shortlist && <footer className="shortlist-guide">{guidance}{dataDetails}</footer>}</>}
   </main>;

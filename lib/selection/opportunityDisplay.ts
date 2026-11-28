@@ -2,7 +2,8 @@ import type { Opportunity, OpportunitySite } from "./opportunity";
 
 const labels: Record<Opportunity["disposition"], string> = {
   Shortlist: "Acquisition shortlist",
-  "Service diligence": "Review for fleet service",
+  Investigate: "Investigate charging opportunity",
+  "Service diligence": "Service diligence · parked",
   Reserve: "Keep as a backup",
   "Suggest drop": "Proposed removal",
   Hold: "Pause work",
@@ -17,7 +18,7 @@ const labels: Record<Opportunity["disposition"], string> = {
 export function recommendation(option: Opportunity) {
   const rank = option.rank;
   if (rank != null && option.disposition === "Shortlist") return "Acquisition priority #" + rank;
-  if (rank != null && option.disposition === "Service diligence") return "Fleet service priority #" + rank;
+  if (rank != null && option.disposition === "Service diligence") return "Service diligence · parked";
   return labels[option.disposition];
 }
 

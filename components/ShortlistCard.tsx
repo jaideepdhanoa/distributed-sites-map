@@ -1,9 +1,10 @@
+import { DiligenceLayout } from "./DiligenceLayout";
 import SiteCoverageReview from "./SiteCoverageReview";
 import type { SelectionRow } from "@/lib/selection/screen";
 import type { Opportunity, OpportunitySite } from "@/lib/selection/opportunity";
 import { offeredTransaction } from "@/lib/selection/opportunityDisplay";
 import { reviewLink } from "@/lib/reviewNavigation";
-import { pipelineCost, screenBasis } from "@/lib/charging/pipelineCost";
+import { displayedFit, pipelineCost, screenBasis } from "@/lib/charging/pipelineCost";
 import { amounts } from "@/lib/charging/model";
 import { filedScreenLabel } from "@/lib/charging/summary";
 import { ChargingLink } from "./ChargingLink";
@@ -18,6 +19,7 @@ export default function ShortlistCard({ row, review, option, origin }:Props) {
   const plan = option.route === review.primary.route ? review.visitPlan : undefined;
   const charging = row.charging;
   const cost = pipelineCost(charging);
+  const fit = displayedFit(row.chargingSpace,charging);
   const alternatives = [review.primary, ...review.alternatives].filter(other => other.route !== option.route);
   return <article aria-labelledby={"title-"+row.id} className="shortlist-card">
     <header>
@@ -36,11 +38,12 @@ export default function ShortlistCard({ row, review, option, origin }:Props) {
       {row.pendingDrop && <p><b>Drop proposal awaiting approval.</b> Review the proposal before arranging a visit.</p>}
       {row.financeVisible && <dl className="shortlist-figures">
         <div><dt>Asking price</dt><dd>{row.asking || "Price needs confirmation"}</dd></div>
-        <div><dt>Charging spaces</dt><dd>{row.chargingSpace?.value || row.option || "Needs measurement"}{row.chargingSpace?.basis && <small>{row.chargingSpace.basis}</small>}</dd></div>
+        <div><dt>Charging spaces</dt><dd>{fit?.value || row.option || "Needs measurement"}{fit?.basis && <small>{fit.basis}</small>}</dd></div>
         <div><dt>Site cost per charge</dt><dd>{charging
           ? <ChargingLink site={row.id} basis={screenBasis(charging)} revision={charging.selected} returnTo={origin}>{cost.value}</ChargingLink>
           : cost.value}<small>{cost.basis}</small></dd></div>
       </dl>}
+      {row.financeVisible && <DiligenceLayout site={row.id} charging={charging}/>}
       <p className="shortlist-next"><b>Next check</b> {option.next}</p>
       {plan && <VisitActions plan={plan} charging={charging}/>}
     </div>

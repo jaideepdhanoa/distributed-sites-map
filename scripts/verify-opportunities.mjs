@@ -27,7 +27,10 @@ if (!existsSync(path)) throw Error("The generated opportunity register is missin
       const projectionsMatch = rows.every(row => {
         const deal = mapDeals.get(row.id);
         if (!deal) return !row.hasRecord;
-        return isDeepStrictEqual(row.chargingSpace, deal.chargingSpace)
+        return (row.pipelineTrack==="service") === (expected.sites[row.id]?.primary.disposition === "Service diligence")
+          && row.pipelineTrack === deal.pipelineTrack
+          && isDeepStrictEqual(row.charging?.preliminary,deal.charging?.preliminary)
+          && isDeepStrictEqual(row.chargingSpace, deal.chargingSpace)
           && row.charging?.sourceRevision === deal.charging?.sourceRevision
           && row.charging?.selected === deal.charging?.selected
           && row.charging?.result?.siteCost === deal.charging?.result?.siteCost
@@ -38,7 +41,7 @@ if (!existsSync(path)) throw Error("The generated opportunity register is missin
         footprintScenarios: rows.reduce((n, r) => n + (r.review?.coverage?.cases?.length || 0), 0),
         activeWithoutReview: rows.filter(r => !r.review).length,
         activeWithNextDecision: rows.filter(r => r.review?.primary.next?.trim()).length,
-        activeSites: rows.length,
+        activeSites: rows.filter(r=>r.pipelineTrack==="charging").length,
         activeShortlist: rows.filter(r => r.review?.primary.disposition === "Shortlist").length,
         shortlistVisitPlans: rows.filter(r => r.review?.primary.disposition === "Shortlist" && r.review.visitPlan).length,
         serviceDiligence: rows.filter(r => r.review?.primary.disposition === "Service diligence").length,

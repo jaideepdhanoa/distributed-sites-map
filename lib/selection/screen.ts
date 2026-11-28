@@ -13,6 +13,7 @@ export function chargingHold(input:Inputs|undefined) {
 }
 
 export type SelectionRow = {
+  pipelineTrack?: import("@/lib/selection/pipelineTrack").PipelineTrack;
   id: string; name: string; city: string; mapped: boolean; hasRecord?: boolean; stage: string; mirrorStage: string;
   priority: string; instruction: string; geometry: string; section: string; amount: number | null;
   asking?: string;

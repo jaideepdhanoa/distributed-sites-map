@@ -9,6 +9,7 @@ export type LedgerInputs = {
 export type LedgerKey = keyof LedgerInputs;
 export type Changes = Partial<LedgerInputs>;
 export type LedgerBasis = {
+  mixId?:string; areaKinds?:Record<string,string>; allocationNeeded?:("conversion"|"displaced")[]; componentIds?:Record<string,string>;
   inputs:LedgerInputs; terms:"purchase"|"lease"; condition:string; space:string;
   priceBasis:string; cashBasis:string; source?:string|null; date?:string|null; proxy?:number|null;
   // The layout may be a conditional screen rather than a proven fit.
@@ -27,6 +28,27 @@ export function savedChanges(saved:SavedScreen):Changes {
   return {...changes,
     volume:values.volume*(scenario===1 || scenario===3 ? 0.75 : 1),
     upgrade:values.upgrade*(scenario>=2?1.5:1)};
+}
+
+export function remainingBasis(parent:LedgerBasis, omitted:string[], available:LedgerBasis[]):LedgerBasis {
+  if(!omitted.length || !parent.parts) return parent;
+  const parts=parent.parts.filter(p=>!omitted.includes(p.area));
+  const components=parts.map(p=>parent.componentIds?.[p.area]);
+  const exact=components.length && components.every(Boolean) && available.find(b=>
+    b.parts?.length===parts.length && parts.every((p,i)=>b.componentIds?.[p.area]===components[i]));
+  if(exact) return exact;
+  const stalls=parts.reduce((n,p)=>n+p.stalls,0);
+  const hasWorks=parts.some(p=>!["parking","pad"].includes(parent.areaKinds?.[p.area]??""));
+  const converts=parts.some(p=>!["parking","pad","ground"].includes(parent.areaKinds?.[p.area]??""));
+  const allocationNeeded:("conversion"|"displaced")[]=[];
+  if(hasWorks && parent.inputs.conversion>0) allocationNeeded.push("conversion");
+  if(converts && parent.inputs.displaced>0) allocationNeeded.push("displaced");
+  const restoreCash=!converts && parent.withheldOperatingCash!=null;
+  return {...parent,parts,mixId:undefined,condition:parts.map(p=>p.area).join(" + "),space:stalls+" assessed stalls",
+    allocationNeeded,conversionRecorded:false,displacedRecorded:false,
+    cashBasis:restoreCash?"Source operating cash before displacement":parent.cashBasis,
+    withheldOperatingCash:converts?parent.withheldOperatingCash:undefined,
+    inputs:{...parent.inputs,stalls,conversion:0,displaced:0,cash:restoreCash?parent.withheldOperatingCash!:parent.inputs.cash}};
 }
 
 export function screenLedger(basis:LedgerBasis, changes:Changes={}) {
@@ -49,7 +71,7 @@ export function screenLedger(basis:LedgerBasis, changes:Changes={}) {
     displaced, cash:cash===0?0:-cash,
   };
   const annualCost=Object.values(costs).reduce((sum,n)=>sum+n,0);
-  return {costs,sessions,annualCost,operatingCash,perCharge:sessions>0?annualCost/sessions:null,
+  return {costs,sessions,annualCost,operatingCash,perCharge:sessions>0 && !basis.allocationNeeded?.some(k=>changes[k]==null)?annualCost/sessions:null,
     recovery,posts,chargers,perStall,build,upgrade};
 }
 

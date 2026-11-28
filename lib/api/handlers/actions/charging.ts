@@ -7,7 +7,9 @@ import type { ActionRole } from "@/lib/actions/roles";
 import type { DealProps } from "@/lib/types";
 import { loadMapDeals } from "../data/deals";
 import { caseHistory,saveCase } from "@/lib/charging/store";
-import { sourceRevision } from "@/lib/charging/source";
+import { purchaseFile } from "@/lib/purchaseReviewLoad";
+import { summarize } from "@/lib/charging/summary";
+import { selectedCases, sourceRevision } from "@/lib/charging/source";
 import { unmappedChargingSite } from "@/lib/charging/unmapped";
 import { initialCase } from "@/lib/charging/model";
 import {listScreen} from "@/lib/charging/listScreen";
@@ -23,10 +25,15 @@ async function siteFor(request:Request,role:ActionRole) {
   const data=await loadMapDeals(role);
   const mapped=data.features.find(f=>f.properties?.deal_id===id)?.properties as DealProps|undefined;
   if(mapped)return mapped.charging?mapped:null;
-  const site=unmappedChargingSite(id);
+  const site=await unmappedChargingSite(id);
   if(!site)return null;
   const staged=await overlayHeldStages(await overlayDealStages(await overlayStageFile({features:[{properties:{deal_id:id,stage:site.stage,stage_group:""}}]},"deal")),"deal");
-  return unmappedChargingSite(id,String(staged.features[0]?.properties?.stage??site.stage));
+  const stage=String(staged.features[0]?.properties?.stage??site.stage);
+  if(/dropped|off[ -]?market/i.test(stage)) return null;
+  site.stage=stage;
+  const a=purchaseFile()?.assumptions;
+  site.charging=summarize(site,sourceRevision(site,a),(await selectedCases()).get(id),a);
+  return site;
 }
 export async function GET(request:Request) {
   const session=await requireUser();

@@ -174,3 +174,39 @@ test("combined cases retain equal utilization and remove unverified income from 
   assert.ok(reduced.perCharge!=null && costRange(conversion,4).startsWith("$"+reduced.perCharge.toFixed(2)));
   assert.equal(costRange(parking,parking.stalls),costRange(parking));
 });
+
+test("the site editor and list follow current assessed geometry and preserve a measured zero",()=>{
+  for(const count of [null,0,7]){
+    const physical={count,value:String(count),basis:"Current drawing"};
+    assert.equal(initialCase({...deal,bays_that_fit:18,chargingSpace:physical}).values.stalls,count);
+  }
+});
+
+test("filing an acquisition as investigated or shortlisted preserves its pricing evidence",()=>{
+  const current={...deal,chargingSpace:{count:5,value:"5 spaces",basis:"Drawn",
+    layouts:[{stalls:5,condition:"Parking",parcel:true,system:false}]}};
+  const cases=[{stalls:5,price:current.asking_price,cash:1000,base:1}];
+  const run=(disposition:string)=>preliminaryCost({...current,opportunityReview:{
+    primary:{disposition,route:"Operating acquisition"},coverage:{cases}}} as typeof deal,assumptions);
+  assert.deepEqual(run("Investigate"),run("Shortlist"));
+  const result=run("Investigate");
+  assert.ok("layouts" in result);
+  assert.match(result.priceBasis,/Filed/);
+});
+
+test("uncombining uses the exact remaining geometry and requires allocation of bundled works",async()=>{
+  const {remainingBasis}=await import("../../lib/charging/screenLedger");
+  const result=preliminaryCost(deal,assumptions);
+  assert.ok("layouts" in result);
+  const seed=result.layouts[0].ledger;
+  const original={...seed,inputs:{...seed.inputs,stalls:6,conversion:10000,cash:0},withheldOperatingCash:2000,
+    parts:[{area:"Parking",stalls:4},{area:"Bay",stalls:2}],areaKinds:{Parking:"parking",Bay:"bay"},componentIds:{Parking:"row1",Bay:"row2"}};
+  const parking=remainingBasis(original,["Bay"],[]);
+  assert.equal(parking.inputs.cash,2000);
+  assert.equal(parking.inputs.conversion,0);
+  assert.equal(parking.inputs.stalls,4);
+  const bays=remainingBasis(original,["Parking"],[]);
+  assert.equal(screenLedger(bays).perCharge,null);
+  assert.ok(screenLedger(bays,{conversion:1000}).perCharge!=null);
+  assert.equal(remainingBasis(original,["Bay"],[parking]),parking);
+});

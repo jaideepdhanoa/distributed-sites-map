@@ -1,5 +1,5 @@
 import { nextDecision, offeredTransaction, recommendation } from "@/lib/selection/opportunityDisplay";
-import { pipelineCost, screenBasis } from "@/lib/charging/pipelineCost";
+import { displayedFit, pipelineCost, screenBasis } from "@/lib/charging/pipelineCost";
 import {ChargingLink} from "@/components/ChargingLink";
 import { filedScreenLabel } from "@/lib/charging/summary";
 import MapPanelGrip from "./MapPanelGrip";
@@ -54,7 +54,7 @@ export default function MapSitePreview(props: PreviewProps) {
   const powerDeal = deal || props.linkedDeal;
   const commercial = props.signedIn && !listing ? powerDeal?.opportunityReview : undefined;
   const asking = commercial && figures.find(figure => figure.label === "Asking price");
-  const fit = props.signedIn && !listing ? powerDeal?.chargingSpace : undefined;
+  const fit = props.signedIn && !listing ? displayedFit(powerDeal?.chargingSpace,powerDeal?.charging) : undefined;
   const cost = pipelineCost(powerDeal?.charging);
   const power = props.signedIn && !listing && access.enabled && !evidence && /power|utility|electrical/i.test(review) && powerDeal?.kind !== "land" && !site?.land_only && powerDeal?.stage_group !== "dropped";
   const address = displayAddress(record.address);

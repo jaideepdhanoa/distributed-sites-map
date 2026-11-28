@@ -28,7 +28,7 @@ export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?
   }
   if (trial?.hypothetical && option?.disposition === "Suggest drop") return {reason:"Review the disposition before testing a new charging layout"};
   if (selected?.rights === "unavailable") return { reason: "Charging rights are unavailable for the selected case" };
-  if (d.chargingHold && /seller availability|tenant lease/i.test(d.chargingHold)) return { reason: d.chargingHold };
+  if (d.chargingHold && /seller availability/i.test(d.chargingHold)) return { reason: d.chargingHold };
   const lease = option?.route === "Operating lease" || selected?.terms === "lease";
   if (["Host agreement", "Fleet service", "Service premises"].includes(option?.route ?? "")) {
     return { reason: "Charging access and commercial terms are needed for this service offer" };
@@ -41,9 +41,9 @@ export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?
   const matchedCases = d.chargingSpace?.layouts?.filter(l=>l.parcel && !l.system).map(l=>
     d.opportunityReview?.coverage?.cases.find(c=>c.stalls===l.stalls && c.price!=null && c.base!=null));
   const sharedTerms = matchedCases?.[0];
-  const parcelTerms = !lease && option?.disposition==="Shortlist" && !trial?.hypothetical && sharedTerms &&
+  const parcelTerms = !lease && option?.route?.includes("acquisition") && !trial?.hypothetical && sharedTerms &&
     matchedCases?.every(c=>c?.price===sharedTerms.price && c?.cash===sharedTerms.cash) ? sharedTerms : undefined;
-  const filed = trial?.hypothetical && !lease && option?.disposition === "Shortlist"
+  const filed = trial?.hypothetical && !lease && option?.route?.includes("acquisition")
     ? d.opportunityReview?.coverage?.cases.find(c => c.stalls === trial.assumptions.stalls && c.price != null && c.base != null)
     : parcelTerms;
   const price = filed?.price ?? (lease ? selected?.terms === "lease" && selected.rights === "controlled" ? selected.values.rent : null
@@ -79,7 +79,7 @@ export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?
     const incomeUnverified=layout.operatingConversion && layout.lostAnnualCash==null && (credited??0)>0;
     const layoutIncome=incomeUnverified ? 0 : credited??0;
     const ledger:LedgerBasis = {
-      terms, siteDrivers:true, withheldOperatingCash:incomeUnverified?credited??undefined:undefined, parts:layout.parts, rightsByArea:layout.rightsByArea, businessType:d.business_type, creditCash:trial?.assumptions.creditCash, condition:layout.condition, space:layout.system ? layout.stalls+" assessed stalls" : space, priceBasis, cashBasis:incomeUnverified ? "Positive business income excluded until conversion losses are quantified" : cashBasis, hypothetical:trial?.hypothetical??false,
+      mixId:layout.mixId, componentIds:layout.componentIds, areaKinds:layout.areaKinds, terms, siteDrivers:true, withheldOperatingCash:incomeUnverified?credited??undefined:undefined, parts:layout.parts, rightsByArea:layout.rightsByArea, businessType:d.business_type, creditCash:trial?.assumptions.creditCash, condition:layout.condition, space:layout.system ? layout.stalls+" assessed stalls" : space, priceBasis, cashBasis:incomeUnverified ? "Positive business income excluded until conversion losses are quantified" : cashBasis, hypothetical:trial?.hypothetical??false,
       parcel:layout.parcel, conversionRecorded:layout.conversionCost!=null, displacedRecorded:layout.lostAnnualCash!=null,
       workbookDefaults:trial ? {volume:100,unitBuild:c.unitBuild,postCost:c.attendant,upgrade:c.upgrade,cash:credited??0} : undefined,
       source:lease || filed ? null : research?.source, date:lease || filed ? null : research?.reviewedOn,
@@ -96,6 +96,17 @@ export function preliminaryCost(d: DealProps, a?: PurchaseAssumptions, selected?
       base:range(base), downside:range(downside)});
   }
   if (!costed.length) return {reason:"No completed charges in this layout"};
+  // Keep the least disruptive operating scope first. A smaller priced variant can
+  // save a staffed post, but a different rights or cash assumption is a new case.
+  const first=costed[0];
+  if(first.operatingScope!=null) {
+    const comparable=costed.filter(l=>l.operatingScope===first.operatingScope &&
+      (l.rights?.pending===0)===(first.rights?.pending===0) &&
+      l.ledger.conversionRecorded===first.ledger.conversionRecorded &&
+      l.ledger.displacedRecorded===first.ledger.displacedRecorded && l.ledger.cashBasis===first.ledger.cashBasis);
+    const preferred=comparable.reduce((best,l)=>l.base.perCharge<best.base.perCharge ? l : best,first);
+    if(preferred!==first) costed.unshift(...costed.splice(costed.indexOf(preferred),1));
+  }
   return {layouts:costed, space, price, terms, priceBasis, cash, cashBasis,
     years:a.horizon, capital:a.capital, closing:a.closing, tax:c.tax};
 }

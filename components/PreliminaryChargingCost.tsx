@@ -8,7 +8,7 @@ export function PreliminaryChargingCost({estimate,hypothetical=false,saveContext
   saveContext?:{site:string;source:string;canWrite:boolean;listTrial?:ListAssumptions};initial?:SavedScreen;layoutName?:string|null;omitted?:string[];
 }){
   const bases=initial?[initial.inputs.basis]:"layouts" in estimate?estimate.layouts.map(l=>l.ledger):[];
-  const index=!initial && layoutName?bases.findIndex(b=>b.condition.startsWith(layoutName+". ")):0;
+  const index=!initial && layoutName?bases.findIndex(b=>b.mixId===layoutName || b.condition.startsWith(layoutName+". ")):0;
   if(index<0)return <p role="status">This combination changed. Reopen Spaces for the current assessment.</p>;
   const excluded=initial?.inputs.omitted??omitted;
   const parts=bases[index]?.parts;

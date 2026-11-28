@@ -1,4 +1,5 @@
 import { higherUpgradeCase,screenLedger } from "./screenLedger";
+import type { PipelineFit } from "../spaces/pipelineFit";
 import { amounts } from "./model";
 import type { LayoutCost } from "./preliminary";
 import type { ChargingSummary } from "./summary";
@@ -21,18 +22,29 @@ export function costRange(layout: LayoutCost, stalls?:number) {
   return amounts(low, 2) + "–" + amounts(high, 2);
 }
 
+/** The count displayed alongside a price comes from the case supplying that price. */
+export function displayedFit(fit?:PipelineFit, c?:ChargingSummary):PipelineFit|undefined {
+  if(c?.selected && !c.stale && c.result.siteCost!=null && c.selectedStalls!=null)
+    return {count:c.selectedStalls,value:c.selectedStalls+" spaces",basis:"Selected case · "+c.name+
+      (fit ? " · System assessment: "+fit.value : "")};
+  const lead=c && !c.stale && c.preliminary && "layouts" in c.preliminary ? c.preliminary.layouts[0] : null;
+  if(lead && fit && lead.mixId && lead.mixId!==fit.layouts?.[0]?.mixId)
+    return {...fit,count:lead.stalls,value:lead.stalls+" spaces",basis:lead.condition};
+  return fit;
+}
+
 /** Pin the number being explained even when the selected detailed case is incomplete. */
 export function screenBasis(c?:ChargingSummary) {
-  return c && !c.stale && c.result.siteCost==null && c.preliminary && "layouts" in c.preliminary ? "screen" : undefined;
+  return c && !c.stale && (!c.selected || c.result.siteCost==null) && c.preliminary && "layouts" in c.preliminary ? "screen" : undefined;
 }
 
 export function pipelineCost(charging?: ChargingSummary) {
   if (!charging) return { value: "No charging case", basis: "", amount: null };
   if (charging.stale) return { value: "Needs recalculation", basis: "Site inputs have changed", amount: null };
   const amount = charging.result.siteCost;
-  if (amount != null) {
+  if (amount != null && (charging.selected || !charging.preliminary)) {
     const scope = charging.energyScope === "excluded" ? " · excludes electricity" : "";
-    return { value: amounts(amount, 2), basis: (charging.selected ? "Selected case" : "Planning estimate") + scope, amount };
+    return { value: amounts(amount, 2), basis: (charging.selected ? "Selected case" + (charging.selectedStalls != null ? " · " + charging.selectedStalls + " stalls" : "") : "Planning estimate") + scope, amount };
   }
   if (charging.preliminary) {
     if ("layouts" in charging.preliminary) {

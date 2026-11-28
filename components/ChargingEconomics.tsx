@@ -136,16 +136,20 @@ function Editor({data,reload,revision,explain,updateHistory}:{updateHistory:(row
     setTrial(null);setSourceField(null);setParent(row);setDraft(row?.inputs??seed);setName(row?.name??"Moove staffed");setReviewed(false);setStatus("");request.current=null;
   }
   function changeLayout(label:string){
+    const mix=site.chargingSpace?.layouts?.find(l=>l.mixId===label);
+    const estimate=site.charging?.preliminary;
+    const priced=estimate && "layouts" in estimate && estimate.layouts.find(l=>l.mixId===label);
     const index=layout?.zones.indexOf(label)??-1;
-    const count=index<0?seed.values.stalls:layout?.stalls?.[index]??null;
+    const count=mix?.stalls ?? (index<0?seed.values.stalls:layout?.stalls?.[index]??null);
     const ref=site.purchase?.assumptions.charging;
     const values={...draft.values,stalls:count,build:count!=null && ref?.unitBuild!=null ? count*ref.unitBuild:null,
-      posts:count!=null && ref?.perPost ? Math.ceil(count/ref.perPost):null,loss:null,conversion:null,interruption:null};
+      posts:count!=null && ref?.perPost ? Math.ceil(count/ref.perPost):null,loss:mix?.lostAnnualCash??null,conversion:mix?.conversionCost??null,interruption:null,
+      ...(priced ? {cash:priced.ledger.inputs.cash} : {})};
     const evidence={...draft.evidence};
     for(const k of ["stalls","build","posts","loss","conversion","interruption"] as Key[])delete evidence[k];
     const sourceValues={...draft.sourceValues};
     for(const k of ["stalls","build","posts","loss","conversion","interruption"] as Key[])delete sourceValues[k];
-    edit({...draft,ranking:undefined,sourceValues,layout:label,rights:"unknown",rightsSource:"",rightsDate:"",allOptionsReviewed:false,values,evidence});
+    edit({...draft,ranking:undefined,sourceValues,mixId:mix?.mixId,layout:mix?.condition.split(". ")[0]??label,rights:"unknown",rightsSource:"",rightsDate:"",allOptionsReviewed:false,values,evidence});
   }
   function field(key:Key){
     const meta=fields[key],src=sourceValue(draft,key),e=src.evidence,val=draft.values[key],overridden=!!draft.sourceValues?.[key];
@@ -266,8 +270,10 @@ function Editor({data,reload,revision,explain,updateHistory}:{updateHistory:(row
     }}>Start a conversion downside case</button><p className="layer-meta">Starts a separate draft at $250,000 of additional works and $50,000 of lost annual margin. Replace either figure with the estimate for this footprint.</p><p className="layer-meta">Host hours replace Moove hours when the full operating window is covered. Verify the host schedule and fee.</p>
     <div className="charging-controls">
       <label>Deal terms<select className="secondary" value={draft.terms} onChange={e=>edit({...draft,terms:e.target.value as Inputs["terms"]})}><option value="purchase">Purchase</option><option value="lease">Lease</option></select></label>
-      <label>Footprint<select className="secondary" value={draft.layout} onChange={e=>changeLayout(e.target.value)}>
-        {[...new Set(["Workbook footprint",...(layout?.zones??[]),draft.layout])].map(n=><option key={n}>{n}</option>)}</select></label>
+      <label>Footprint<select className="secondary" value={draft.mixId??draft.layout} onChange={e=>changeLayout(e.target.value)}>
+        {site.chargingSpace?.layouts?.filter(l=>l.mixId).map(l=><option key={l.mixId} value={l.mixId}>{l.condition.split(". ")[0]} · {l.stalls} stalls</option>)}
+        {[...new Set([...(layout?.zones??[]),...(!draft.mixId?[draft.layout]:[])])].map(n=><option key={n}>{n}</option>)}
+        {draft.mixId && !site.chargingSpace?.layouts?.some(l=>l.mixId===draft.mixId) && <option value={draft.mixId}>{draft.layout} · previous revision</option>}</select></label>
       <label>Site rights<select className="secondary" value={draft.rights} onChange={e=>edit({...draft,rights:e.target.value as Inputs["rights"]})}>
         <option value="unknown">Unverified</option><option value="controlled">Controlled during operating hours</option><option value="unavailable">Documented as unavailable</option></select></label>
       <label>Rights evidence<input className="field" value={draft.rightsSource} maxLength={400} onChange={e=>edit({...draft,rightsSource:e.target.value})}/></label>

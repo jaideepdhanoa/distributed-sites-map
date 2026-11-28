@@ -4,7 +4,7 @@ import type { Sql } from "../actions/db";
 import { InputError } from "../actions/text";
 import {validListTrial} from "./listTrial";
 import type { PreliminaryCost,ListAssumptions } from "./preliminary";
-import { ledgerFields, screenLedger, validChange, type LedgerKey, type SavedScreen } from "./screenLedger";
+import { ledgerFields, remainingBasis, screenLedger, validChange, type LedgerKey, type SavedScreen } from "./screenLedger";
 
 export const screenVersion="preliminary-ledger/1";
 const key=z.enum(Object.keys(ledgerFields) as [LedgerKey,...LedgerKey[]]);
@@ -29,8 +29,11 @@ export async function saveScreen(sql:Sql,site:string,author:string,request:z.inf
     !basis.parts.some(p=>!omitted.includes(p.area)))) throw new InputError("Review the selected layout areas.",400);
   if (["volume","benchmark","referenceYears","referenceStalls"].some(k=>k in request.changes))
     throw new InputError("Utilization is shared across site configurations.",400);
-  const inputs={basis,changes:request.changes,scenario:request.scenario,...(omitted?.length?{omitted}:{})};
-  const result=screenLedger(basis,request.changes);
+  const resolved=remainingBasis(basis,omitted??[],estimate && "layouts" in estimate?estimate.layouts.map(l=>l.ledger):[]);
+  if(omitted?.length && request.changes.stalls!==resolved.inputs.stalls)
+    throw new InputError("The stall count must match the remaining drawn areas.",400);
+  const inputs={basis:resolved,changes:request.changes,scenario:request.scenario,...(omitted?.length?{omitted}:{})};
+  const result=screenLedger(resolved,request.changes);
   if(result.perCharge==null) throw new InputError("A priced alternative needs completed charges.",400);
   // A screen is an immutable snapshot. Its UUID also makes retrying the insert idempotent.
   const values=[site,request.id,request.name,author,screenVersion,request.sourceRevision,JSON.stringify(inputs),JSON.stringify(result)];

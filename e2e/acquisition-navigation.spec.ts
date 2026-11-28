@@ -187,3 +187,29 @@ test("open the released map record and switch evidence sections", async ({page})
     expect(await card.getByRole("tabpanel").count()).toBe(1);
   }
 });
+
+test("service diligence stays outside the default pipeline count and remains selectable", async ({page},info)=>{
+  await fixtures(page);
+  await page.route("**/api/data/deals",route=>route.fulfill({json:{type:"FeatureCollection",
+    features:sites.map((s,i)=>({type:"Feature",geometry:{type:"Point",coordinates:[-112,33.4]},properties:{
+      deal_id:s.id,kind:"pipeline",city:"PHX",name:s.name,stage:"Financial screen",stage_group:"financial",
+      business_type:"Car Wash",service_area_class:"Inside",pipelineTrack:i?"service":"charging"}}))}}));
+  await page.goto("/?city=PHX&funnel=pipeline&view=list&pstage=all");
+  await expect(page.locator(".shell")).toHaveAttribute("data-list-count","1");
+  const scope=page.locator(".workspace-scope:visible").first();
+  await scope.click();
+  const category=page.getByRole("group",{name:"Pipeline category"});
+  await expect(category.getByRole("button",{name:"Live pipeline"})).toHaveAttribute("aria-pressed","true");
+  await expect(category.getByRole("button",{name:"Service diligence"})).toHaveAttribute("aria-pressed","false");
+  await mkdir("review-shots",{recursive:true});
+  await page.screenshot({path:"review-shots/pipeline-category-"+info.project.name+".png"});
+  await category.getByRole("button",{name:"Service diligence"}).click();
+  await expect(page).toHaveURL(/track=service/);
+  await expect(page.locator(".shell")).toHaveAttribute("data-list-count","1");
+  await page.reload();
+  await expect(page.locator(".shell")).toHaveAttribute("data-list-count","1");
+  await expect(page.locator(".workspace-scope:visible").first()).toContainText("Service diligence");
+  await page.goto("/?city=PHX&funnel=pipeline&view=list&pstage=all");
+  await expect(page.locator(".shell")).toHaveAttribute("data-list-count","1");
+  await expect(page.locator(".workspace-scope:visible").first()).not.toContainText("Service diligence");
+});

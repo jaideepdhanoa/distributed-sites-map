@@ -173,6 +173,7 @@ export type SiteProps = {
 };
 
 export type DealProps = {
+  pipelineTrack?: import("@/lib/selection/pipelineTrack").PipelineTrack;
   chargingHold?: string;
   chargingSpace?: import("./spaces/pipelineFit").PipelineFit;
   charging?: import("./charging/summary").ChargingSummary;

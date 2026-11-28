@@ -7,6 +7,7 @@ export type MapSpaceSite = {
   id: string;
   name: string;
   market: string;
+  pipelineTrack?:import("../selection/pipelineTrack").PipelineTrack;
   cohort: Assessment["cohort"];
   revision: string;
   frame: Pick<Aerial, "id" | "bounds" | "kind" | "source" | "date" | "width" | "height" | "metersPerPixel">;

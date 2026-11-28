@@ -1,10 +1,11 @@
 import type { DealProps } from "../types";
 import type { PipelineFit } from "../spaces/pipelineFit";
 import { amounts } from "./model";
-import { pipelineCost, costRange, displayedPriceDelta } from "./pipelineCost";
+import { displayedFit, pipelineCost, costRange, displayedPriceDelta } from "./pipelineCost";
 import { defaultListAssumptions, preliminaryCost, type ListAssumptions, type PreliminaryCost } from "./preliminary";
 
-export function listSpace(fit?: PipelineFit) {
+export function listSpace(physical?: PipelineFit, charging?:DealProps["charging"]) {
+  const fit=displayedFit(physical,charging);
   const layout = fit?.layouts?.[0];
   if (fit?.count == null) return {value:fit?.value ?? "Needs measurement", basis:fit?.basis || "No measured layout on file", count:null, group:"unmeasured"};
   if (fit.count === 0 && layout && layout.stalls > 0) {
@@ -20,7 +21,7 @@ export function listScreen(d: DealProps, assumptions = defaultListAssumptions) {
   const originalGroup = original.amount == null ? "pending" : "priced";
   const result = (cost:typeof original, group:string, estimate?:PreliminaryCost, proxy?:number|null) =>
     ({cost, group, estimate, proxy});
-  if (!c || c.stale || c.result.siteCost != null) return result(original, originalGroup, c && !c.stale && c.result.siteCost == null ? c.preliminary : undefined);
+  if (!c || c.stale || (c.selected && c.result.siteCost != null)) return result(original, originalGroup, c && !c.stale && c.result.siteCost == null ? c.preliminary : undefined);
   const a = d.purchase?.assumptions ?? c.screenAssumptions;
   const assessed = c.preliminary && "layouts" in c.preliminary;
   if (!a) return result(original, originalGroup, assessed ? c.preliminary : undefined);

@@ -10,6 +10,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import ShortlistCard from "@/components/ShortlistCard";
 import "./shortlist.css";
 import OpportunityReview from "@/components/OpportunityReview";
+import { pipelineTrack } from "@/lib/selection/pipelineTrack";
 import { compareAttention, currentDisposition, dispositions, matchingOption, routes, type OpportunitySite, type FiledReview } from "@/lib/selection/opportunity";
 import SelectionResearch from "@/components/SelectionResearch";
 import type { SelectionRow } from "@/lib/selection/screen";
@@ -41,7 +42,14 @@ function SelectionList() {
       .catch(() => { if (!controller.signal.aborted) setError(true); });
     return () => controller.abort();
   },[attempt]);
-  const rows = data?.rows || [];
+  const serviceView = params.get("disposition") === "Service diligence";
+  const explicitDecision=params.get("disposition");
+  const explicitRoute=params.get("route");
+  const rows=(data?.rows || []).filter(row=>{
+    const category=row.pipelineTrack ?? pipelineTrack(row.review?.primary.disposition);
+    if(category==="service" || serviceView) return serviceView && category==="service";
+    return category==="charging" || Boolean(explicitDecision || explicitRoute);
+  });
   const candidates=rows.map(r=>({id:r.id,city:r.city,merit:r.charging?.merit}));
   const sequence=marketSequence(candidates);
   const incompatible=[...incompatibleMarkets(candidates)].filter(c=>!market || market===c);
@@ -57,7 +65,7 @@ function SelectionList() {
   const match = (review?:OpportunitySite) => matchingOption(review,decision,route,reason);
   const matchesDecision = (review?:OpportunitySite) => review ? Boolean(match(review)) : !route && (!decision || decision === "Unreviewed");
   const matchesPlace = (r:{id:string;city:string}, name:string) => (!scope || scope.has(r.id)) && (!market || r.city === market) && [name,r.city,r.id].join(" ").toLowerCase().includes(query.trim().toLowerCase());
-  const filed = (data?.filed || []).filter(r => evidenceMatches(r.review) && matchesPlace(r,r.review.name) && matchesDecision(r.review));
+  const filed = (data?.filed || []).filter(r => (r.review.primary.disposition === "Service diligence") === serviceView && evidenceMatches(r.review) && matchesPlace(r,r.review.name) && matchesDecision(r.review));
   const showFiled = !check && !params.get("stalls") && !params.get("charging") && !investment;
   const shortlist = decision === "Shortlist";
   const droppedView = decision === "Dropped";
@@ -87,7 +95,7 @@ function SelectionList() {
   return <main ref={pane} className={shortlist ? "space-review-page shortlist-page" : "space-review-page"}>
     <a className="text-link" href={back}>← Pipeline list</a>
     {shortlist ? <header className="shortlist-intro"><h1>Acquisition shortlist</h1>
-      <p>Choose the next visit by the question it can settle.</p>
+      <p>Priority diligence uses a drawn layout of at least four stalls, comparable costs or documented break-even terms, and a check that can change the decision. There is no fixed shortlist size.</p>
       <a className="text-link" href="/?review=1&qmarket=all&qstage=any&qapprove=1">Open items needing my approval →</a>
       <small>The Review inbox also includes changes and requests across the wider pipeline.</small>
     </header> : <><h1>Selection review</h1><p>Choose the next diligence check. Investment approval requires verified site rights, usable space, power, retained cash flow and network benefit.</p></>}
@@ -124,7 +132,7 @@ function SelectionList() {
     {scope && <p className="inherited-scope">Limited to the sites from your pipeline list. <button type="button" className="text-link" onClick={()=>setReviewFilter("scope","")}>Show all active sites</button></p>}
     {!data && !error && <p role="status">Loading pipeline…</p>}
     {error && <p role="alert">Pipeline could not be loaded. <button className="text-link" onClick={()=>setAttempt(a=>a+1)}>Retry</button></p>}
-    {data && <><p aria-live="polite">{droppedView ? `${droppedCount} ${droppedCount === 1 ? "site" : "sites"} with a dropped opportunity` : shortlist ? scoped.length+" shortlisted · "+rows.length+" active pipeline sites" : `${scoped.length} of ${rows.length} active sites`}</p>
+    {data && <><p aria-live="polite">{droppedView ? `${droppedCount} ${droppedCount === 1 ? "site" : "sites"} with a dropped opportunity` : shortlist ? scoped.length+" shortlisted · "+rows.length+" active pipeline sites" : serviceView ? `${scoped.length} parked service opportunities` : `${scoped.length} of ${rows.length} active sites`}</p>
       {!data.hasInputs && <p>Workbook screen pending. Some unlocated sites use their dated assessment cohort.</p>}
       {!shortlist && dataDetails}
       {!scoped.length && !(droppedView && showFiled && filed.length) && <p>{investment?"No current site case qualifies for investment ranking in this view.":"No sites match these filters."}</p>}

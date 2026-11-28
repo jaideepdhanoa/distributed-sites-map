@@ -1092,8 +1092,12 @@ export default function Explorer() {
   const censusFeatures = features.filter((feature) => feature.properties.origin !== "off-market");
   const sites = censusFeatures.map((feature) => presentSite(feature.properties));
   const offMarketFeatures = features.filter((feature) => feature.properties.origin === "off-market" && shownInMarket(feature.properties.city));
+  const serviceView = funnel === "pipeline" && params.get("track") === "service";
+  const track=serviceView ? "service" : params.get("track")==="filed" ? "filed" : "charging";
+  const includeHistory=track==="charging" && (pipeStage==="dropped" || showDroppedDeals);
   const dealBundle = useMemo(() => {
-    const rows = data?.deals.features ?? [];
+    const rows = (data?.deals.features ?? []).filter(f => funnel !== "pipeline" || (f.properties.pipelineTrack ?? "charging") === track ||
+      (includeHistory && f.properties.pipelineTrack==="filed" && f.properties.stage_group==="dropped"));
     const byId = new Map<string, DealProps>();
     const byUniverse = new Map<string, DealProps>();
     for (const feature of rows) {
@@ -1101,7 +1105,7 @@ export default function Explorer() {
       if (feature.properties.universe_id && !byUniverse.has(feature.properties.universe_id)) byUniverse.set(feature.properties.universe_id, feature.properties);
     }
     return { features: rows, byId, byUniverse };
-  }, [data?.deals]);
+  }, [data?.deals, funnel, track, includeHistory]);
 
   const powerCatalog = useMemo(() => {
     const allSites = new Map((catalog || []).map(f => [f.properties.site_id,f.properties]));
@@ -1143,7 +1147,7 @@ export default function Explorer() {
     setTip("");
   }, [funnel, city, stage]);
 
-  const dealFeatures = data?.deals.features ?? [];
+  const dealFeatures = dealBundle.features;
   const dealRows = dealFeatures.map((feature) => feature.properties);
   const links = landLinks(dealRows);
   const viewStage: StageId = allStages ? "universe" : stage;
@@ -1436,7 +1440,7 @@ export default function Explorer() {
       ?? offMarketFeatures.find((feature) => feature.properties.site_id === selected)?.properties
       ?? catalog?.find((feature) => feature.properties.site_id === selected)?.properties
       ?? null;
-  const selectedDeal = dealRows.find((deal) => deal.deal_id === selected) ?? null;
+  const selectedDeal = data?.deals.features.find(f => f.properties.deal_id === selected)?.properties ?? null;
   const spaceSelectedId = selectedDeal?.deal_id || (selectedSite && dealForSite(selectedSite)?.deal_id) || selected || undefined;
   const showingPreview = Boolean(selected && previewId === selected && !listView && !reviewing && !ndaVisible && !loopsVisible);
   const pinPowerDeal = selectedDeal || (selectedSite ? powerDealForSite(selectedSite) : null);
@@ -2261,7 +2265,7 @@ export default function Explorer() {
   const activeStepLabel = funnel === "pipeline"
     ? outsideGroup ? "Outside service area" : allPipes || pipelineWide ? "All deals" : PIPE_STEPS.find(item => item.id === pipeStage)?.label || "Desk screen"
     : allStages || universeWide ? "All sites" : STEPS.find(item => item.id === stage)?.label || "Open land";
-  const shortlistTitle = `${selectedMarket === "other" ? "Other markets" : marketLabel(selectedMarket)} · ${activeStepLabel}`;
+  const shortlistTitle = `${serviceView ? "Service diligence · " : track==="filed" ? "Filed opportunities · " : ""}${selectedMarket === "other" ? "Other markets" : marketLabel(selectedMarket)} · ${activeStepLabel}`;
   const desktopFilters = (
     <button className={`tool only-desktop ${filtersOpen ? "on" : ""}`} type="button" aria-expanded={filtersOpen} onClick={() => {
       setFiltersOpen(!filtersOpen);
@@ -2533,6 +2537,13 @@ export default function Explorer() {
               {(selectedMarket === "other" || marketView.totals.Other > 0) && <option value="other">Other markets ({marketView.totals.Other})</option>}
             </select>
           </label>
+          {funnel === "pipeline" && <div className="funnel-switch" role="group" aria-label="Pipeline category">
+            {(["charging","service","filed"] as const).map(category => <button type="button" key={category} className={track === category ? "chip on" : "chip"}
+              aria-pressed={track === category} onClick={() => {
+                setSelected(null); setListCount(null);
+                write({track:category==="charging" ? null : category,site:null,pstage:"all",outside:null},true);
+              }}>{category==="service" ? "Service diligence" : category==="filed" ? "Filed opportunities" : "Live pipeline"}</button>)}
+          </div>}
           <nav id="workspace-funnel" className={funnel === "pipeline" ? "funnel compact" : "funnel"} aria-label="Funnel">
             {funnel === "universe" ? null : (
               <>

@@ -18,6 +18,8 @@ import {
   type Assessment,
   type Point,
 } from "@/lib/spaces/options";
+import { remainingBasis, screenLedger, higherUpgradeCase } from "@/lib/charging/screenLedger";
+import { amounts } from "@/lib/charging/model";
 import { costRange } from "@/lib/charging/pipelineCost";
 import type { PreliminaryCost } from "@/lib/charging/preliminary";
 import { navigateSpaces } from "@/lib/spaces/navigation";
@@ -134,14 +136,17 @@ export default function MainMapSpaces({
     for(const label of omitted) url.searchParams.append("omit",label);
     window.history.replaceState(null,"",url);
   };
-  const caseIndex = study === "default" ? Math.max(0,cases.findIndex(c=>c.name===namedCase)) : Number(study);
+  const preferred=estimate && "layouts" in estimate ? estimate.layouts[0]?.mixId : undefined;
+  const namedIndex=cases.findIndex(c=>c.mixId===namedCase || c.name===namedCase);
+  const caseIndex = study === "default" ? namedCase ? namedIndex : Math.max(0,cases.findIndex(c=>c.mixId===preferred)) : Number(study);
   const selectedCase = filter === "all" && !area && cases && Number.isInteger(caseIndex) ? cases[caseIndex] : undefined;
   const parts=selectedCase ? areaCounts(selectedCase.rows) : [];
-  const omitted=selectedCase?.name===namedCase ? parts.filter(p=>exclusions.includes(p.area)).map(p=>p.area) : [];
+  const attached=!!selectedCase && (selectedCase.mixId===namedCase || selectedCase.name===namedCase);
+  const omitted=attached ? parts.filter(p=>exclusions.includes(p.area)).map(p=>p.area) : [];
   const filtered=useMemo(()=>selectedCase && ({...selectedCase,
-    rows:selectedCase.rows.filter(r=>!(selectedCase.name===namedCase && exclusions.includes(r.area))),
-    approach:selectedCase.name===namedCase && exclusions.length>0 ? undefined : selectedCase.approach
-  }),[selectedCase,namedCase,exclusions]);
+    rows:selectedCase.rows.filter(r=>!(attached && exclusions.includes(r.area))),
+    approach:attached && exclusions.length>0 ? undefined : selectedCase.approach
+  }),[selectedCase,attached,exclusions]);
   const rights = filtered?.rows.length && site ? layoutRights(filtered.rows,site.zones) : null;
   const matchingCase=omitted.length && filtered ? cases.find(c=>JSON.stringify(c.rows)===JSON.stringify(filtered.rows)) : undefined;
   const canTestRow = active && !active.fitHold && active.kind !== "bay" && active.kind !== "clear";
@@ -154,7 +159,10 @@ export default function MainMapSpaces({
   },[active,angle,draft,edge,rowTrial,filtered,site]);
   const costCase=matchingCase || selectedCase;
   const price=costCase && estimate && "layouts" in estimate ? estimate.layouts.find(l=>
-    l.condition===costCase.name+". "+costCase.condition && l.stalls===costCase.rows.reduce((n,r)=>n+r.count,0)) : undefined;
+    l.mixId ? l.mixId===costCase.mixId : l.condition===costCase.name+". "+costCase.condition && l.stalls===costCase.rows.reduce((n,r)=>n+r.count,0)) : undefined;
+  const subset=price && !matchingCase && omitted.length ? remainingBasis(price.ledger,omitted,estimate && "layouts" in estimate ? estimate.layouts.map(l=>l.ledger):[]) : undefined;
+  const base=subset && screenLedger(subset).perCharge, high=subset && higherUpgradeCase(subset).perCharge;
+  const range=subset ? base!=null && high!=null ? amounts(base,2)+"–"+amounts(high,2) : null : price ? costRange(price) : null;
   const prior = history.reviews.find(
     (x) =>
       x.review?.option === layout &&
@@ -235,12 +243,13 @@ export default function MainMapSpaces({
     return () => window.removeEventListener("beforeunload", leave);
   }, [dirty]);
   const fromMap = params.get("spaceScope") === "map";
+  const track=params.get("track") || "charging";
   const scoped = useMemo(
     () =>
       (catalog?.sites || []).filter(
-        (s) => fromMap ? mapSiteIds.has(s.id) : s.cohort === (site?.cohort || cohort) && (!region || s.market === region),
+        (s) => fromMap ? mapSiteIds.has(s.id) : s.cohort === (site?.cohort || cohort) && (s.cohort!=="active" || (s.pipelineTrack??"charging")===track) && (!region || s.market === region),
       ),
-    [catalog, cohort, region, site, fromMap, mapSiteIds],
+    [catalog, cohort, region, site, fromMap, mapSiteIds,track],
   );
   const needle=search.trim().toLowerCase();
   const list=useMemo(()=>scoped.flatMap(s=>{
@@ -252,9 +261,9 @@ export default function MainMapSpaces({
   }),[scoped,needle,fitCheck]);
   const footprintCount = list.reduce((total, record) => total + candidates(record).length, 0);
   const visible=useMemo(()=>{
-    if(!open) return (catalog?.sites||[]).filter(s=>s.id!==previewSite && s.cohort==="active" && (!market||market==="all"||s.market===market));
+    if(!open) return (catalog?.sites||[]).filter(s=>s.id!==previewSite && s.cohort==="active" && (s.pipelineTrack??"charging")===track && (!market||market==="all"||s.market===market));
     return site ? [...list.filter(s=>s.id!==site.id),site] : list;
-  },[open,catalog,previewSite,market,site,list]);
+  },[open,catalog,previewSite,market,site,list,track]);
   function leave(action: () => void) {
     if (locked.current) return;
     if (dirty) setDiscard(() => action);
@@ -578,7 +587,7 @@ export default function MainMapSpaces({
                   const best=bestRow(active,site.frame,site.zones.filter(z=>z.kind==="clear").map(z=>z.points));
                   setEdge(best?.edge ?? 0);setAngle(best?.angle ?? 90);
                 }
-                if (cases[Number(value)]) {writeMix(cases[Number(value)].name,[]);setStudy("default");}
+                if (cases[Number(value)]) {writeMix(cases[Number(value)].mixId ?? cases[Number(value)].name,[]);setStudy("default");}
                 else setStudy(value);
               }}>
                 <option value="none">Area outlines</option>
@@ -592,18 +601,20 @@ export default function MainMapSpaces({
                 <strong>{omitted.length ? "Your combination" : selectedCase.system ? "System recommendation" : "Filed alternative"}</strong>
                 {selectedCase.system && <small>Highest stall count found under these operating assumptions.</small>}
                 {parts.map(p=><label key={p.area}><input className="check" type="checkbox" checked={!omitted.includes(p.area)}
-                  onChange={e=>writeMix(selectedCase.name,e.target.checked ? omitted.filter(x=>x!==p.area) : [...omitted,p.area])}/><span>{p.area}</span><b>{p.stalls}</b></label>)}
-                {omitted.length>0 && <button type="button" className="text-link" onClick={()=>writeMix(selectedCase.name,[])}>Restore full combination</button>}
+                  onChange={e=>writeMix(selectedCase.mixId ?? selectedCase.name,e.target.checked ? omitted.filter(x=>x!==p.area) : [...omitted,p.area])}/><span>{p.area}</span><b>{p.stalls}</b></label>)}
+                {omitted.length>0 && <button type="button" className="text-link" onClick={()=>writeMix(selectedCase.mixId ?? selectedCase.name,[])}>Restore full combination</button>}
                 <small>Every included stall uses the same utilization rate.</small>
               </div>}
               {(selectedCase || rowTrial) && <p aria-live="polite"><strong>{sketch ? sketch.stalls.length+" stalls sketched" : selectedCase && !filtered?.rows.length ? "0 stalls selected" : "Layout needs measurement"}</strong>
                 {sketch && " · Blue stalls and amber drive aisle."} {sketch?.approach && "Dashed line shows the proposed entry route."} {selectedCase?.condition || (rowTrial && (angle===90 ? "Verify the two-way approach and peak availability." : "Verify one-way entry, exit and peak availability."))} {rowTrial && active?.kind === "ground" && "Development scenario. Verify buildable limits, drainage and paving cost."}</p>}
               {sketch && rights && <div className="space-gate"><strong>Right to use</strong><p>{rightsSummary(rights)}</p>
                 {rights.checks.map(check=><p key={check}>{check}</p>)}</div>}
-              {selectedCase && sketch && price && <p className="mix-price"><b>{costRange(price,sketch.stalls.length)}</b> per completed charge
+              {selectedCase && sketch && price && range && <p className="mix-price"><b>{range}</b> per completed charge
                 <small>Base to downside · excludes electricity{price.operatingConversion && !price.ledger.conversionRecorded ? " and unquoted conversion works" : ""}.</small></p>}
+              {selectedCase && sketch && omitted.length>0 && !range && <p>Price the retained areas in the ledger.</p>}
+              {sketch && sketch.stalls.length>20 && <p>Above the 20-stall costing assumption. Verify site-specific build and utility costs.</p>}
               {selectedCase && sketch && <a className="text-link" href={"/charging?"+new URLSearchParams([
-                ["site",site.id],["view","explain"],["basis","screen"],["layout",matchingCase?.name || selectedCase.name],
+                ["site",site.id],["view","explain"],["basis","screen"],["layout",costCase?.mixId ?? selectedCase.name],
                 ...(matchingCase ? [] : omitted).map(p=>["omit",p]),["returnTo","/?"+params.toString()]])}>See cost per charge</a>}
             </div> : null}
             {site && !active && (

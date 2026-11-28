@@ -1,5 +1,5 @@
 "use client";
-import {useRef,useState, type FormEvent} from "react";
+import {useRef,useState, type CSSProperties, type FormEvent} from "react";
 import type {ListAssumptions} from "@/lib/charging/preliminary";
 import {displayedPriceDelta} from "@/lib/charging/pipelineCost";
 import {amounts} from "@/lib/charging/model";
@@ -98,6 +98,8 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
   const layoutCount=currentParts?.length?currentParts.reduce((n,p)=>n+p.stalls,0):basis.inputs.stalls;
   const nameOf=(b:LedgerBasis)=>b.condition.split(". ")[0];
   const comparisons=projected.map((b,i)=>screenLedger(b,{...common,...locals[i]}));
+  const higherUpgrades=projected.map((b,i)=>higherUpgradeCase(b,{...common,...locals[i]}));
+  const columns=Math.ceil(bases.length/Math.ceil(bases.length/4));
   const diff=(n:number|null)=>n==null || r.perCharge==null?null:displayedPriceDelta(n,r.perCharge);
   const stallTrials=[-1,1].map(step=>{
     const stalls=v.stalls+step,valid=validChange("stalls",stalls);
@@ -110,8 +112,6 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
     ...comparisons.flatMap((c,i)=>i===index?[]:[{label:nameOf(bases[i]),test:"Switch configuration",impact:diff(c.perCharge)}]),
   ].filter(item=>item.impact!=null && Math.abs(item.impact)>=.005).sort((a,b)=>Math.abs(b.impact!)-Math.abs(a.impact!)).slice(0,3);
   const parity=basis.proxy!=null && r.sessions>0?(basis.proxy*r.sessions-(r.annualCost-r.costs.property))/(lease?12:(1+v.closing/100)*r.recovery):null;
-  const starting=screenLedger(basis);
-  const high=higherUpgradeCase(basis);
   const presets:Partial<Record<LedgerKey,[string,number][]>>={
     price:[["Starting price",basis.inputs.price],["−10%",basis.inputs.price*.9],["−20%",basis.inputs.price*.8]],
     upgrade:basis.inputs.upgrade?[["Base",basis.inputs.upgrade],["−50%",basis.inputs.upgrade*.5],["+50%",basis.inputs.upgrade*1.5]]:[["Base",0],["$100k",100000],["$250k",250000]],
@@ -142,15 +142,16 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
     {!!basis.allocationNeeded?.length && <p>Enter the amounts for the retained areas: {basis.allocationNeeded.map(k=>ledgerFields[k]).join(", ")}.</p>}
     {v.stalls>20 && <p>Above the 20-stall costing assumption. Verify site-specific build and utility costs.</p>}
     {initial && !basis.siteDrivers && <p>Historical case · original utilization of {num(v.volume)}% of the workbook benchmark.</p>}
-    {!initial && starting.perCharge!=null && high.perCharge!=null && <p className="layer-meta">Starting range for this layout · <b>{amounts(starting.perCharge,2)}–{amounts(high.perCharge,2)}</b> with the base and 50% higher utility upgrade.</p>}
     <section className="layout-ledger" aria-label="Stall configuration"><h3>Stall configuration</h3>
-      <div className="layout-choices">{bases.map((b,i)=>{const c=comparisons[i],stalls=locals[i]?.stalls??b.inputs.stalls;
-        const stress=higherUpgradeCase(projected[i],{...common,...locals[i]});
-        return <button type="button" className="paper-btn layout-choice" key={i} aria-pressed={index===i} onClick={()=>{setIndex(i);clearStatus();}}>
-          <span>{nameOf(b)}</span><b>{stalls} stalls <small>· {c.perCharge==null?"Unpriced":amounts(c.perCharge,2)+"/charge"}</small></b>
-          {!initial && stress.perCharge!=null && <small>+50% utility · {amounts(stress.perCharge,2)}/charge</small>}
-          {!!b.parts?.length && <small>{b.parts.filter(p=>!(areas[i]??[]).includes(p.area)).map(p=>p.area+" ("+p.stalls+")").join(" + ")}</small>}
-        </button>;})}</div>
+      <p className="layout-legend">Cost per charge with an upfront utility upgrade of <b>{amounts(r.upgrade)}</b>{!initial && r.upgrade>0 && <> → <b>{amounts(higherUpgrades[index].upgrade)}</b> (+50%)</>}</p>
+      <div className="layout-choices" style={{"--layout-columns":columns} as CSSProperties}>{bases.map((b,i)=>{
+        const c=comparisons[i],higher=higherUpgrades[i],stalls=locals[i]?.stalls??projected[i].inputs.stalls;
+        const content=<><b className="layout-count">{stalls} {stalls===1?"stall":"stalls"}</b><span className="layout-name">{nameOf(b)}</span>
+          <span className="layout-price">{c.perCharge==null?"Unpriced":amounts(c.perCharge,2)}{!initial && c.upgrade>0 && higher.perCharge!=null && <> → {amounts(higher.perCharge,2)}</>}</span></>;
+        return bases.length===1?<div className="layout-only" key={i}>{content}</div>:
+          <button type="button" className="paper-btn layout-choice" key={i} aria-pressed={index===i} onClick={()=>{setIndex(i);clearStatus();}}>{content}</button>;
+      })}</div>
+      {initial && !!currentParts?.length && <p><b>Included areas</b> · {currentParts.map(p=>p.area+" ("+p.stalls+")").join(" + ")}</p>}
       {currentParts?.length && basis.rightsByArea && v.stalls===layoutCount ? <p><b>Right to use</b> · {currentParts.reduce((n,p)=>n+(basis.rightsByArea?.[p.area]?p.stalls:0),0)} of {layoutCount} stalls have documented use and access.</p> : null}
       {basis.condition!==nameOf(basis) && <p>{basis.condition.slice(nameOf(basis).length+2)}</p>}
       {!!bases[index].parts?.length && !initial && <fieldset className="ledger-areas"><legend>Included areas</legend>{bases[index].parts!.map(part=><label key={part.area}>

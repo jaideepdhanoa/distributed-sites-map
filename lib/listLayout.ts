@@ -160,7 +160,8 @@ export function sanitizeLayout(input: unknown, allowed: string[]): ListLayout {
     widths,
     pinned,
     hidden,
-    sort: legacy && (!raw.touched || !savedSort || hidden.includes(savedSort.id)) ? { id: "priority", desc: false } : savedSort,
+    sort: known.has("chargeCost") && ((!raw.touched && (!savedSort || savedSort.id === "priority")) ||
+      (legacy && (!savedSort || hidden.includes(savedSort.id)))) ? { id: "chargeCost", desc: false } : savedSort,
     filters,
     touched: raw.touched === true,
   };

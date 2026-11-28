@@ -137,7 +137,7 @@ export default function MainMapSpaces({
     window.history.replaceState(null,"",url);
   };
   const recommended=estimate && "layouts" in estimate ? estimate.layouts[0]?.mixId : undefined;
-  const preferred=charging?.selected && !charging.stale && cases.some(c=>c.mixId===charging.selectedMix) ? charging.selectedMix : recommended;
+  const preferred=recommended ?? (charging?.selected && !charging.stale ? charging.selectedMix : undefined);
   const namedIndex=cases.findIndex(c=>c.mixId===namedCase || c.name===namedCase);
   const caseIndex = study === "default" ? namedCase ? namedIndex : Math.max(0,cases.findIndex(c=>c.mixId===preferred)) : Number(study);
   const selectedCase = filter === "all" && !area && cases && Number.isInteger(caseIndex) ? cases[caseIndex] : undefined;
@@ -572,7 +572,7 @@ export default function MainMapSpaces({
                     <button className="menu-item" type="button" key={s.id} onClick={() => pick(s.id)}>
                       <strong>{s.name}</strong>
                       <small>
-                        {s.assessed ? `${s.assessed.stalls} assessed stalls${s.assessed.maximum>s.assessed.stalls ? " · up to "+s.assessed.maximum+" with assumptions" : ""}` : "No system combination"} · {candidates(s).length} {candidates(s).length === 1 ? "space" : "spaces"} ·{" "}
+                        {s.assessed ? `Up to ${s.assessed.maximum} drawn stalls` : "No system combination"} · {candidates(s).length} {candidates(s).length === 1 ? "space" : "spaces"} ·{" "}
                         {s.frame.bounds ? "Map aligned" : "Source image"}
                       </small>
                     </button>
@@ -616,7 +616,7 @@ export default function MainMapSpaces({
               {selectedCase && sketch && price && range && <p className="mix-price"><b>{range}</b> per completed charge
                 <small>Base to downside · excludes electricity{price.operatingConversion && !price.ledger.conversionRecorded ? " and unquoted conversion works" : ""}.</small></p>}
               {selectedCase && sketch && omitted.length>0 && !range && <p>Price the retained areas in the ledger.</p>}
-              {sketch && sketch.stalls.length>20 && <p>Above the 20-stall costing assumption. Verify site-specific build and utility costs.</p>}
+              {sketch && sketch.stalls.length>20 && <p>Verify construction and utility costs for this larger layout.</p>}
               {selectedCase && sketch && <a className="text-link" href={"/charging?"+new URLSearchParams([
                 ["site",site.id],["view","explain"],["basis","screen"],["layout",costCase?.mixId ?? selectedCase.name],
                 ...(matchingCase ? [] : omitted).map(p=>["omit",p]),["returnTo","/?"+params.toString()]])}>See cost per charge</a>}

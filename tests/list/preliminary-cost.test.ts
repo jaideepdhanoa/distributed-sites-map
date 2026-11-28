@@ -27,7 +27,7 @@ test("site range reconciles separate site costs and scaled completed charges", (
   assert.equal(pipelineCost(staleSaved).amount,layout.base.perCharge);
   assert.match(pipelineCost(staleSaved).basis,/selected case needs recalculation/);
   assert.equal(listScreen({...deal,charging:staleSaved}).cost.value,costRange(layout));
-  assert.equal(pipelineCost({...summary,result:{...summary.result,siteCost:4},selected:"selected"}).amount,4);
+  assert.equal(pipelineCost({...summary,result:{...summary.result,siteCost:4},selected:"selected"}).amount,layout.base.perCharge);
 });
 
 test("a missing measurement, stale offer, or incomplete assumption cannot generate a price", () => {
@@ -164,7 +164,8 @@ test("combined cases retain equal utilization and remove unverified income from 
   const fit={value:"8 spaces",count:8,basis:"System estimate",layouts};
   const estimate=preliminaryCost({...deal,chargingSpace:fit},assumptions);
   assert.ok("layouts" in estimate);
-  const [parking,conversion]=estimate.layouts;
+  const [conversion,parking]=estimate.layouts;
+  assert.ok(conversion.base.perCharge < parking.base.perCharge);
   assert.equal(conversion.base.sessions,parking.base.sessions*1.5);
   assert.equal(conversion.ledger.inputs.cash,0);
   assert.equal(parking.ledger.inputs.cash,5000);
@@ -221,8 +222,11 @@ test("a selected local case and a priced system layout each retain their own com
   const c={result:{siteCost:null,depot:7},preliminary,comparator:"local",selected:"case:1",selectedStalls:9,name:"Local case"} as unknown as ChargingSummary;
   assert.deepEqual(displayedDepot(c),{amount:20,label:"Workbook depot proxy"});
   const selected={...c,result:{...c.result,siteCost:6}};
-  assert.deepEqual(displayedDepot(selected),{amount:7,label:"Local depot"});
-  assert.equal(displayedFit(deal.chargingSpace,selected)?.count,9);
+  assert.deepEqual(displayedDepot(selected),{amount:20,label:"Workbook depot proxy"});
+  assert.equal(displayedFit(deal.chargingSpace,selected)?.count,preliminary.layouts[0].stalls);
+  const savedOnly={...selected,preliminary:undefined};
+  assert.deepEqual(displayedDepot(savedOnly),{amount:7,label:"Local depot"});
+  assert.equal(displayedFit(deal.chargingSpace,savedOnly)?.count,9);
 });
 
 test("identified opportunities automatically price conflicting inputs and preserve the physical count",()=>{
@@ -231,8 +235,9 @@ test("identified opportunities automatically price conflicting inputs and preser
     opportunityReview:{primary:{disposition:"Investigate",route:"Property only",next:"Check the aisle"},coverage:{countyStatus:"Address matched",cases:[]}}} as unknown as DealProps;
   const priced=preliminaryCost(site,assumptions);
   assert.ok("layouts" in priced);
-  assert.deepEqual(priced.layouts.map(l=>[l.stalls,l.ledger.inputs.price]),[[2,140000],[4,140000],[2,110000],[4,110000]]);
+  assert.deepEqual(priced.layouts.map(l=>[l.stalls,l.ledger.inputs.price]),[[4,110000],[4,140000],[2,110000],[2,140000]]);
   const [lead]=priced.layouts;
+  assert.equal(priced.price,lead.ledger.inputs.price);
   assert.ok(lead.ledger.hypothetical);
   assert.match(lead.ledger.validation!,/prices disagree/);
   assert.equal(lead.ledger.inputs.cash,0);
@@ -273,4 +278,25 @@ test("a confirmed whole-site zero recommends drop after all alternatives are rev
   assert.equal(calculate(c).decision,"Suggest drop");
   c.allOptionsReviewed=false;
   assert.notEqual(calculate(c).decision,"Suggest drop");
+});
+
+test("an uncapped base-cost layout supplies the cost, count, comparator and ledger even when utility stress misses parity", async () => {
+  const {diligenceLayout} = await import("../../lib/charging/diligenceLayout");
+  const {listCostLabel} = await import("../../lib/charging/listScreen");
+  const layouts = [4, 16, 28].map(stalls => ({stalls, mixId:"mix-"+stalls, system:true, condition:"Layout "+stalls}));
+  const site = {...deal, chargingSpace:{count:4, value:"4 spaces", basis:"Parking", layouts}};
+  const priced = preliminaryCost(site,assumptions);
+  assert.ok("layouts" in priced);
+  const best = priced.layouts[0];
+  assert.equal(best.stalls,28);
+  const pricedAssumptions={...assumptions,hub:(best.base.perCharge+best.downside.perCharge)/2*assumptions.charging.charges!};
+  const estimate=preliminaryCost(site,pricedAssumptions);
+  assert.ok("layouts" in estimate);
+  const charging={preliminary:estimate,screenAssumptions:pricedAssumptions,result:{siteCost:80},selected:"saved:7",selectedStalls:4} as unknown as ChargingSummary;
+  const screen=listScreen({...site,charging});
+  assert.equal(diligenceLayout(estimate)?.mixId,best.mixId);
+  assert.equal(screen.cost.amount,pipelineCost(charging).amount);
+  assert.equal(screen.cost.value,costRange(best));
+  assert.equal(listSpace(site.chargingSpace,charging,screen.estimate).count,best.stalls);
+  assert.equal(listCostLabel(screen,charging),"Validate build cost");
 });

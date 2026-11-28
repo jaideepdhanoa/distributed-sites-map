@@ -1,8 +1,8 @@
 "use client";
 
 import { compareAttention, matchingOption } from "@/lib/selection/opportunity";
-import { recommendation, nextDecision } from "@/lib/selection/opportunityDisplay";
-import { listScreen, listSpace, hasListChanges, proxyReading } from "@/lib/charging/listScreen";
+import { recommendation } from "@/lib/selection/opportunityDisplay";
+import { listScreen, listSpace, hasListChanges, listCostLabel } from "@/lib/charging/listScreen";
 import { defaultListAssumptions, type ListAssumptions } from "@/lib/charging/preliminary";
 import { PipelineChargingDialog } from "./PipelineChargingDialog";
 import { ChargingLink } from "./ChargingLink";
@@ -52,7 +52,6 @@ import { ColumnPicker, EmptyShortlist, RowCheck, ShortlistSummary, SortControl, 
 import { stageChipLabel } from "@/lib/chips";
 import { droppedDecisionLine } from "@/lib/droppedLine";
 import { isQuickLube, QUICK_LUBE_LABEL, stageTone } from "@/lib/labels";
-import { plainNextStep } from "@/lib/nextStepLine";
 import { stripGmailIds } from "@/lib/displayText";
 import { chipsForDeal, suggestedDropChip } from "@/lib/tags/show";
 import { columnFamily } from "@/lib/tags/vocab";
@@ -62,7 +61,7 @@ import { TagChip } from "./TagChip";
 import { useNarrowList } from "./useNarrowList";
 import { StagePending } from "./StagePending";
 
-const coverageLabels = {positive:"with potential spaces", zero:"zero in assessed layout", unmeasured:"need measurement",
+const coverageLabels = {parity:"at or below depot at base", positive:"with potential spaces", zero:"zero in assessed layout", unmeasured:"need measurement",
   priced:"site estimates", conditional:"conditional estimates", scenario:"what-if only", pending:"without a cost"} as const;
 type Coverage = keyof typeof coverageLabels;
 export type PipelineRow = {
@@ -123,10 +122,15 @@ function cell(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   const deal = row.deal;
   if (id === "site") return deal.name || deal.address || deal.deal_id;
   if (id === "stage") return stageChipLabel(deal.stage, deal.stage_group);
-  if (id === "priority") return signedIn ? (deal.opportunityReview ? recommendation(deal.opportunityReview.primary) : "Awaiting review") : "";
+  if (id === "priority") {
+    if (!signedIn) return "";
+    const option = deal.opportunityReview?.primary;
+    if (!option) return "Awaiting review";
+    return option.disposition === "Investigate" ? "Investigate" : recommendation(option);
+  }
   if (id === "spaces" || id === "chargeCost") {
     if (!signedIn || deal.kind === "land") return "";
-    const fact = id === "spaces" ? listSpace(deal.chargingSpace,deal.charging) : (row.screen ?? listScreen(deal)).cost;
+    const fact = id === "spaces" ? listSpace(deal.chargingSpace,deal.charging,row.screen?.estimate) : (row.screen ?? listScreen(deal)).cost;
     return fact ? [fact.value, fact.basis].filter(Boolean).join(" · ") : "No layout estimate";
   }
   if (id === "merit") return signedIn ? deal.charging?.merit.action ?? deal.screening?.priority ?? "—" : "";
@@ -216,7 +220,7 @@ function stageFilterCode(deal: DealProps): string {
 
 function sortValue(row: PipelineRow, id: PipelineColumnId, signedIn: boolean) {
   const deal = row.deal;
-  if (id === "spaces") return signedIn ? listSpace(deal.chargingSpace,deal.charging).count : null;
+  if (id === "spaces") return signedIn ? listSpace(deal.chargingSpace,deal.charging,row.screen?.estimate).count : null;
   if (id === "chargeCost") return signedIn ? (row.screen ?? listScreen(deal)).cost.amount : null;
   if (id === "merit") return deal.charging?.merit.order ?? null;
   if (id === "asking") return signedIn ? deal.asking_price : null;
@@ -347,7 +351,7 @@ export default function PipelineList({
   const fallback = useMemo(() => {
     const optional = PIPELINE_COLUMNS.filter((column) => "optional" in column && column.optional).map((column) => column.id);
     const base=defaultLayout(allowed, ["site"], optional);
-    if(signedIn)base.sort={id:"priority",desc:false};
+    if(signedIn)base.sort={id:"chargeCost",desc:false};
     return base;
   }, [allowed,signedIn]);
   const seed = useMemo(() => (columnSeed?.length ? defaultLayout(allowed, ["site"], allowed.filter((id) => id !== "site" && !columnSeed.includes(id))) : null), [allowed, columnSeed]);
@@ -407,7 +411,8 @@ export default function PipelineList({
   }, [activeLayout, mapArea, rows, sheetColumns, visible,signedIn,financeOpen,finEvidence,finCarry]);
   const coverage = params.get("chargeCoverage") || "";
   const matches = (row:PipelineRow, key:string) => row.deal.kind === "pipeline" &&
-    (row.screen?.group === key || listSpace(row.deal.chargingSpace,row.deal.charging).group === key);
+    (key === "parity" ? !!row.screen?.estimate && "layouts" in row.screen.estimate && !row.screen.estimate.layouts[0].ledger.hypothetical &&
+      row.screen.cost.amount != null && row.screen.proxy != null && row.screen.cost.amount <= row.screen.proxy : row.screen?.group === key || listSpace(row.deal.chargingSpace,row.deal.charging,row.screen?.estimate).group === key);
   const ordered = signedIn && Object.hasOwn(coverageLabels,coverage) ? scopedRows.filter(row=>matches(row, coverage)) : scopedRows;
   const detailRow = costPanel && costPanel !== "assumptions" ? ordered.find(row=>row.deal.deal_id === costPanel) : undefined;
   const scope = ordered.map(row=>row.deal.deal_id).join("|");
@@ -554,6 +559,7 @@ export default function PipelineList({
   function coverageLinks(keys: Coverage[]) {
     return keys.map(key => {
       const count = scopedRows.filter(row => matches(row,key)).length;
+      if (!count && coverage !== key) return null;
       return <button type="button" key={key} className="text-link pipeline-coverage" aria-pressed={coverage === key}
         onClick={() => {
           const column = ["positive","zero","unmeasured"].includes(key) ? "spaces" : "chargeCost";
@@ -567,7 +573,7 @@ export default function PipelineList({
       <div><span className="only-desktop">Median asking</span><span className="only-mobile">Median asking</span><strong title={summary.medianAsking == null ? "Not on file" : undefined}>{summary.medianAsking == null ? "—" : fullMoney(summary.medianAsking)}</strong><small>{summary.withAsking} of {summary.count} reported</small></div>
       {signedIn && <div><span>Acquisition shortlist</span><strong>{ordered.filter(({deal}) => matchingOption(deal.opportunityReview, "Shortlist", "")).length}</strong>
         <a className="text-link" onClick={() => rememberReviewPosition(listScroller(), "", picked)} href={reviewLink("/selection-review", {scope, disposition:"Shortlist"}, origin)}>Review shortlisted sites</a></div>}
-      {signedIn && <><div><span>Cost per charge</span>{coverageLinks(["priced","conditional","scenario","pending"])}</div>
+      {signedIn && <><div><span>Cost per charge · base to +50% utility</span>{coverageLinks(["parity","priced","conditional","scenario","pending"])}</div>
         <div><span>Charging layouts</span>{coverageLinks(["positive","zero","unmeasured"])}</div></>}
     </ShortlistSummary>
   );
@@ -668,10 +674,10 @@ export default function PipelineList({
               tone: stageTone(row.deal),
               facts: phoneFacts(row, signedIn),
               actionLabel: signedIn && row.deal.opportunityReview ? "Review priority" : undefined,
-              action: signedIn ? (row.deal.opportunityReview ? recommendation(row.deal.opportunityReview.primary) : plainNextStep(row.deal.next_step || "").line || undefined) : undefined,
+              action: signedIn && row.deal.opportunityReview ? cell(row, "priority", true) : undefined,
               measures: signedIn && row.deal.kind === "pipeline" ? [
-                ...(row.deal.opportunityReview ? [["Next decision", nextDecision(row.deal.opportunityReview)] as [string, string]] : []),
-                ["Charging spaces", cell(row, "spaces", true)], ["Cost per charge", [cell(row, "chargeCost", true), row.screen && proxyReading(row.screen)].filter(Boolean).join(" · ")],
+                ["Charging spaces", listSpace(row.deal.chargingSpace, row.deal.charging, row.screen?.estimate).value],
+                ["Cost per charge", row.screen ? [row.screen.cost.value, listCostLabel(row.screen, row.deal.charging)].filter(Boolean).join(" · ") : "Not estimated"],
               ] : undefined,
               chips: (() => {
                 if (row.deal.kind === "land") return <LandPausedChip />;
@@ -711,16 +717,21 @@ export default function PipelineList({
         ) : null}
         renderCell={(row, column) => {
           const id = row.deal.deal_id;
-          if (column === "priority" && row.deal.opportunityReview) return <span className="pipeline-measure"><strong>{recommendation(row.deal.opportunityReview.primary)}</strong><small>{nextDecision(row.deal.opportunityReview)}</small></span>;
+          if (column === "priority") return <strong>{cell(row, "priority", signedIn)}</strong>;
           if (column === "spaces" || column === "chargeCost") {
             if (!signedIn || row.deal.kind === "land") return "—";
-            const cost = column === "chargeCost";
-            const fact = cost ? row.screen?.cost : listSpace(row.deal.chargingSpace,row.deal.charging);
-            return <span className="pipeline-measure">{cost && row.screen?.group === "scenario" && <strong className="pipeline-what-if">What-if estimate</strong>}{cost && row.deal.charging
-              ? row.screen?.estimate ? <button type="button" className="text-link" onClick={ev=>{ev.stopPropagation();setCostPanel(id);}}>{fact?.value}</button>
-                : <ChargingLink site={id} revision={row.deal.charging.selected}>{fact?.value}</ChargingLink>
-              : <strong>{fact?.value || "No layout estimate"}</strong>}
-              {fact?.basis && <small>{fact.basis}</small>}{cost && row.screen && proxyReading(row.screen) && <small className="proxy-reading">{proxyReading(row.screen)}</small>}</span>;
+            if (column === "spaces") {
+              const space = listSpace(row.deal.chargingSpace, row.deal.charging, row.screen?.estimate);
+              return <strong title={space.basis}>{space.value}</strong>;
+            }
+            const screen = row.screen;
+            if (!screen) return "—";
+            const label = listCostLabel(screen, row.deal.charging);
+            return <span className="pipeline-measure">
+              {screen.estimate ? <button type="button" className="text-link" onClick={ev=>{ev.stopPropagation();setCostPanel(id);}}>{screen.cost.value}</button>
+                : row.deal.charging ? <ChargingLink site={id} revision={row.deal.charging.selected}>{screen.cost.value}</ChargingLink> : screen.cost.value}
+              {label && <small>{label}</small>}
+            </span>;
           }
           if (column === "openLand") return <NumberCell label={cell(row, "openLand", signedIn)} value={openLandMeasured(row.deal.open_land_sqft, row.deal.open_land_basis) ? row.deal.open_land_sqft : null} stats={strips.openLand} direction="higher" format={openLandText} />;
           if (column === "asking") return <AskingCell deal={row.deal} stats={strips.asking} onBroker={onBroker} signedIn={signedIn} />;
@@ -782,11 +793,11 @@ export default function PipelineList({
                   {cell(row, "site", signedIn)}
                   {row.noPin ? <span className="no-pin"> No pin</span> : null}
                 </span>
-                {signedIn && onFinancials && row.deal.kind==="pipeline" && <button type="button" className="text-link" onClick={e=>{e.stopPropagation();onFinancials(id);}}>Financials</button>}
                 <span className="site-meta">
                   {displayAddress(row.deal.address) && displayAddress(row.deal.address) !== String(row.deal.name || "").trim() ? (
                     <span className="site-address" title={displayAddress(row.deal.address)}>{displayAddress(row.deal.address)}</span>
                   ) : <span className="site-address" />}
+                  {signedIn && onFinancials && row.deal.kind==="pipeline" && <button type="button" className="text-link" onClick={e=>{e.stopPropagation();onFinancials(id);}}>Financials</button>}
                   <NearMark deal={row.deal} />
                   {signedIn ? (() => {
                     const drop = dealChips(row.deal, signedIn).find((chip) => chip.family === "drop_reason") || suggestedDropChip(String(row.deal.suggested_drop || ""));

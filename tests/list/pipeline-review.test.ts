@@ -15,7 +15,7 @@ test("old column layouts acquire the decision columns once and retain the remain
   assert.deepEqual(layout.order.slice(0,4), ["site","priority","spaces","chargeCost"]);
   assert.equal(layout.widths.asking,400);
   assert.deepEqual(layout.filters,{asking:"test"});
-  assert.deepEqual(layout.sort,{id:"priority",desc:false});
+  assert.deepEqual(layout.sort,{id:"chargeCost",desc:false});
   for (const id of ["county","score","openLand"]) assert.ok(layout.hidden.includes(id));
   assert.deepEqual(sanitizeLayout(layout,ids),layout);
   assert.deepEqual(defaultColumnIds().slice(0,4), ["site","priority","spaces","chargeCost"]);

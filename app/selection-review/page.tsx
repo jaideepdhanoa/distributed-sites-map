@@ -75,6 +75,7 @@ function SelectionList() {
     (!params.get("charging") || r.charging?.merit.action===params.get("charging"))).sort((a,b)=>{
       if(investment)return a.city.localeCompare(b.city) || sequence.get(a.id)!.rank-sequence.get(b.id)!.rank;
       const priority = order === "attention" ? compareAttention(match(a.review),match(b.review)) :
+        order === "baseCost" ? (pipelineCost(a.charging).amount ?? Infinity) - (pipelineCost(b.charging).amount ?? Infinity) :
         order === "earlier" ? (b.charging?.result.earlyMin??-1)-(a.charging?.result.earlyMin??-1) : 0;
       return priority || (scope && order !== "market" ? scope.get(a.id)! - scope.get(b.id)! : 0) || (order === "attention" ? diligenceOrder(a.charging?.merit,b.charging?.merit) : 0) || a.city.localeCompare(b.city) || a.name.localeCompare(b.name);
     });
@@ -123,8 +124,8 @@ function SelectionList() {
       <label>Screening check<select aria-label="Next check" className="secondary" value={check} onChange={e=>setReviewFilter("check",e.target.value)}><option value="">All checks</option>{[...new Set(rows.map(r=>r.priority))].sort().map(c=><option key={c}>{c}</option>)}</select></label>
       <label>Charging decision<select className="secondary" value={params.get("charging")||""} onChange={e=>setReviewFilter("charging",e.target.value)}>
         <option value="">All decisions</option>{[...new Set(rows.flatMap(r=>r.charging?[r.charging.merit.action]:[]))].sort().map(s=><option key={s}>{s}</option>)}</select></label>
-      <label>Moove-staffed downside at parity<select className="secondary" value={params.get("stalls")||""} onChange={e=>setReviewFilter("stalls",e.target.value)}><option value="">Any stall count</option>{[...new Set(rows.flatMap(r=>r.chargingSpace?.layouts?.map(l=>l.stalls)??[]))].sort((a,b)=>a-b).map(n=><option value={n} key={n}>{n} assessed stalls</option>)}</select></label>
-      <label>Order<select aria-label="Order" className="secondary" value={params.get("sort")||""} onChange={e=>setReviewFilter("sort",e.target.value)}><option value="">Diligence priority</option>{rows.some(r=>r.financeVisible) && <option value="investment">Investment sequence by market</option>}<option value="market">Market and site</option><option value="earlier">Earlier usable charges</option></select></label>
+      <label>Drawn stall count<select className="secondary" value={params.get("stalls")||""} onChange={e=>setReviewFilter("stalls",e.target.value)}><option value="">Any stall count</option>{[...new Set(rows.flatMap(r=>r.chargingSpace?.layouts?.map(l=>l.stalls)??[]))].sort((a,b)=>a-b).map(n=><option value={n} key={n}>{n} assessed stalls</option>)}</select></label>
+      <label>Order<select aria-label="Order" className="secondary" value={params.get("sort")||""} onChange={e=>setReviewFilter("sort",e.target.value)}><option value="">Diligence priority</option>{rows.some(r=>r.financeVisible) && <option value="baseCost">Lowest base cost per charge</option>}{rows.some(r=>r.financeVisible) && <option value="investment">Investment sequence by market</option>}<option value="market">Market and site</option><option value="earlier">Earlier usable charges</option></select></label>
       </div>
     </details>
     </div>

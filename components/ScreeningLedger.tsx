@@ -140,7 +140,7 @@ export function ScreeningLedger({bases,initialIndex,excluded,saveContext,initial
       <p>{amounts(r.annualCost)} annual net cost ÷ {count(r.sessions)} annual charges{priced && base.perCharge!=null && custom?" · "+delta(displayedPriceDelta(r.perCharge!,base.perCharge))+" vs starting estimate":""}</p>
       <small>Electricity and utility demand charges excluded</small></div>
     {!!basis.allocationNeeded?.length && <p>Enter the amounts for the retained areas: {basis.allocationNeeded.map(k=>ledgerFields[k]).join(", ")}.</p>}
-    {v.stalls>20 && <p>Above the 20-stall costing assumption. Verify site-specific build and utility costs.</p>}
+    {v.stalls>20 && <p>Verify construction and utility costs for this larger layout.</p>}
     {initial && !basis.siteDrivers && <p>Historical case · original utilization of {num(v.volume)}% of the workbook benchmark.</p>}
     <section className="layout-ledger" aria-label="Stall configuration"><h3>Stall configuration</h3>
       <p className="layout-legend">Cost per charge with an upfront utility upgrade of <b>{amounts(r.upgrade)}</b>{!initial && r.upgrade>0 && <> → <b>{amounts(higherUpgrades[index].upgrade)}</b> (+50%)</>}</p>

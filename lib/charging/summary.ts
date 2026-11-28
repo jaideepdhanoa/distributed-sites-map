@@ -10,7 +10,7 @@ export type ChargingSummary = {selectedMix?:string;selectedStalls?:number|null;s
 export function summarize(deal:DealProps,sourceRevision:string,active?:SavedCase, assumptions: PurchaseAssumptions | undefined = deal.purchase?.assumptions):ChargingSummary {
   const stale=!!active && (active.sourceRevision!==sourceRevision || active.model!==modelVersion);
   const preliminary=active && !stale && verifiedZeroFit(active.inputs)
-    ? {reason:"Verified site-wide zero capacity. Submit the documented finding for drop approval."}
+    ? {reason:"No charging stalls fit the verified site-wide review. Submit the finding for drop approval."}
     : preliminaryCost(deal,assumptions,stale ? undefined : active?.inputs);
   const inputs=active?.inputs ?? initialCase(deal,"layouts" in preliminary ? preliminary.layouts[0] : undefined);
   const a=deal.purchase?.assumptions;

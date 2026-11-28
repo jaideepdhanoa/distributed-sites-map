@@ -193,7 +193,7 @@ test("service diligence stays outside the default pipeline count and remains sel
   await page.route("**/api/data/deals",route=>route.fulfill({json:{type:"FeatureCollection",
     features:sites.map((s,i)=>({type:"Feature",geometry:{type:"Point",coordinates:[-112,33.4]},properties:{
       deal_id:s.id,kind:"pipeline",city:"PHX",name:s.name,stage:"Financial screen",stage_group:"financial",
-      business_type:"Car Wash",service_area_class:"Inside",pipelineTrack:i?"service":"charging"}}))}}));
+      business_type:i?"Car Wash":"Convenience store",is_c_store:!i,service_area_class:"Inside",pipelineTrack:i?"service":"charging"}}))}}));
   await page.goto("/?city=PHX&funnel=pipeline&view=list&pstage=all");
   await expect(page.locator(".shell")).toHaveAttribute("data-list-count","1");
   const scope=page.locator(".workspace-scope:visible").first();

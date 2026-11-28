@@ -186,7 +186,7 @@ function placed(deal: Feature<Deal>, sites: Map<string, Feature<Site>>) {
 }
 
 function categoryChoice(options: { cstore?: boolean; land?: boolean; auto?: boolean; wash?: boolean } = {}): Categories {
-  const categories = { ...defaultCategories(), land: Boolean(options.land), store: Boolean(options.cstore) };
+  const categories = { ...defaultCategories(), land: Boolean(options.land), store: options.cstore ?? true };
   if (options.auto !== undefined) categories.auto = options.auto;
   if (options.wash !== undefined) categories.wash = options.wash;
   return categories;

@@ -96,7 +96,7 @@ export const CATEGORY_NOTES = {
   lube: "Quick lube sites. On with car washes.",
   auto: "Auto repair and tire. An auto center belongs here once it is typed Auto repair.",
   land: "Vacant parcels, such as LAND-PHX. Not spare land on a wash.",
-  store: "Fuel and convenience stores. Off until you turn them on.",
+  store: "Fuel and convenience stores. Included in the live charging pipeline.",
 } as const;
 
 export const UNSCREENED_LISTINGS_LABEL = "Unscreened market listings";
@@ -167,7 +167,7 @@ export const LAYER_TITLES = {
   universe: "Universe sites. The car-wash census for this market.",
   pipeline: "Pipeline deals.",
   land: "Vacant land parcels, such as LAND-PHX. Off until the Land category is on. A chosen stage then includes the parcels at that stage.",
-  cstore: "Fuel and convenience stores. Off until the C-stores category is on.",
+  cstore: "Fuel and convenience stores in the selected categories.",
   dropped: "Deals that are no longer being pursued.",
   unscreened: UNSCREENED_LISTINGS_NOTE,
   traffic: "Workbook traffic count on each pin.",

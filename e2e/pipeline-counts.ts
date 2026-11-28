@@ -27,7 +27,7 @@ export function cityPipelineCounts(city = "PHX", options: { cstore?: boolean; la
   const data = JSON.parse(readFileSync("data/generated/deals.geojson", "utf8")) as {
     features: { properties: DealProps }[];
   };
-  const categories: Categories = { ...defaultCategories(), land: Boolean(options.land), store: Boolean(options.cstore) };
+  const categories: Categories = { ...defaultCategories(), land: Boolean(options.land), store: options.cstore ?? true };
   if (options.auto !== undefined) categories.auto = options.auto;
   if (options.wash !== undefined) categories.wash = options.wash;
   const cityRows = data.features.map((feature) => feature.properties).filter((deal) => deal.city === city && !isProtectedId(deal.deal_id));

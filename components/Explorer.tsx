@@ -396,13 +396,16 @@ export default function Explorer() {
   const verdict = params.get("verdict") || "any";
   const listed = params.get("listed") || "any";
   const landSites = params.get("land") === "1";
+  const [funnelPref, setFunnelPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
+  const funnel = resolveFunnelMode(params.get("funnel"), funnelPref);
+  const includeStores = funnel === "pipeline" && !["service","filed"].includes(params.get("track") ?? "");
   const categories = parseCategories({
     cats: params.get("cats"),
     landlayer: params.get("landlayer"),
     cstore: params.get("cstore"),
-  });
+  }, includeStores);
   const categoriesRef = useRef(categories);
-  const categoryKey = `${params.get("cats") || ""}|${params.get("landlayer") || ""}|${params.get("cstore") || ""}`;
+  const categoryKey = `${includeStores}|${params.get("cats") || ""}|${params.get("landlayer") || ""}|${params.get("cstore") || ""}`;
   const categoryKeyRef = useRef(categoryKey);
   if (categoryKeyRef.current !== categoryKey) {
     categoryKeyRef.current = categoryKey;
@@ -419,8 +422,6 @@ export default function Explorer() {
   useEffect(() => { setGridFocusId(null); }, [selected, powerMode, selectedMarket]);
   const query = params.get("q") || "";
   const who = params.get("who") || "";
-  const [funnelPref, setFunnelPref] = useState<{ version: string | null; value: string | null }>({ version: null, value: null });
-  const funnel = resolveFunnelMode(params.get("funnel"), funnelPref);
   const showUniverse = funnel === "universe" || pinsOn;
   const showPipeline = funnel === "pipeline" || dealsOn;
   const extraParam = params.get("extra");
@@ -1140,7 +1141,7 @@ export default function Explorer() {
   function setCategory(id: CategoryId, on: boolean) {
     const next = { ...categoriesRef.current, [id]: on };
     categoriesRef.current = next;
-    write(categorySearch(next));
+    write(categorySearch(next, includeStores));
   }
 
   useEffect(() => {
@@ -2024,7 +2025,7 @@ export default function Explorer() {
   if (!categories.lube) activeFilters.push({ id: "lube", label: "Quick lube off", clear: () => setCategory("lube", true) });
   if (!categories.auto) activeFilters.push({ id: "auto", label: "Auto service off", clear: () => setCategory("auto", true) });
   if (categories.land) activeFilters.push({ id: "landcat", label: "Land", clear: () => setCategory("land", false) });
-  if (categories.store) activeFilters.push({ id: "store", label: "C-stores", clear: () => setCategory("store", false) });
+  if (categories.store !== includeStores) activeFilters.push({ id: "store", label: categories.store ? "C-stores" : "C-stores off", clear: () => setCategory("store", includeStores) });
   if (reach !== "within10") activeFilters.push({ id: "reach", label: reachLabel(reach), clear: () => write({ reach: null }) });
   if (pickedIds.length) activeFilters.push({ id: "pick", label: `${pickedIds.length.toLocaleString()} selected`, clear: () => write({ pick: null }) });
   if (landTier !== "any") activeFilters.push({ id: "tier", label: tierLabel(landTier) || "Spare land", clear: () => write({ tier: null }) });

@@ -259,7 +259,7 @@ for (const city of CITIES) {
       await expect(page.locator(".map[data-deal-markers='square']"), "deal marker").toBeAttached();
     }
 
-    const withLand = expectedSquares(catalog, city, "desk", { land: true });
+    const withLand = expectedSquares(catalog, city, "desk", { land: true, cstore: false });
     await go(page, `${cityQuery}funnel=pipeline&tab=pipeline&pstage=desk&cats=wash|lube|auto|land`);
     await page.waitForFunction(
       (count) => (((window as unknown as { __src?: { deals?: unknown[] } }).__src?.deals) || []).length === count,
@@ -267,7 +267,7 @@ for (const city of CITIES) {
       { timeout: 20_000 },
     );
     same(`${city} pipeline land`, (await source(page, "deals")).map((pin) => pin.id), withLand);
-    expect((await badge(page, PIPE_LABEL.desk)).shown).toBe(expectedStageTotal(catalog, city, "desk", { land: true }));
+    expect((await badge(page, PIPE_LABEL.desk)).shown).toBe(expectedStageTotal(catalog, city, "desk", { land: true, cstore: false }));
     await expect(page.locator(".funnel .step").filter({ hasText: PIPE_LABEL.desk }).first()).not.toContainText(" land");
   });
 }

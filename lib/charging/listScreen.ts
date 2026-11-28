@@ -17,9 +17,9 @@ export function listScreen(d: DealProps, assumptions = defaultListAssumptions) {
   const originalGroup = original.amount == null ? "pending" : "priced";
   const result = (cost:typeof original, group:string, estimate?:PreliminaryCost, proxy?:number|null) =>
     ({cost, group, estimate, proxy});
-  if (!c || c.stale || (c.selected && c.result.siteCost != null)) return result(original, originalGroup, c && !c.stale && c.result.siteCost == null ? c.preliminary : undefined);
+  const assessed = c?.preliminary && "layouts" in c.preliminary;
+  if (!c || (c.stale && !assessed) || (!c.stale && c.selected && c.result.siteCost != null)) return result(original, originalGroup, c && !c.stale && c.result.siteCost == null ? c.preliminary : undefined);
   const a = d.purchase?.assumptions ?? c.screenAssumptions;
-  const assessed = c.preliminary && "layouts" in c.preliminary;
   if (!a) return result(original, originalGroup, assessed ? c.preliminary : undefined);
   if(!assessed && !assumptions.assumeFit) return result(original,originalGroup);
   const custom = hasListChanges(assumptions, false);
@@ -28,7 +28,7 @@ export function listScreen(d: DealProps, assumptions = defaultListAssumptions) {
   if (!("layouts" in estimate)) return result(original, originalGroup);
   const layout = estimate.layouts[0];
   const proxy = a.hub != null && a.charging?.charges ? a.hub / a.charging.charges : null;
-  const detail = assessed ? (custom ? "Trial" : "Preliminary") + " · " + layout.stalls + " spaces · " + layout.condition
+  const detail = assessed ? (custom ? "Trial" : c.stale ? "System estimate · selected case needs recalculation" : "Preliminary") + " · " + layout.stalls + " spaces · " + layout.condition
     : "If " + layout.stalls + " spaces fit · " + estimate.priceBasis + (c.selected ? " · selected case incomplete" : "");
   return result({amount:layout.base.perCharge, value:costRange(layout), basis:detail + " · excludes electricity"}, assessed ? "priced" : "scenario", estimate, proxy);
 }

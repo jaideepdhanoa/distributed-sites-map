@@ -480,9 +480,9 @@ test("an approved stage move shows on the open card without a reload", async ({ 
   expect(generatedDeal(id)?.stage).toBe(stored);
 });
 
-test("c-stores stay hidden until the filter is on, and review leads with approvals", async ({ page, request }) => {
+test("an explicit category exclusion hides c-stores until restored, and review leads with approvals", async ({ page, request }) => {
   await mkdir("/opt/cursor/artifacts", { recursive: true });
-  await openAs(page, "reviewer", "/?funnel=pipeline&pstage=desk&view=list");
+  await openAs(page, "reviewer", "/?funnel=pipeline&pstage=desk&view=list&cats=wash%7Clube%7Cauto");
   await expect(page.getByTestId("pipeline-list")).toBeVisible();
   await expect(page.getByTestId("pipeline-list")).not.toContainText("Sinclair");
   await page.getByTestId("scope-search").locator("visible=true").first().click();
@@ -499,7 +499,7 @@ test("c-stores stay hidden until the filter is on, and review leads with approva
   await page.getByRole("button", { name: "Map", exact: true }).click();
   await page.locator("button.tool", { hasText: "Filters" }).click();
   await page.getByTestId("cstore-category").click();
-  await expect(page).toHaveURL(/cats=wash(?:%7C|\|)lube(?:%7C|\|)auto(?:%7C|\|)store/);
+  await expect(page).not.toHaveURL(/[?&]cats=/);
   await page.getByRole("button", { name: "List", exact: true }).click();
   const sinclair = page.getByTestId("pipeline-list").getByText("Sinclair").first();
   await expect(sinclair).toBeVisible();

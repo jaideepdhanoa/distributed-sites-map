@@ -41,13 +41,13 @@ test("auto service is on with car washes, and unscreened listings stay a separat
   await expect(panel.getByTestId("lube-category")).toBeChecked();
   await expect(panel.getByText("Quick lube sites. On with car washes.")).toBeVisible();
   await panel.getByTestId("lube-category").click();
-  await expect(page).toHaveURL(/cats=wash(?:%7C|\|)auto(?:&|$)/);
+  await expect(page).toHaveURL(/cats=wash(?:%7C|\|)auto(?:%7C|\|)store(?:&|$)/);
   await expect(page.locator(".active-row").getByRole("button", { name: "Quick lube off" })).toBeVisible();
   await panel.getByTestId("lube-category").click();
   await expect(page).not.toHaveURL(/[?&]cats=/);
   await expect(panel.getByTestId("auto-category")).toBeChecked();
   await expect(panel.getByTestId("land-category")).not.toBeChecked();
-  await expect(panel.getByTestId("cstore-category")).not.toBeChecked();
+  await expect(panel.getByTestId("cstore-category")).toBeChecked();
   await expect(panel.getByText("Auto repair and tire.")).toBeVisible();
   const listings = panel.getByTestId("unscreened-listings");
   await expect(listings).not.toBeChecked();
@@ -63,7 +63,7 @@ test("auto service is on with car washes, and unscreened listings stay a separat
   await expect(page.locator(".shell")).toHaveAttribute("data-list-count", String(both.deskTotal));
 
   await panel.getByTestId("auto-category").click();
-  await expect(page).toHaveURL(/[?&]cats=wash(?:%7C|\|)lube(?:&|$)/);
+  await expect(page).toHaveURL(/[?&]cats=wash(?:%7C|\|)lube(?:%7C|\|)store(?:&|$)/);
   await expect(page.locator(".shell")).toHaveAttribute("data-list-count", String(washes.deskTotal));
   await expect(page.getByTestId("map-scope")).toContainText(String(washes.deskTotal));
   await expect(list).not.toContainText("Owner-operated repair shop");
@@ -71,7 +71,7 @@ test("auto service is on with car washes, and unscreened listings stay a separat
 
   await panel.getByTestId("wash-category").click();
   await panel.getByTestId("auto-category").click();
-  await expect(page).toHaveURL(/[?&]cats=lube(?:%7C|\|)auto(?:&|$)/);
+  await expect(page).toHaveURL(/[?&]cats=lube(?:%7C|\|)auto(?:%7C|\|)store(?:&|$)/);
   await expect(page.locator(".shell")).toHaveAttribute("data-list-count", String(autos.deskTotal));
   await expect(list).toContainText("Owner-operated repair shop");
   await expect(list).not.toContainText("Majestic Car Wash");

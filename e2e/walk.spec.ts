@@ -63,10 +63,10 @@ test("phone list is one toolbar row of cards and hides search this area", async 
     const sortBox = sort.getBoundingClientRect();
     const overlapX = Math.min(countBox.right, sortBox.right) - Math.max(countBox.left, sortBox.left);
     const overlapY = Math.min(countBox.bottom, sortBox.bottom) - Math.max(countBox.top, sortBox.top);
-    const meta = card.querySelector(".phone-card-meta");
+    const labels = Array.from(card.querySelectorAll(".phone-measure b"), el => el.textContent);
     return {
       missing: false,
-      pieces: Boolean(card.querySelector(".phone-card-name") && meta && meta.querySelectorAll(".phone-fact").length >= 2),
+      pieces: Boolean(card.querySelector(".phone-card-name") && labels.includes("Charging spaces") && labels.includes("Cost per charge")),
       scroll: document.documentElement.scrollWidth - document.documentElement.clientWidth > 1 || bar.scrollWidth - bar.clientWidth > 1,
       overlap: overlapX > 1 && overlapY > 1,
       stacked: countBox.bottom <= sortBox.top + 1,
@@ -94,21 +94,16 @@ test("phone cards keep gaps between the stage and the facts", async ({ page }, i
   await expect(card).toBeVisible();
   await page.locator("[data-testid=phone-cards]").screenshot({ path: "review-shots/mobile-card-gaps.png" });
   const gaps = await card.evaluate((node) => {
-    const stage = node.querySelector(".phone-card-stage") || node.querySelector(".mobile-next-action") || node.querySelector(".phone-card-name");
-    const meta = node.querySelector(".phone-card-meta");
-    const facts = [...node.querySelectorAll(".phone-fact")];
-    const sep = node.querySelector(".phone-sep");
-    if (!stage || !meta || facts.length < 2 || !sep) return null;
-    const stageBox = stage.getBoundingClientRect();
-    const metaBox = meta.getBoundingClientRect();
-    const sepStyle = getComputedStyle(sep);
-    const sepSpace = parseFloat(sepStyle.marginLeft) + parseFloat(sepStyle.marginRight);
+    const [spaces, cost] = node.querySelectorAll(".phone-measure");
+    const preceding = spaces?.previousElementSibling;
+    if (!preceding || !spaces || !cost) return null;
+    const spacesBox = spaces.getBoundingClientRect();
     const summary = document.querySelector("[data-testid=summary-row]");
     const tiles = [...(summary?.querySelectorAll(":scope > div") || [])].map((el) => el.getBoundingClientRect());
     const tops = tiles.map((box) => box.top);
     return {
-      stageGap: metaBox.top - stageBox.bottom,
-      sepSpace,
+      stageGap: spacesBox.top - preceding.getBoundingClientRect().bottom,
+      measureGap: cost.getBoundingClientRect().top - spacesBox.bottom,
       bareMissing: /Not on file/.test(node.textContent || ""),
       summaryHeight: summary?.getBoundingClientRect().height || 0,
       firstCardVisible: node.getBoundingClientRect().bottom <= innerHeight,
@@ -119,7 +114,7 @@ test("phone cards keep gaps between the stage and the facts", async ({ page }, i
   });
   expect(gaps).toBeTruthy();
   expect(gaps?.stageGap).toBeGreaterThanOrEqual(4);
-  expect(gaps?.sepSpace).toBeGreaterThanOrEqual(12);
+  expect(gaps?.measureGap).toBeGreaterThanOrEqual(4);
   expect(gaps?.bareMissing).toBe(false);
   expect(gaps?.clipped).toBe(false);
   expect(gaps?.showsCoverage).toBe(true);

@@ -4644,7 +4644,7 @@ button.mobile-search { white-space: nowrap; overflow: hidden; text-overflow: ell
 
 .pipeline-measure, .evidence-item { display: grid; gap: 3px; }
 .pipeline-measure small, .phone-measure b, .evidence-item b { color: var(--ink-2); font-size: var(--type-cap); }
-.phone-measure { line-height: 1.4; white-space: normal; margin-top: 3px; }
+.phone-measure { line-height: 1.4; white-space: normal; margin-top: 4px; }
 .evidence-item { padding: 4px 10px 4px 0; }
 
 /* Map work panels use their normal layout until the user places them. */

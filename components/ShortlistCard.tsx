@@ -41,7 +41,7 @@ export default function ShortlistCard({ row, review, option, origin }:Props) {
         <div><dt>Higher utility{layout && <> · {compact(layout.downside.upgrade)}</>}</dt><dd>{layout ? amounts(layout.downside.perCharge,2) : "—"}</dd></div>
       </dl>}
     </header>
-    <details className="shortlist-detail"><summary>Site details</summary>
+    <details className="disclosure shortlist-detail"><summary className="disclosure">Site details</summary>
       <p>{offeredTransaction(option, option.route === review.primary.route ? row.research?.scope : undefined)}
         {recordUrl && <> · <a className="text-link" href={recordUrl}>Open site record →</a></>}</p>
     <div className="visit-decision shortlist-visit" aria-label="Visit decision">

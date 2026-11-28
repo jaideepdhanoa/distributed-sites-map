@@ -222,6 +222,7 @@ test("explain a preliminary range with a conditional aisle on desktop and phone"
   await expect(panel.getByLabel("Purchase price ($)",{exact:true})).toHaveValue("90000");
   await expect(panel.getByLabel("Additional works ($)",{exact:true})).toHaveValue("0");
   await panel.getByRole("button",{name:"Reset to starting estimate"}).click();
+  await shared.click();
   await layout.getByLabel("Side parking · 1").uncheck();
   await expect(panel.locator(".screen-result")).toContainText("$9.17");
   await panel.getByLabel("Alternative name").fill("Three-stall trial");

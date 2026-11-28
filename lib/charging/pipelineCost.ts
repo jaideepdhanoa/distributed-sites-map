@@ -27,7 +27,7 @@ export function displayedFit(fit?:PipelineFit, c?:ChargingSummary):PipelineFit|u
   if(c?.selected && !c.stale && c.result.siteCost!=null && c.selectedStalls!=null)
     return {count:c.selectedStalls,value:c.selectedStalls+" spaces",basis:"Selected case · "+c.name+
       (fit ? " · System assessment: "+fit.value : "")};
-  const lead=c && !c.stale && c.preliminary && "layouts" in c.preliminary ? c.preliminary.layouts[0] : null;
+  const lead=c && c.preliminary && "layouts" in c.preliminary ? c.preliminary.layouts[0] : null;
   const conditional=fit?.layouts?.[0];
   if(fit?.count===0 && conditional && conditional.stalls>0)
     return {...fit,count:conditional.stalls,value:"Up to "+conditional.stalls+" spaces",basis:conditional.condition+" · "+fit.value+" inside outline"};
@@ -38,7 +38,7 @@ export function displayedFit(fit?:PipelineFit, c?:ChargingSummary):PipelineFit|u
 
 /** Pin the number being explained even when the selected detailed case is incomplete. */
 export function screenBasis(c?:ChargingSummary) {
-  return c && !c.stale && (!c.selected || c.result.siteCost==null) && c.preliminary && "layouts" in c.preliminary ? "screen" : undefined;
+  return c && (c.stale || !c.selected || c.result.siteCost==null) && c.preliminary && "layouts" in c.preliminary ? "screen" : undefined;
 }
 
 export function displayedDepot(c:ChargingSummary) {
@@ -49,9 +49,9 @@ export function displayedDepot(c:ChargingSummary) {
 
 export function pipelineCost(charging?: ChargingSummary) {
   if (!charging) return { value: "No charging case", basis: "", amount: null };
-  if (charging.stale) return { value: "Needs recalculation", basis: "Site inputs have changed", amount: null };
+  if (charging.stale && !screenBasis(charging)) return { value: "Needs recalculation", basis: "Site inputs have changed", amount: null };
   const amount = charging.result.siteCost;
-  if (amount != null && (charging.selected || !charging.preliminary)) {
+  if (!charging.stale && amount != null && (charging.selected || !charging.preliminary)) {
     const scope = charging.energyScope === "excluded" ? " · excludes electricity" : charging.energyScope==="included" ? " · includes electricity" : "";
     return { value: amounts(amount, 2), basis: (charging.selected ? "Selected case" + (charging.selectedStalls != null ? " · " + charging.selectedStalls + " stalls" : "") : "Planning estimate") + scope, amount };
   }
@@ -59,7 +59,7 @@ export function pipelineCost(charging?: ChargingSummary) {
     if ("layouts" in charging.preliminary) {
       const layout = charging.preliminary.layouts[0];
       return {value:costRange(layout), amount:layout.base.perCharge,
-        basis:"Preliminary · " + layout.stalls + (layout.stalls === 1 ? " space · " : " spaces · ") + layout.condition + " · excludes electricity"};
+        basis:(charging.stale ? "System estimate · selected case needs recalculation · " : "Preliminary · ") + layout.stalls + (layout.stalls === 1 ? " space · " : " spaces · ") + layout.condition + " · excludes electricity"};
     }
     return {value:"Not estimated", basis:charging.preliminary.reason, amount:null};
   }

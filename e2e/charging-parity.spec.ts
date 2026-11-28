@@ -277,7 +277,7 @@ test("open released charging ranges from the Phoenix list",async({page},info)=>{
   for (const d of deals) {
     const c=d!.charging, p=c?.preliminary;
     if (!c) counts.inactiveOrOutsideScope++;
-    else if (c.stale) counts.other++;
+    else if (c.stale && !(p && "layouts" in p)) counts.other++;
     else if (c.result.siteCost!=null || (p && "layouts" in p)) counts.priced++;
     else if (p && "reason" in p && /footprint|layout|spaces fit|measure|image|aisle|parcel|outline|bay/i.test(p.reason)) counts.needsLayout++;
     else if (p && "reason" in p && /terms|rent|available|price|rights|lease|availability/i.test(p.reason)) counts.needsTerms++;

@@ -7,8 +7,8 @@ export type CategoryId = (typeof CATEGORY_IDS)[number];
 export type Categories = Record<CategoryId, boolean>;
 
 /**
- * Car washes, quick lube, and auto service are the working set. Land parcels and
- * c-stores stay off until a link or the Filters panel turns them on.
+ * Explore starts with washes, lube and auto service. The live charging pipeline
+ * includes fuel and convenience stores. Explicit category links win in either view.
  *
  * `cats` is the shareable choice (`cats=wash|lube|auto`). A missing `cats` is car washes,
  * quick lube, and auto service. Older links still opt in: `landlayer=1` turns Land on, and
@@ -20,14 +20,14 @@ export function parseCategories(input: {
   cats?: string | null;
   landlayer?: string | null;
   cstore?: string | null;
-}): Categories {
+}, includeStores = false): Categories {
   if (input.cats == null || input.cats === "") {
     return {
       wash: true,
       lube: true,
       auto: true,
       land: input.landlayer === "1",
-      store: input.cstore === "1",
+      store: includeStores || input.cstore === "1",
     };
   }
   if (input.cats === "none") return { wash: false, lube: false, auto: false, land: false, store: false };
@@ -41,21 +41,21 @@ export function parseCategories(input: {
   };
 }
 
-export function defaultCategories(): Categories {
-  return { wash: true, lube: true, auto: true, land: false, store: false };
+export function defaultCategories(includeStores = false): Categories {
+  return { wash: true, lube: true, auto: true, land: false, store: includeStores };
 }
 
 /** Null when the choice is the default, so the URL stays clean. `none` means every category is off. */
-export function categoriesParam(value: Categories): string | null {
-  const base = defaultCategories();
+export function categoriesParam(value: Categories, includeStores = false): string | null {
+  const base = defaultCategories(includeStores);
   if (CATEGORY_IDS.every((id) => value[id] === base[id])) return null;
   const on = CATEGORY_IDS.filter((id) => value[id]);
   return on.length ? on.join("|") : "none";
 }
 
 /** One write clears the legacy land and c-store params so the URL has a single source. */
-export function categorySearch(next: Categories): Record<string, string | null> {
-  return { cats: categoriesParam(next), landlayer: null, cstore: null };
+export function categorySearch(next: Categories, includeStores = false): Record<string, string | null> {
+  return { cats: categoriesParam(next, includeStores), landlayer: null, cstore: null };
 }
 
 export type LandLinks = { dealIds: Set<string>; siteIds: Set<string> };

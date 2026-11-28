@@ -49,7 +49,7 @@ function SelectionList() {
   const rows=(data?.rows || []).filter(row=>{
     const category=row.pipelineTrack ?? pipelineTrack(row.review?.primary.disposition);
     if(category==="service" || serviceView) return serviceView && category==="service";
-    return category==="charging" || Boolean(explicitDecision || explicitRoute);
+    return category==="charging" || (explicitDecision!=="Shortlist" && Boolean(explicitDecision || explicitRoute));
   });
   const candidates=rows.map(r=>({id:r.id,city:r.city,merit:r.charging?.merit}));
   const sequence=marketSequence(candidates);

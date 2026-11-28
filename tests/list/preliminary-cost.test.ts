@@ -23,7 +23,10 @@ test("site range reconciles separate site costs and scaled completed charges", (
   assert.deepEqual(layout.downside,{sessions:4000,upgrade:30000,annualCost:41700,perCharge:10.425});
   const summary = {result:{siteCost:null},screen:[],preliminary:estimate} as unknown as ChargingSummary;
   assert.equal(pipelineCost(summary).value,costRange(layout));
-  assert.equal(pipelineCost({...summary,stale:true}).amount,null);
+  const staleSaved={...summary,selected:"saved:1",stale:true,result:{...summary.result,siteCost:4}};
+  assert.equal(pipelineCost(staleSaved).amount,layout.base.perCharge);
+  assert.match(pipelineCost(staleSaved).basis,/selected case needs recalculation/);
+  assert.equal(listScreen({...deal,charging:staleSaved}).cost.value,costRange(layout));
   assert.equal(pipelineCost({...summary,result:{...summary.result,siteCost:4},selected:"selected"}).amount,4);
 });
 

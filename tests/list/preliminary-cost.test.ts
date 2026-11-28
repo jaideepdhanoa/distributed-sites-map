@@ -254,6 +254,10 @@ test("reviewed price and fit tests retain losses and identify availability trigg
   assert.ok("layouts" in priced);
   const {ledger}=priced.layouts[0];
   assert.equal(ledger.inputs.stalls,1);assert.equal(ledger.inputs.cash,-500);
+  const withRecast=preliminaryCost({...site,purchase:{...site.purchase!,inputs:{...site.purchase!.inputs,cash:null,normalized:-800}}},assumptions);
+  assert.ok("layouts" in withRecast);
+  assert.equal(withRecast.layouts[0].ledger.inputs.cash,-800);
+  assert.match(withRecast.layouts[0].ledger.cashBasis,/normalized EBITDA/);
   assert.equal(ledger.source,"https://example.org/terms");
   assert.match(ledger.validation!,/becomes available.*opening.*sale terms/);
   assert.ok("reason" in preliminaryCost({...site,opportunityReview:{...site.opportunityReview!,primary:{...site.opportunityReview!.primary,disposition:"Service diligence"}}},assumptions));

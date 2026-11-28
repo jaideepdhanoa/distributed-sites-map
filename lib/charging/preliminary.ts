@@ -68,14 +68,16 @@ function costCase(d: DealProps, a?: PurchaseAssumptions, selected?: ScreenTenure
     c.perCharger == null || c.tax == null) return {reason:"The workbook charging and cost assumptions are incomplete"};
 
   // Use retained business cash only for an operating purchase. A missing figure earns no credit.
-  const retained = !lease && option?.route !== "Property only" && !/^no$/i.test(w?.open ?? "") ? w?.cash : null;
-  const credited = planning ? Math.min(0, retained ?? 0) : filed && option?.route !== "Property only" && !/^no$/i.test(w?.open ?? "") ? filed.cash : retained;
+  const operatingPurchase = !lease && option?.route !== "Property only" && !/^no$/i.test(w?.open ?? "");
+  const retained = operatingPurchase ? w?.cash : null;
+  const lossProxy = planning && operatingPurchase && retained == null && w?.normalized != null && w.normalized<0 ? w.normalized : undefined;
+  const credited = planning ? Math.min(0, retained ?? lossProxy ?? 0) : filed && option?.route !== "Property only" && !/^no$/i.test(w?.open ?? "") ? filed.cash : retained;
   // Removing credit for positive earnings must preserve any operating loss.
   const cash = trial?.assumptions.creditCash === false ? Math.min(0, credited ?? 0) : credited ?? 0;
   const upgrade = trial?.assumptions.upgrade ?? c.upgrade;
   const terms=lease ? "lease" : "purchase";
   const priceBasis=planning?.label ?? (filed ? "Filed test price · confirm the offering" : lease ? "Selected charging lease" : research?.basis || "Workbook property ask");
-  const cashBasis=planning ? (credited && credited<0 ? "Recorded operating loss included" : "No positive business income credited pending validation") : trial?.assumptions.creditCash===false && (credited??0)>0 ? "Credit removed in list trial" : credited==null ? "No business income credited" : filed ? "Retained cash in filed test" : "Workbook retained annual cash";
+  const cashBasis=lossProxy!=null ? "Negative normalized EBITDA used as a proxy until operating cash is verified" : planning ? (credited && credited<0 ? "Recorded operating loss included" : "No positive business income credited pending validation") : trial?.assumptions.creditCash===false && (credited??0)>0 ? "Credit removed in list trial" : credited==null ? "No business income credited" : filed ? "Retained cash in filed test" : "Workbook retained annual cash";
   const space=fit?.value ?? "unmeasured";
   const costed: LayoutCost[] = [];
   for (const layout of layouts) {
